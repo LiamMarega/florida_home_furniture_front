@@ -1,9 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Star, Quote } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 import { fadeInUp, staggerContainer, staggerItem } from '@/lib/animations';
 import { useScrollAnimation } from '@/hooks/use-scroll-animation';
 
@@ -18,25 +16,72 @@ interface Review {
   verified_purchase: boolean;
 }
 
+const staticReviews: Review[] = [
+  {
+    id: '1',
+    customer_name: 'Sarah Mitchell',
+    customer_avatar: null,
+    customer_location: 'London, UK',
+    rating: 5,
+    title: 'Exceptional Quality',
+    comment: 'The craftsmanship on my dining table is outstanding. Every detail shows the care and attention put into creating this beautiful piece.',
+    verified_purchase: true,
+  },
+  {
+    id: '2',
+    customer_name: 'James Patterson',
+    customer_avatar: null,
+    customer_location: 'Manchester, UK',
+    rating: 5,
+    title: 'Perfect for Our Living Room',
+    comment: 'We absolutely love our new sofa! The comfort level is incredible and it fits perfectly with our interior design.',
+    verified_purchase: true,
+  },
+  {
+    id: '3',
+    customer_name: 'Emily Thompson',
+    customer_avatar: null,
+    customer_location: 'Birmingham, UK',
+    rating: 5,
+    title: 'Worth Every Penny',
+    comment: 'Initially hesitant about the price, but the quality and durability make it a worthwhile investment. Best furniture purchase we\'ve made!',
+    verified_purchase: true,
+  },
+  {
+    id: '4',
+    customer_name: 'Michael Brown',
+    customer_avatar: null,
+    customer_location: 'Edinburgh, UK',
+    rating: 4,
+    title: 'Beautiful Design',
+    comment: 'The minimalist design of our new cabinet fits perfectly in our home. Excellent storage space and looks amazing.',
+    verified_purchase: true,
+  },
+  {
+    id: '5',
+    customer_name: 'Lisa Anderson',
+    customer_avatar: null,
+    customer_location: 'Bristol, UK',
+    rating: 5,
+    title: 'Exceeded Expectations',
+    comment: 'From ordering to delivery, everything was smooth. The chairs are even more beautiful in person than in the photos!',
+    verified_purchase: true,
+  },
+  {
+    id: '6',
+    customer_name: 'David Wilson',
+    customer_avatar: null,
+    customer_location: 'Leeds, UK',
+    rating: 5,
+    title: 'Outstanding Service',
+    comment: 'Not only is the furniture top-notch, but the customer service was exceptional. They helped us choose the perfect pieces for our space.',
+    verified_purchase: true,
+  },
+];
+
 export function TestimonialsSection() {
-  const [reviews, setReviews] = useState<Review[]>([]);
   const { ref, isVisible } = useScrollAnimation();
-
-  useEffect(() => {
-    async function loadReviews() {
-      const { data } = await supabase
-        .from('reviews')
-        .select('*')
-        .order('helpful_count', { ascending: false })
-        .limit(6);
-
-      if (data) {
-        setReviews(data);
-      }
-    }
-
-    loadReviews();
-  }, []);
+  const reviews = staticReviews;
 
   return (
     <section ref={ref} className="py-20 bg-gradient-to-b from-white to-orange-50/30">

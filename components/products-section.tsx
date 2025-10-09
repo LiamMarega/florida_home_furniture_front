@@ -1,8 +1,42 @@
 'use client';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { products } from '@/lib/data';
 import { ProductCard } from './ui/product-card';
+
+const products = [
+  {
+    id: '1',
+    title: 'WalnutGrace Chair',
+    subtitle: 'Chair',
+    price: '£450',
+    image: 'https://images.pexels.com/photos/1350789/pexels-photo-1350789.jpeg?auto=compress&cs=tinysrgb&w=600',
+    slug: 'walnutgrace-chair',
+  },
+  {
+    id: '2',
+    title: 'Minimalist Luxe Storage Buffet',
+    subtitle: 'Table',
+    price: '£2350',
+    image: 'https://images.pexels.com/photos/1866149/pexels-photo-1866149.jpeg?auto=compress&cs=tinysrgb&w=600',
+    slug: 'minimalist-luxe-storage-buffet',
+  },
+  {
+    id: '3',
+    title: 'Classic Harmony Sideboard',
+    subtitle: 'Table',
+    price: '£2350',
+    image: 'https://images.pexels.com/photos/6585756/pexels-photo-6585756.jpeg?auto=compress&cs=tinysrgb&w=600',
+    slug: 'classic-harmony-sideboard',
+  },
+  {
+    id: '4',
+    title: 'ChicHaven Couch',
+    subtitle: 'Chair',
+    price: '£1450',
+    image: 'https://images.pexels.com/photos/1866149/pexels-photo-1866149.jpeg?auto=compress&cs=tinysrgb&w=600',
+    slug: 'chichaven-couch',
+  },
+];
 
 export function ProductsSection() {
   return (

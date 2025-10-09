@@ -3,45 +3,69 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Search, SlidersHorizontal, Star, ShoppingCart } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { vendureClient } from '@/lib/vendure-client';
+import { SEARCH_PRODUCTS } from '@/lib/graphql/queries';
 import { staggerContainer, staggerItem } from '@/lib/animations';
 import { useScrollAnimation } from '@/hooks/use-scroll-animation';
 import { useCart } from '@/contexts/cart-context';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { toast } from 'sonner';
+import { SearchResultProduct } from '@/lib/types';
 
-interface Product {
+interface DisplayProduct {
   id: string;
   name: string;
   slug: string;
-  short_description: string;
+  description: string;
   price: number;
-  sale_price: number | null;
-  images: { url: string; alt: string }[];
-  rating: number;
-  review_count: number;
-  stock_count: number;
+  currencyCode: string;
+  imageUrl: string;
+  variantId: string;
+  stockLevel: string;
 }
 
 export function EnhancedProductsGrid() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<DisplayProduct[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<DisplayProduct[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'featured' | 'price-low' | 'price-high' | 'rating'>('featured');
+  const [sortBy, setSortBy] = useState<'featured' | 'price-low' | 'price-high'>('featured');
   const { ref, isVisible } = useScrollAnimation();
   const { addItem } = useCart();
 
   useEffect(() => {
     async function loadProducts() {
-      const { data } = await supabase
-        .from('products')
-        .select('*')
-        .order('featured', { ascending: false });
+      try {
+        const data = await vendureClient.request<{ search: { items: SearchResultProduct[] } }>(
+          SEARCH_PRODUCTS,
+          {
+            input: {
+              term: '',
+              take: 50,
+              groupByProduct: true,
+            },
+          }
+        );
 
-      if (data) {
-        setProducts(data);
-        setFilteredProducts(data);
+        if (data.search.items) {
+          const displayProducts: DisplayProduct[] = data.search.items.map((item) => ({
+            id: item.productId,
+            name: item.productName,
+            slug: item.slug,
+            description: item.description,
+            price: item.priceWithTax.value || item.priceWithTax.min || 0,
+            currencyCode: item.currencyCode,
+            imageUrl: item.productAsset?.preview || 'https://via.placeholder.com/400',
+            variantId: item.productId,
+            stockLevel: 'IN_STOCK',
+          }));
+
+          setProducts(displayProducts);
+          setFilteredProducts(displayProducts);
+        }
+      } catch (error) {
+        console.error('Error loading products:', error);
+        toast.error('Failed to load products');
       }
     }
 
@@ -54,28 +78,29 @@ export function EnhancedProductsGrid() {
     if (searchQuery) {
       filtered = filtered.filter((product) =>
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.short_description?.toLowerCase().includes(searchQuery.toLowerCase())
+        product.description?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
     switch (sortBy) {
       case 'price-low':
-        filtered.sort((a, b) => (a.sale_price || a.price) - (b.sale_price || b.price));
+        filtered.sort((a, b) => a.price - b.price);
         break;
       case 'price-high':
-        filtered.sort((a, b) => (b.sale_price || b.price) - (a.sale_price || a.price));
-        break;
-      case 'rating':
-        filtered.sort((a, b) => b.rating - a.rating);
+        filtered.sort((a, b) => b.price - a.price);
         break;
     }
 
     setFilteredProducts(filtered);
   }, [searchQuery, sortBy, products]);
 
-  const handleAddToCart = async (productId: string, productName: string) => {
-    await addItem(productId);
-    toast.success(`${productName} added to cart!`);
+  const handleAddToCart = async (variantId: string, productName: string) => {
+    try {
+      await addItem(variantId);
+      toast.success(`${productName} added to cart!`);
+    } catch (error) {
+      toast.error('Failed to add item to cart');
+    }
   };
 
   return (
@@ -110,7 +135,6 @@ export function EnhancedProductsGrid() {
                 <option value="featured">Featured</option>
                 <option value="price-low">Price: Low to High</option>
                 <option value="price-high">Price: High to Low</option>
-                <option value="rating">Top Rated</option>
               </select>
 
               <Button variant="outline" className="gap-2">
@@ -133,12 +157,6 @@ export function EnhancedProductsGrid() {
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
           >
             {filteredProducts.map((product) => {
-              const currentPrice = product.sale_price || product.price;
-              const hasDiscount = product.sale_price !== null;
-              const discountPercentage = hasDiscount
-                ? Math.round(((product.price - product.sale_price!) / product.price) * 100)
-                : 0;
-
               return (
                 <motion.div
                   key={product.id}
@@ -147,21 +165,9 @@ export function EnhancedProductsGrid() {
                   className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-300"
                 >
                   <div className="relative aspect-square overflow-hidden bg-gray-100">
-                    {hasDiscount && (
-                      <div className="absolute top-4 left-4 z-10 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold">
-                        -{discountPercentage}%
-                      </div>
-                    )}
-
-                    {product.stock_count < 10 && product.stock_count > 0 && (
-                      <div className="absolute top-4 right-4 z-10 bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold">
-                        Only {product.stock_count} left!
-                      </div>
-                    )}
-
                     <img
-                      src={product.images[0]?.url || 'https://via.placeholder.com/400'}
-                      alt={product.images[0]?.alt || product.name}
+                      src={product.imageUrl}
+                      alt={product.name}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                     />
 
@@ -169,40 +175,25 @@ export function EnhancedProductsGrid() {
                   </div>
 
                   <div className="p-6">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 fill-orange-400 text-orange-400" />
-                        <span className="text-sm font-semibold text-gray-900">
-                          {product.rating.toFixed(1)}
-                        </span>
-                      </div>
-                      <span className="text-sm text-gray-500">({product.review_count})</span>
-                    </div>
-
                     <h3 className="font-bold text-gray-900 text-lg mb-2 line-clamp-1">
                       {product.name}
                     </h3>
 
                     <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                      {product.short_description}
+                      {product.description}
                     </p>
 
                     <div className="flex items-end justify-between">
                       <div>
                         <div className="text-2xl font-bold text-gray-900">
-                          £{currentPrice.toFixed(2)}
+                          {product.currencyCode === 'GBP' ? '£' : '$'}{(product.price / 100).toFixed(2)}
                         </div>
-                        {hasDiscount && (
-                          <div className="text-sm text-gray-500 line-through">
-                            £{product.price.toFixed(2)}
-                          </div>
-                        )}
                       </div>
 
                       <Button
                         size="sm"
-                        onClick={() => handleAddToCart(product.id, product.name)}
-                        disabled={product.stock_count === 0}
+                        onClick={() => handleAddToCart(product.variantId, product.name)}
+                        disabled={product.stockLevel === 'OUT_OF_STOCK'}
                         className="bg-orange-600 hover:bg-orange-700 gap-2"
                       >
                         <ShoppingCart className="w-4 h-4" />

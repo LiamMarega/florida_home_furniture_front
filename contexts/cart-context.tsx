@@ -1,145 +1,112 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
-
-interface CartItem {
-  id: string;
-  product_id: string;
-  quantity: number;
-  product?: {
-    id: string;
-    name: string;
-    price: number;
-    sale_price: number | null;
-    images: { url: string; alt: string }[];
-    slug: string;
-  };
-}
+import { vendureClient } from '@/lib/vendure-client';
+import { GET_ACTIVE_ORDER } from '@/lib/graphql/queries';
+import { ADD_ITEM_TO_ORDER, ADJUST_ORDER_LINE, REMOVE_ORDER_LINE, REMOVE_ALL_ORDER_LINES } from '@/lib/graphql/mutations';
+import { Order, OrderLine } from '@/lib/types';
 
 interface CartContextType {
-  items: CartItem[];
+  items: OrderLine[];
   itemCount: number;
   total: number;
-  addItem: (productId: string, quantity?: number) => Promise<void>;
-  removeItem: (productId: string) => Promise<void>;
-  updateQuantity: (productId: string, quantity: number) => Promise<void>;
+  addItem: (productVariantId: string, quantity?: number) => Promise<void>;
+  removeItem: (orderLineId: string) => Promise<void>;
+  updateQuantity: (orderLineId: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
   isLoading: boolean;
+  order: Order | null;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-function getSessionId() {
-  if (typeof window === 'undefined') return '';
-
-  let sessionId = localStorage.getItem('cart_session_id');
-  if (!sessionId) {
-    sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    localStorage.setItem('cart_session_id', sessionId);
-  }
-  return sessionId;
-}
-
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadCart = useCallback(async () => {
-    const sessionId = getSessionId();
-
-    const { data, error } = await supabase
-      .from('cart_items')
-      .select(`
-        *,
-        product:products(id, name, price, sale_price, images, slug)
-      `)
-      .eq('session_id', sessionId);
-
-    if (!error && data) {
-      setItems(data as CartItem[]);
+    try {
+      const data = await vendureClient.request<{ activeOrder: Order | null }>(GET_ACTIVE_ORDER);
+      setOrder(data.activeOrder);
+    } catch (error) {
+      console.error('Error loading cart:', error);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
   useEffect(() => {
     loadCart();
   }, [loadCart]);
 
-  const addItem = async (productId: string, quantity = 1) => {
-    const sessionId = getSessionId();
+  const addItem = async (productVariantId: string, quantity = 1) => {
+    try {
+      const data = await vendureClient.request<{ addItemToOrder: Order }>(ADD_ITEM_TO_ORDER, {
+        productVariantId,
+        quantity,
+      });
 
-    const existingItem = items.find(item => item.product_id === productId);
-
-    if (existingItem) {
-      await updateQuantity(productId, existingItem.quantity + quantity);
-    } else {
-      const { error } = await supabase
-        .from('cart_items')
-        .insert({
-          session_id: sessionId,
-          product_id: productId,
-          quantity
-        });
-
-      if (!error) {
-        await loadCart();
+      if (data.addItemToOrder) {
+        setOrder(data.addItemToOrder);
       }
+    } catch (error) {
+      console.error('Error adding item to cart:', error);
+      throw error;
     }
   };
 
-  const removeItem = async (productId: string) => {
-    const sessionId = getSessionId();
+  const removeItem = async (orderLineId: string) => {
+    try {
+      const data = await vendureClient.request<{ removeOrderLine: Order }>(REMOVE_ORDER_LINE, {
+        orderLineId,
+      });
 
-    const { error } = await supabase
-      .from('cart_items')
-      .delete()
-      .eq('session_id', sessionId)
-      .eq('product_id', productId);
-
-    if (!error) {
-      await loadCart();
+      if (data.removeOrderLine) {
+        setOrder(data.removeOrderLine);
+      }
+    } catch (error) {
+      console.error('Error removing item from cart:', error);
+      throw error;
     }
   };
 
-  const updateQuantity = async (productId: string, quantity: number) => {
+  const updateQuantity = async (orderLineId: string, quantity: number) => {
     if (quantity <= 0) {
-      await removeItem(productId);
+      await removeItem(orderLineId);
       return;
     }
 
-    const sessionId = getSessionId();
+    try {
+      const data = await vendureClient.request<{ adjustOrderLine: Order }>(ADJUST_ORDER_LINE, {
+        orderLineId,
+        quantity,
+      });
 
-    const { error } = await supabase
-      .from('cart_items')
-      .update({ quantity, updated_at: new Date().toISOString() })
-      .eq('session_id', sessionId)
-      .eq('product_id', productId);
-
-    if (!error) {
-      await loadCart();
+      if (data.adjustOrderLine) {
+        setOrder(data.adjustOrderLine);
+      }
+    } catch (error) {
+      console.error('Error updating quantity:', error);
+      throw error;
     }
   };
 
   const clearCart = async () => {
-    const sessionId = getSessionId();
+    try {
+      const data = await vendureClient.request<{ removeAllOrderLines: Order }>(REMOVE_ALL_ORDER_LINES);
 
-    const { error } = await supabase
-      .from('cart_items')
-      .delete()
-      .eq('session_id', sessionId);
-
-    if (!error) {
-      setItems([]);
+      if (data.removeAllOrderLines) {
+        setOrder(data.removeAllOrderLines);
+      }
+    } catch (error) {
+      console.error('Error clearing cart:', error);
+      throw error;
     }
   };
 
+  const items = order?.lines || [];
   const itemCount = items.reduce((total, item) => total + item.quantity, 0);
-
-  const total = items.reduce((sum, item) => {
-    const price = item.product?.sale_price ?? item.product?.price ?? 0;
-    return sum + (price * item.quantity);
-  }, 0);
+  const total = order?.totalWithTax || 0;
 
   return (
     <CartContext.Provider
@@ -151,7 +118,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         removeItem,
         updateQuantity,
         clearCart,
-        isLoading
+        isLoading,
+        order
       }}
     >
       {children}

@@ -2,13 +2,47 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { collections } from '@/lib/data';
+
+const collections = [
+  {
+    id: 'beds',
+    name: 'Our Beds Collection: Your Sleep Space with Comfort and Style',
+    image: 'https://images.pexels.com/photos/1454806/pexels-photo-1454806.jpeg?auto=compress&cs=tinysrgb&w=800',
+    slug: 'beds',
+    colSpan: 3,
+    rowSpan: 2,
+  },
+  {
+    id: 'sofas',
+    name: 'Browse Our Sofas Collection',
+    image: 'https://images.pexels.com/photos/1648768/pexels-photo-1648768.jpeg?auto=compress&cs=tinysrgb&w=800',
+    slug: 'sofas',
+    colSpan: 3,
+    rowSpan: 2,
+  },
+  {
+    id: 'tables',
+    name: 'Our Tables Collection',
+    image: 'https://images.pexels.com/photos/1866149/pexels-photo-1866149.jpeg?auto=compress&cs=tinysrgb&w=800',
+    slug: 'tables',
+    colSpan: 3,
+    rowSpan: 1,
+  },
+  {
+    id: 'all',
+    name: 'See All Collection →',
+    image: 'https://images.pexels.com/photos/1457842/pexels-photo-1457842.jpeg?auto=compress&cs=tinysrgb&w=800',
+    slug: 'all',
+    colSpan: 3,
+    rowSpan: 1,
+  },
+];
 
 export function CollectionsBento() {
   return (
     <section className="mt-8">
       <div className="grid grid-cols-1 md:grid-cols-6 gap-5">
-        {collections.map((collection, index) => {
+        {collections.map((collection) => {
           const isLarge = collection.rowSpan === 2;
           const gridClasses = isLarge
             ? 'md:col-span-3 md:row-span-2 h-[400px] md:h-[500px]'
@@ -22,14 +56,14 @@ export function CollectionsBento() {
             >
               <Image
                 src={collection.image}
-                alt={collection.title}
+                alt={collection.name}
                 fill
                 className="object-cover"
                 sizes="(min-width: 768px) 50vw, 100vw"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-black/20" />
               <h3 className="absolute left-5 bottom-4 text-white text-[16px] md:text-[18px] font-semibold drop-shadow-lg max-w-[280px]">
-                {collection.title}
+                {collection.name}
               </h3>
             </Link>
           );
