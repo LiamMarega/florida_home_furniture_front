@@ -69,6 +69,16 @@ export const ORDER_LINE_FRAGMENT = gql`
   }
 `;
 
+export const SEARCH_RESULT_ASSET_FRAGMENT = gql`
+  fragment SearchResultAsset on SearchResultAsset {
+    id
+    preview
+    source
+    width
+    height
+  }
+`;
+
 export const ORDER_FRAGMENT = gql`
   ${ORDER_LINE_FRAGMENT}
   fragment Order on Order {

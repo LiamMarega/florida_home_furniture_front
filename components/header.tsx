@@ -1,13 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { Search, Heart, ShoppingCart, User, Menu } from 'lucide-react';
+import { Search, Heart, User, Menu } from 'lucide-react';
 import { navigationItems } from '@/lib/data';
-import { useCart } from '@/contexts/cart-context';
-import { motion } from 'framer-motion';
+import { MiniCart } from '@/components/cart/mini-cart';
 
 export function Header() {
-  const { itemCount } = useCart();
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm">
@@ -45,21 +43,7 @@ export function Header() {
               <Heart className="w-5 h-5" />
             </button>
 
-            <button
-              aria-label="Open cart"
-              className="relative hover:text-orange-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 rounded p-2"
-            >
-              <ShoppingCart className="w-5 h-5" />
-              {itemCount > 0 && (
-                <motion.span
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="absolute -top-1 -right-1 bg-orange-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"
-                >
-                  {itemCount}
-                </motion.span>
-              )}
-            </button>
+            <MiniCart />
 
             <button
               aria-label="Open account"

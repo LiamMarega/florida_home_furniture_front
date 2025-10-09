@@ -4,25 +4,22 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Search, SlidersHorizontal, Star, ShoppingCart } from 'lucide-react';
 import { vendureClient } from '@/lib/vendure-client';
-import { SEARCH_PRODUCTS } from '@/lib/graphql/queries';
+import { GET_ALL_PRODUCTS } from '@/lib/graphql/queries';
 import { staggerContainer, staggerItem } from '@/lib/animations';
 import { useScrollAnimation } from '@/hooks/use-scroll-animation';
-import { useCart } from '@/contexts/cart-context';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { toast } from 'sonner';
-import { SearchResultProduct } from '@/lib/types';
+import Image from 'next/image';
 
 interface DisplayProduct {
   id: string;
   name: string;
   slug: string;
-  description: string;
-  price: number;
-  currencyCode: string;
-  imageUrl: string;
-  variantId: string;
-  stockLevel: string;
+  featuredAsset: {
+    id: string;
+    preview: string;
+  };
 }
 
 export function EnhancedProductsGrid() {
@@ -31,37 +28,17 @@ export function EnhancedProductsGrid() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'featured' | 'price-low' | 'price-high'>('featured');
   const { ref, isVisible } = useScrollAnimation();
-  const { addItem } = useCart();
 
   useEffect(() => {
     async function loadProducts() {
       try {
-        const data = await vendureClient.request<{ search: { items: SearchResultProduct[] } }>(
-          SEARCH_PRODUCTS,
-          {
-            input: {
-              term: '',
-              take: 50,
-              groupByProduct: true,
-            },
-          }
+        const data = await vendureClient.request<{ products: { items: DisplayProduct[] } }>(
+          GET_ALL_PRODUCTS
         );
 
-        if (data.search.items) {
-          const displayProducts: DisplayProduct[] = data.search.items.map((item) => ({
-            id: item.productId,
-            name: item.productName,
-            slug: item.slug,
-            description: item.description,
-            price: item.priceWithTax.value || item.priceWithTax.min || 0,
-            currencyCode: item.currencyCode,
-            imageUrl: item.productAsset?.preview || 'https://via.placeholder.com/400',
-            variantId: item.productId,
-            stockLevel: 'IN_STOCK',
-          }));
-
-          setProducts(displayProducts);
-          setFilteredProducts(displayProducts);
+        if (data.products.items) {
+          setProducts(data.products.items);
+          setFilteredProducts(data.products.items);
         }
       } catch (error) {
         console.error('Error loading products:', error);
@@ -77,31 +54,24 @@ export function EnhancedProductsGrid() {
 
     if (searchQuery) {
       filtered = filtered.filter((product) =>
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.description?.toLowerCase().includes(searchQuery.toLowerCase())
+        product.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
+    // Since we don't have price data, we'll just sort by name for now
     switch (sortBy) {
       case 'price-low':
-        filtered.sort((a, b) => a.price - b.price);
-        break;
       case 'price-high':
-        filtered.sort((a, b) => b.price - a.price);
+        filtered.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      default:
+        // Keep original order for 'featured'
         break;
     }
 
     setFilteredProducts(filtered);
   }, [searchQuery, sortBy, products]);
 
-  const handleAddToCart = async (variantId: string, productName: string) => {
-    try {
-      await addItem(variantId);
-      toast.success(`${productName} added to cart!`);
-    } catch (error) {
-      toast.error('Failed to add item to cart');
-    }
-  };
 
   return (
     <section id="products-section" ref={ref} className="py-20 bg-gray-50">
@@ -156,54 +126,49 @@ export function EnhancedProductsGrid() {
             variants={staggerContainer}
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
           >
-            {filteredProducts.map((product) => {
-              return (
-                <motion.div
-                  key={product.id}
-                  variants={staggerItem}
-                  whileHover={{ y: -8, transition: { duration: 0.3 } }}
-                  className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-300"
-                >
-                  <div className="relative aspect-square overflow-hidden bg-gray-100">
-                    <img
-                      src={product.imageUrl}
-                      alt={product.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+            {filteredProducts.map((product) => (
+              <motion.div
+                key={product.id}
+                variants={staggerItem}
+                whileHover={{ y: -8, transition: { duration: 0.3 } }}
+                className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-300"
+              >
+                <div className="relative aspect-square overflow-hidden bg-gray-100">
+                  <img
+                    src={product.featuredAsset.preview}
+                    alt={product.name}
+                    className="object-cover" 
                     />
+                </div>
 
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300"></div>
-                  </div>
+                <div className="p-6">
+                  <h3 className="font-bold text-gray-900 text-lg mb-2 line-clamp-1">
+                    {product.name}
+                  </h3>
 
-                  <div className="p-6">
-                    <h3 className="font-bold text-gray-900 text-lg mb-2 line-clamp-1">
-                      {product.name}
-                    </h3>
+                  <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                    Producto disponible - Haz clic para ver más detalles
+                  </p>
 
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                      {product.description}
-                    </p>
-
-                    <div className="flex items-end justify-between">
-                      <div>
-                        <div className="text-2xl font-bold text-gray-900">
-                          {product.currencyCode === 'GBP' ? '£' : '$'}{(product.price / 100).toFixed(2)}
-                        </div>
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <div className="text-lg font-semibold text-gray-900">
+                        Ver detalles
                       </div>
-
-                      <Button
-                        size="sm"
-                        onClick={() => handleAddToCart(product.variantId, product.name)}
-                        disabled={product.stockLevel === 'OUT_OF_STOCK'}
-                        className="bg-orange-600 hover:bg-orange-700 gap-2"
-                      >
-                        <ShoppingCart className="w-4 h-4" />
-                        Add
-                      </Button>
                     </div>
+
+                    <Button
+                      size="sm"
+                      onClick={() => window.open(`/products/${product.slug}`, '_blank')}
+                      className="bg-orange-600 hover:bg-orange-700 gap-2"
+                    >
+                      <ShoppingCart className="w-4 h-4" />
+                      Ver
+                    </Button>
                   </div>
-                </motion.div>
-              );
-            })}
+                </div>
+              </motion.div>
+            ))}
           </motion.div>
         )}
       </div>

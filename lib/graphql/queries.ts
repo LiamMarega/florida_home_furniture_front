@@ -1,5 +1,5 @@
 import { gql } from 'graphql-request';
-import { PRODUCT_FRAGMENT, ORDER_FRAGMENT, ASSET_FRAGMENT } from './fragments';
+import { PRODUCT_FRAGMENT, ORDER_FRAGMENT, ASSET_FRAGMENT, SEARCH_RESULT_ASSET_FRAGMENT } from './fragments';
 
 export const GET_PRODUCTS = gql`
   ${PRODUCT_FRAGMENT}
@@ -14,7 +14,7 @@ export const GET_PRODUCTS = gql`
 `;
 
 export const SEARCH_PRODUCTS = gql`
-  ${ASSET_FRAGMENT}
+  ${SEARCH_RESULT_ASSET_FRAGMENT}
   query SearchProducts($input: SearchInput!) {
     search(input: $input) {
       items {
@@ -33,7 +33,7 @@ export const SEARCH_PRODUCTS = gql`
         }
         currencyCode
         productAsset {
-          ...Asset
+          ...SearchResultAsset
         }
       }
       totalItems
@@ -117,4 +117,21 @@ export const GET_ACTIVE_CUSTOMER = gql`
       emailAddress
     }
   }
+`;
+
+export const GET_ALL_PRODUCTS = gql`
+    query GetAllProducts {
+      products {
+        items {
+          id
+          name
+          slug
+          featuredAsset {
+            id
+            preview
+          }
+        }
+        totalItems
+      }
+    }
 `;
