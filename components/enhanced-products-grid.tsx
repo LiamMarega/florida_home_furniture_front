@@ -134,9 +134,10 @@ export function EnhancedProductsGrid() {
                 className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-300"
               >
                 <div className="relative aspect-square overflow-hidden bg-gray-100">
-                  <img
+                  <Image
                     src={product.featuredAsset.preview}
                     alt={product.name}
+                    fill
                     className="object-cover" 
                     />
                 </div>

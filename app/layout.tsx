@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google';
 import { Header } from '@/components/header';
 import { CartProvider } from '@/contexts/cart-context';
 import { Toaster } from '@/components/ui/sonner';
+import localFont from 'next/font/local';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -12,7 +13,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'),
   title: 'Mavren - Create Spaces That Last a Lifetime | Premium Furniture Store',
   description: 'Discover exceptional furniture that blends timeless design with modern comfort. Shop sofas, chairs, tables, and more. Free shipping on orders over £500. 30-day returns guaranteed.',
   keywords: 'furniture, sofas, chairs, tables, home decor, office furniture, modern furniture, luxury furniture',
