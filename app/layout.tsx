@@ -1,25 +1,57 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import { Header } from '@/components/header';
 import { CartProvider } from '@/contexts/cart-context';
 import { Toaster } from '@/components/ui/sonner';
 import localFont from 'next/font/local';
 
-const inter = Inter({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+const tangoSans = localFont({
+  src: [
+    {
+      path: '../public/fonts/tangoSans/TangoSans.ttf',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../public/fonts/tangoSans/TangoSans_Bold.ttf',
+      weight: '700',
+      style: 'normal',
+    },
+  ],
+  variable: '--font-tango-sans',
+  display: 'swap',
+});
+
+const creatoDisplay = localFont({
+  src: [
+    {
+      path: '../public/fonts/creato/CreatoDisplay-Regular.otf',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../public/fonts/creato/CreatoDisplay-Medium.otf',
+      weight: '500',
+      style: 'normal',
+    },
+    {
+      path: '../public/fonts/creato/CreatoDisplay-Bold.otf',
+      weight: '700',
+      style: 'normal',
+    },
+  ],
+  variable: '--font-creato-display',
   display: 'swap',
 });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'),
-  title: 'Mavren - Create Spaces That Last a Lifetime | Premium Furniture Store',
-  description: 'Discover exceptional furniture that blends timeless design with modern comfort. Shop sofas, chairs, tables, and more. Free shipping on orders over £500. 30-day returns guaranteed.',
-  keywords: 'furniture, sofas, chairs, tables, home decor, office furniture, modern furniture, luxury furniture',
+  title: 'Florida Homes Furniture - Modern Furniture Store | Miami',
+  description: 'Discover modern, functional and accessible furniture from Miami. Shop sofas, chairs, tables, and more. Free shipping on orders over $500. 30-day returns guaranteed.',
+  keywords: 'furniture, sofas, chairs, tables, home decor, office furniture, modern furniture, Miami furniture, Florida furniture',
   openGraph: {
-    title: 'Mavren - Premium Furniture Store',
-    description: 'Create spaces that last a lifetime with our handcrafted furniture collection',
+    title: 'Florida Homes Furniture - Premium Furniture Store',
+    description: 'Modern, functional and accessible furniture from Miami. Create spaces that reflect your style.',
     type: 'website',
   },
 };
@@ -31,7 +63,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={`${creatoDisplay.variable} ${tangoSans.variable} font-creato-display`}>
         <CartProvider>
           <Header />
           {children}

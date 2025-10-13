@@ -11,7 +11,7 @@ export function CartPage() {
   const { items, itemCount, total, order, clearCart, isUpdating, isLoading } = useCart();
 
   const formatPrice = (price: number, currencyCode: string) => {
-    return new Intl.NumberFormat('es-ES', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currencyCode,
     }).format(price / 100);
@@ -20,10 +20,10 @@ export function CartPage() {
   const handleClearCart = async () => {
     try {
       await clearCart();
-      toast.success('Carrito vaciado');
+      toast.success('Cart cleared');
     } catch (error) {
       console.error('Error clearing cart:', error);
-      toast.error('Error al vaciar carrito');
+      toast.error('Error clearing cart');
     }
   };
 
@@ -39,15 +39,15 @@ export function CartPage() {
     return (
       <div className="text-center py-12">
         <ShoppingCart className="h-24 w-24 mx-auto mb-6 text-gray-300" />
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">
-          Tu carrito está vacío
+        <h2 className="text-2xl font-bold text-brand-dark-blue mb-4">
+          Your cart is empty
         </h2>
-        <p className="text-gray-600 mb-8">
-          Explora nuestros productos y agrega algo especial a tu carrito
+        <p className="text-brand-dark-blue/80 mb-8">
+          Explore our products and add something special to your cart
         </p>
         <Button asChild>
           <Link href="/">
-            Continuar comprando
+            Continue shopping
           </Link>
         </Button>
       </div>
@@ -57,8 +57,8 @@ export function CartPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">
-          Carrito ({itemCount} {itemCount === 1 ? 'producto' : 'productos'})
+        <h1 className="text-3xl font-bold text-brand-dark-blue">
+          Cart ({itemCount} {itemCount === 1 ? 'product' : 'products'})
         </h1>
         <Button
           variant="outline"
@@ -68,7 +68,7 @@ export function CartPage() {
           {isUpdating ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : null}
-          Vaciar carrito
+          Clear cart
         </Button>
       </div>
 
@@ -85,7 +85,7 @@ export function CartPage() {
         {/* Order Summary */}
         <div className="lg:col-span-1">
           <div className="bg-gray-50 rounded-lg p-6 sticky top-4">
-            <h2 className="text-xl font-semibold mb-4">Resumen del pedido</h2>
+            <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
             
             <div className="space-y-3 mb-6">
               <div className="flex justify-between">
@@ -95,7 +95,7 @@ export function CartPage() {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>Impuestos:</span>
+                <span>Taxes:</span>
                 <span>
                   {order && formatPrice(order.totalWithTax - order.total, order.currencyCode)}
                 </span>
@@ -113,12 +113,12 @@ export function CartPage() {
             <div className="space-y-3">
               <Button asChild className="w-full" size="lg">
                 <Link href="/checkout">
-                  Proceder al pago
+                  Proceed to checkout
                 </Link>
               </Button>
               <Button asChild variant="outline" className="w-full">
                 <Link href="/">
-                  Continuar comprando
+                  Continue shopping
                 </Link>
               </Button>
             </div>

@@ -24,7 +24,7 @@ export function CartItem({ item }: CartItemProps) {
       await updateQuantity(item.id, newQuantity);
     } catch (error) {
       console.error('Error updating quantity:', error);
-      toast.error('Error al actualizar cantidad');
+      toast.error('Error updating quantity');
     } finally {
       setIsUpdating(false);
     }
@@ -36,17 +36,17 @@ export function CartItem({ item }: CartItemProps) {
     try {
       setIsUpdating(true);
       await removeItem(item.id);
-      toast.success('Producto eliminado del carrito');
+      toast.success('Product removed from cart');
     } catch (error) {
       console.error('Error removing item:', error);
-      toast.error('Error al eliminar producto');
+      toast.error('Error removing product');
     } finally {
       setIsUpdating(false);
     }
   };
 
   const formatPrice = (price: number, currencyCode: string) => {
-    return new Intl.NumberFormat('es-ES', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currencyCode,
     }).format(price / 100);
@@ -64,21 +64,21 @@ export function CartItem({ item }: CartItemProps) {
             className="object-cover rounded-md"
           />
         ) : (
-          <div className="w-full h-full bg-gray-200 rounded-md flex items-center justify-center">
-            <span className="text-gray-400 text-xs">Sin imagen</span>
+          <div className="w-full h-full bg-brand-cream rounded-md flex items-center justify-center">
+            <span className="text-brand-dark-blue/60 text-xs">No image</span>
           </div>
         )}
       </div>
 
       {/* Product Info */}
       <div className="flex-1 min-w-0">
-        <h3 className="text-sm font-medium text-gray-900 truncate">
+        <h3 className="text-sm font-medium text-brand-dark-blue truncate">
           {item.productVariant.product?.name || item.productVariant.name}
         </h3>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-brand-dark-blue/70">
           {item.productVariant.name}
         </p>
-        <p className="text-sm font-medium text-gray-900">
+        <p className="text-sm font-medium text-brand-dark-blue">
           {formatPrice(item.unitPriceWithTax, item.productVariant.currencyCode)}
         </p>
       </div>
@@ -120,7 +120,7 @@ export function CartItem({ item }: CartItemProps) {
 
       {/* Total Price */}
       <div className="text-right">
-        <p className="text-sm font-medium text-gray-900">
+        <p className="text-sm font-medium text-brand-dark-blue">
           {formatPrice(item.linePriceWithTax, item.productVariant.currencyCode)}
         </p>
       </div>

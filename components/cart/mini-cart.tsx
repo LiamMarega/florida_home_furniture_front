@@ -18,7 +18,7 @@ export function MiniCart({ className }: MiniCartProps) {
   const { items, itemCount, total, order, clearCart, isUpdating } = useCart();
 
   const formatPrice = (price: number, currencyCode: string) => {
-    return new Intl.NumberFormat('es-ES', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currencyCode,
     }).format(price / 100);
@@ -27,10 +27,10 @@ export function MiniCart({ className }: MiniCartProps) {
   const handleClearCart = async () => {
     try {
       await clearCart();
-      toast.success('Carrito vaciado');
+      toast.success('Cart cleared');
     } catch (error) {
       console.error('Error clearing cart:', error);
-      toast.error('Error al vaciar carrito');
+      toast.error('Error clearing cart');
     }
   };
 
@@ -67,7 +67,7 @@ export function MiniCart({ className }: MiniCartProps) {
           <div className="absolute right-0 top-full mt-2 w-96 bg-white border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="text-lg font-semibold">Carrito ({itemCount})</h3>
+              <h3 className="text-lg font-semibold">Cart ({itemCount})</h3>
               <Button
                 variant="ghost"
                 size="sm"
@@ -83,7 +83,7 @@ export function MiniCart({ className }: MiniCartProps) {
               {items.length === 0 ? (
                 <div className="p-8 text-center text-gray-500">
                   <ShoppingCart className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>Tu carrito está vacío</p>
+                  <p>Your cart is empty</p>
                 </div>
               ) : (
                 <div className="p-4 space-y-4">
@@ -117,11 +117,11 @@ export function MiniCart({ className }: MiniCartProps) {
                     {isUpdating ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : null}
-                    Vaciar
+                    Clear
                   </Button>
                   <Button asChild size="sm" className="flex-1">
                     <Link href="/cart">
-                      Ver carrito
+                      View cart
                     </Link>
                   </Button>
                 </div>

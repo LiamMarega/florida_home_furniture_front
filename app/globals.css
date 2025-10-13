@@ -4,26 +4,34 @@
 
 @layer base {
   :root {
-    --background: 0 0% 92.5%;
-    --foreground: 0 0% 3.9%;
+    --background: 0 0% 100%;
+    --foreground: 210 40% 25%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --card-foreground: 210 40% 25%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 222 47% 11%;
+    --popover-foreground: 210 40% 25%;
+    --primary: 20 80% 50%;
     --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 29%;
-    --accent: 222 47% 11%;
+    --secondary: 210 30% 60%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 45 20% 90%;
+    --muted-foreground: 210 40% 25%;
+    --accent: 20 90% 65%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 222 47% 11%;
-    --radius: 0.5rem;
+    --border: 45 20% 85%;
+    --input: 45 20% 85%;
+    --ring: 20 80% 50%;
+    --radius: 0.75rem;
+    
+    /* Brand Colors */
+    --brand-primary: #E56A2C;
+    --brand-secondary: #7493B2;
+    --brand-accent: #FDA46C;
+    --brand-cream: #E9E2CF;
+    --brand-dark-blue: #234465;
+    --brand-white: #FFFFFF;
   }
 
   * {
@@ -31,8 +39,8 @@
   }
 
   body {
-    @apply bg-white text-gray-900 antialiased;
-    font-feature-settings: 'rlig' 1, 'calt' 1;
+    @apply bg-white text-[#234465] antialiased;
+    font-family: var(--font-creato-display), system-ui, sans-serif;
     margin: 0;
     padding: 0;
     width: 100%;
@@ -41,5 +49,7 @@
 
   h1, h2, h3, h4, h5, h6 {
     @apply tracking-tight;
+    font-family: var(--font-tango-sans), system-ui, sans-serif;
+    color: #234465;
   }
 }

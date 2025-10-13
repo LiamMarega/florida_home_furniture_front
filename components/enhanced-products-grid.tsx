@@ -74,25 +74,25 @@ export function EnhancedProductsGrid() {
 
 
   return (
-    <section id="products-section" ref={ref} className="py-20 bg-gray-50">
+    <section id="products-section" ref={ref} className="py-20">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="mb-12">
-          <h2 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-6">
+          <h2 className="text-4xl sm:text-5xl font-bold text-brand-dark-blue mb-6 font-tango-sans">
             Explore latest collection
           </h2>
-          <p className="text-lg text-gray-600 mb-8">
-            Furniture that blends with your personal style
+          <p className="text-lg text-brand-dark-blue/80 mb-8">
+            Modern furniture that blends with your personal style
           </p>
 
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-dark-blue/60" />
               <Input
                 type="text"
                 placeholder="Search furniture..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 h-12 text-base"
+                className="pl-12 h-12 text-base border-brand-cream focus:border-brand-primary focus:ring-brand-primary"
               />
             </div>
 
@@ -100,7 +100,7 @@ export function EnhancedProductsGrid() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 font-medium focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="px-4 py-3 border border-brand-cream rounded-lg bg-white text-brand-dark-blue font-medium focus:outline-none focus:ring-2 focus:ring-brand-primary"
               >
                 <option value="featured">Featured</option>
                 <option value="price-low">Price: Low to High</option>
@@ -117,7 +117,7 @@ export function EnhancedProductsGrid() {
 
         {filteredProducts.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No products found matching your criteria.</p>
+            <p className="text-brand-dark-blue/60 text-lg">No products found matching your criteria.</p>
           </div>
         ) : (
           <motion.div
@@ -131,9 +131,9 @@ export function EnhancedProductsGrid() {
                 key={product.id}
                 variants={staggerItem}
                 whileHover={{ y: -8, transition: { duration: 0.3 } }}
-                className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-300"
+                className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-brand transition-all duration-300"
               >
-                <div className="relative aspect-square overflow-hidden bg-gray-100">
+                <div className="relative aspect-square overflow-hidden bg-brand-cream">
                   <Image
                     src={product.featuredAsset.preview}
                     alt={product.name}
@@ -143,28 +143,28 @@ export function EnhancedProductsGrid() {
                 </div>
 
                 <div className="p-6">
-                  <h3 className="font-bold text-gray-900 text-lg mb-2 line-clamp-1">
+                  <h3 className="font-bold text-brand-dark-blue text-lg mb-2 line-clamp-1 font-tango-sans">
                     {product.name}
                   </h3>
 
-                  <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                    Producto disponible - Haz clic para ver más detalles
+                  <p className="text-sm text-brand-dark-blue/70 mb-4 line-clamp-2">
+                    Available now - Click to view more details
                   </p>
 
                   <div className="flex items-end justify-between">
                     <div>
-                      <div className="text-lg font-semibold text-gray-900">
-                        Ver detalles
+                      <div className="text-lg font-semibold text-brand-dark-blue">
+                        View details
                       </div>
                     </div>
 
                     <Button
                       size="sm"
                       onClick={() => window.open(`/products/${product.slug}`, '_blank')}
-                      className="bg-orange-600 hover:bg-orange-700 gap-2"
+                      className="gap-2"
                     >
                       <ShoppingCart className="w-4 h-4" />
-                      Ver
+                      View
                     </Button>
                   </div>
                 </div>

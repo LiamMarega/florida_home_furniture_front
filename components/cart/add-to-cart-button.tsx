@@ -32,10 +32,10 @@ export function AddToCartButton({
     try {
       setIsAdding(true);
       await addItem(productVariantId, 1);
-      toast.success(`${productName} agregado al carrito`);
+      toast.success(`${productName} added to cart`);
     } catch (error) {
       console.error('Error adding to cart:', error);
-      toast.error('Error al agregar al carrito');
+      toast.error('Error adding to cart');
     } finally {
       setIsAdding(false);
     }
@@ -54,12 +54,12 @@ export function AddToCartButton({
       {isLoading ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Agregando...
+          Adding...
         </>
       ) : (
         <>
           <ShoppingCart className="mr-2 h-4 w-4" />
-          Agregar al carrito
+          Add to cart
         </>
       )}
     </Button>

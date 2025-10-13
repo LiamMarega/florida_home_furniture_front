@@ -49,24 +49,24 @@ export function PremiumCollection() {
           variants={staggerContainer}
           className="text-center mb-16"
         >
-          <motion.div variants={fadeInUp} className="inline-flex items-center gap-2 bg-orange-100 px-4 py-2 rounded-full mb-4">
-            <span className="text-sm font-semibold text-orange-600 uppercase tracking-wider">
+          <motion.div variants={fadeInUp} className="inline-flex items-center gap-2 bg-brand-accent/20 px-4 py-2 rounded-full mb-4">
+            <span className="text-sm font-semibold text-brand-primary uppercase tracking-wider">
               Premium Quality
             </span>
           </motion.div>
 
           <motion.h2
             variants={fadeInUp}
-            className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 mb-4"
+            className="text-4xl sm:text-5xl lg:text-6xl font-bold text-brand-dark-blue mb-4 font-tango-sans"
           >
             Our premium collection
           </motion.h2>
 
           <motion.p
             variants={fadeInUp}
-            className="text-lg text-gray-600 max-w-2xl mx-auto"
+            className="text-lg text-brand-dark-blue/80 max-w-2xl mx-auto"
           >
-            Discover handcrafted furniture pieces that blend timeless design with modern comfort
+            Discover modern, functional and accessible furniture pieces that blend timeless design with contemporary comfort
           </motion.p>
         </motion.div>
 
@@ -89,17 +89,17 @@ export function PremiumCollection() {
                 className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
               />
 
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent group-hover:from-black/90 transition-all duration-300"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-brand-dark-blue/80 via-brand-dark-blue/40 to-transparent group-hover:from-brand-dark-blue/90 transition-all duration-300"></div>
 
               <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                <h3 className="text-2xl font-bold mb-2 group-hover:translate-y-0 translate-y-2 transition-transform">
+                <h3 className="text-2xl font-bold mb-2 group-hover:translate-y-0 translate-y-2 transition-transform font-tango-sans">
                   {item.title}
                 </h3>
                 <p className="text-white/90 mb-4 group-hover:translate-y-0 translate-y-2 transition-transform delay-75">
                   {item.description}
                 </p>
 
-                <div className="flex items-center gap-2 text-orange-400 font-semibold opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-4 group-hover:translate-y-0">
+                <div className="flex items-center gap-2 text-brand-accent font-semibold opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-4 group-hover:translate-y-0">
                   <span>View Details</span>
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
                 </div>
@@ -116,7 +116,7 @@ export function PremiumCollection() {
         >
           <Link
             href="/collections/all"
-            className="inline-flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-8 py-4 rounded-full font-bold transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-orange-500/50"
+            className="inline-flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 text-white px-8 py-4 rounded-full font-bold transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-brand"
           >
             See All Collection
             <ArrowRight className="w-5 h-5" />
