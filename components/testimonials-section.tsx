@@ -43,8 +43,8 @@ const staticReviews: Review[] = [
     customer_avatar: null,
     customer_location: 'Birmingham, UK',
     rating: 5,
-    title: 'Worth Every Penny',
-    comment: 'Initially hesitant about the price, but the quality and durability make it a worthwhile investment. Best furniture purchase we\'ve made!',
+    title: 'Great Value',
+    comment: 'Found exactly what we needed at a price we could afford. The quality is solid and it looks great in our home!',
     verified_purchase: true,
   },
   {
@@ -63,8 +63,8 @@ const staticReviews: Review[] = [
     customer_avatar: null,
     customer_location: 'Bristol, UK',
     rating: 5,
-    title: 'Exceeded Expectations',
-    comment: 'From ordering to delivery, everything was smooth. The chairs are even more beautiful in person than in the photos!',
+    title: 'Great Service',
+    comment: 'From ordering to delivery, everything was smooth. The chairs look even better in person than in the photos!',
     verified_purchase: true,
   },
   {
@@ -73,8 +73,8 @@ const staticReviews: Review[] = [
     customer_avatar: null,
     customer_location: 'Leeds, UK',
     rating: 5,
-    title: 'Outstanding Service',
-    comment: 'Not only is the furniture top-notch, but the customer service was exceptional. They helped us choose the perfect pieces for our space.',
+    title: 'Helpful Service',
+    comment: 'The furniture is great quality, and the customer service was really helpful. They helped us find the right pieces for our budget.',
     verified_purchase: true,
   },
 ];
@@ -109,7 +109,7 @@ export function TestimonialsSection() {
             variants={fadeInUp}
             className="text-lg text-brand-dark-blue/80 max-w-2xl mx-auto"
           >
-            Real experiences from people who transformed their spaces with our modern furniture
+            Real experiences from people who found great furniture at great prices
           </motion.p>
         </motion.div>
 

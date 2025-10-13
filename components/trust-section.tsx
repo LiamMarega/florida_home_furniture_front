@@ -13,8 +13,8 @@ const trustElements = [
   },
   {
     icon: Truck,
-    title: 'Freeeee Shipping',
-    description: 'Free delivery on all orders over £500 directly to your doorstep'
+    title: 'Free Shipping',
+    description: 'Free delivery on all orders over $200 directly to your doorstep'
   },
   {
     icon: RotateCcw,
@@ -24,7 +24,7 @@ const trustElements = [
   {
     icon: Award,
     title: 'Quality Guaranteed',
-    description: 'Premium materials and expert craftsmanship in every piece'
+    description: 'Quality materials and careful craftsmanship in every piece'
   },
   {
     icon: Lock,
@@ -54,7 +54,7 @@ export function TrustSection() {
             Why shop with us?
           </h2>
           <p className="text-lg text-brand-dark-blue/80 max-w-2xl mx-auto">
-            We are committed to providing you with the best shopping experience for modern furniture
+            We are committed to providing you with quality furniture at great prices with excellent service
           </p>
         </motion.div>
 

@@ -15,10 +15,10 @@ export function HeroNew() {
 
   return (
     <section
-      className="m-5 pt-16 relative min-h-[90dvh] rounded-2xl overflow-hidden bg-gradient-to-br from-brand-cream via-brand-accent/20 to-brand-cream flex items-end"
+      className="m-5 pt-16 relative min-h-[90dvh] rounded-2xl overflow-hidden bg-gradient-to-br from-brand-cream via-brand-accent/20 to-brand-dark-blue/50 flex items-end"
       // Use 90dvh for better mobile and desktop support, as per prompt
     >
-      <div className="absolute inset-0 bg-[url('/images/furniture-background.webp')] bg-cover bg-center opacity-30"></div>
+      <div className="absolute inset-0 bg-[url('/images/furniture-background_hd.jpg')] bg-cover bg-center opacity-100"></div>
       <div className="absolute inset-0 bg-gradient-to-r from-brand-dark-blue/60 via-brand-dark-blue/50 to-transparent"></div>
 
       {/* Flex container puts all text/buttons at the bottom; child for content fills width */}
@@ -35,7 +35,7 @@ export function HeroNew() {
           >
             <div className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-pulse"></div>
             <span className="text-[10px] sm:text-xs font-semibold text-brand-dark-blue uppercase tracking-wider">
-              Modern Furniture from Miami
+              Quality Furniture for Every Home
             </span>
           </motion.div>
 
@@ -76,9 +76,9 @@ export function HeroNew() {
             variants={fadeInUp}
             className="text-sm sm:text-base text-white/90 max-w-xl mb-3 leading-snug"
           >
-            We are crafting modern,{' '}
-            <span className="font-semibold text-brand-accent">functional</span> and{' '}
-            <span className="font-semibold text-brand-accent">accessible</span> furniture that transforms your home and office environment
+            We create modern,{' '}
+            <span className="font-semibold text-brand-accent">affordable</span> and{' '}
+            <span className="font-semibold text-brand-accent">functional</span> furniture that makes your home comfortable and stylish
           </motion.p>
 
           <motion.div

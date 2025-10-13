@@ -1,11 +1,11 @@
-# 🏠 Mavren - Premium Furniture E-commerce
+# 🏠 Florida Homes Furniture - Quality Furniture E-commerce
 
 [![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.2-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.3-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
 [![Vendure](https://img.shields.io/badge/Vendure-Headless_E-commerce-FF6B6B?style=for-the-badge)](https://vendure.io/)
 
-> **Create spaces that last a lifetime** - A modern, high-performance e-commerce platform for premium furniture built with Next.js 14 and Vendure.
+> **Quality furniture for every home** - A modern, high-performance e-commerce platform for affordable, quality furniture built with Next.js 14 and Vendure.
 
 ## 📋 Table of Contents
 
@@ -30,11 +30,12 @@
 
 ### ✨ Core Features
 - **🛍️ Full E-commerce Functionality** - Complete shopping cart, product catalog, and checkout flow
-- **🎨 Modern UI/UX** - Beautiful, responsive design with smooth animations
+- **🎨 Modern UI/UX** - Clean, responsive design with smooth animations
 - **⚡ High Performance** - Server-side rendering, static generation, and optimized images
 - **🔍 Advanced Search** - Real-time product search with filtering and sorting
 - **📱 Mobile-First** - Fully responsive design optimized for all devices
 - **♿ Accessibility** - WCAG compliant with proper ARIA labels and keyboard navigation
+- **💰 Affordable Pricing** - Quality furniture at accessible prices for every budget
 
 ### 🛒 Shopping Experience
 - **🛒 Smart Cart System** - Persistent cart with optimistic updates
@@ -43,6 +44,7 @@
 - **🏷️ Product Variants** - Size, color, and material options
 - **⭐ Reviews & Ratings** - Customer testimonials and product reviews
 - **🎁 Wishlist** - Save favorite products for later
+- **🚚 Free Shipping** - Free delivery on orders over $200
 
 ### 🎯 Business Features
 - **📊 Analytics Integration** - Google Analytics and custom tracking
@@ -889,7 +891,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <div align="center">
-  <p>Made with ❤️ by the Mavren Team</p>
+  <p>Made with ❤️ by the Florida Homes Furniture Team</p>
   <p>
     <a href="https://github.com/your-username/florida_home_front">GitHub</a> •
     <a href="https://your-domain.com">Live Demo</a> •

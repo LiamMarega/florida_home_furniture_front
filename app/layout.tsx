@@ -47,7 +47,7 @@ const creatoDisplay = localFont({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'),
   title: 'Florida Homes Furniture - Modern Furniture Store | Miami',
-  description: 'Discover modern, functional and accessible furniture from Miami. Shop sofas, chairs, tables, and more. Free shipping on orders over $500. 30-day returns guaranteed.',
+  description: 'Discover modern, affordable furniture from Miami. Shop sofas, chairs, tables, and more. Free shipping on orders over $200. 30-day returns guaranteed.',
   keywords: 'furniture, sofas, chairs, tables, home decor, office furniture, modern furniture, Miami furniture, Florida furniture',
   icons: {
     icon: [
@@ -66,8 +66,8 @@ export const metadata: Metadata = {
     title: 'Florida Home Furniture',
   },
   openGraph: {
-    title: 'Florida Homes Furniture - Premium Furniture Store',
-    description: 'Modern, functional and accessible furniture from Miami. Create spaces that reflect your style.',
+    title: 'Florida Homes Furniture - Quality Furniture Store',
+    description: 'Modern, affordable furniture from Miami. Create beautiful spaces that fit your budget.',
     type: 'website',
   },
 };

@@ -81,7 +81,7 @@ export function EnhancedProductsGrid() {
             Explore latest collection
           </h2>
           <p className="text-lg text-brand-dark-blue/80 mb-8">
-            Modern furniture that blends with your personal style
+            Quality furniture that fits your budget and style
           </p>
 
           <div className="flex flex-col lg:flex-row gap-4">

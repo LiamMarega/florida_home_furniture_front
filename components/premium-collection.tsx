@@ -51,7 +51,7 @@ export function PremiumCollection() {
         >
           <motion.div variants={fadeInUp} className="inline-flex items-center gap-2 bg-brand-accent/20 px-4 py-2 rounded-full mb-4">
             <span className="text-sm font-semibold text-brand-primary uppercase tracking-wider">
-              Premium Quality
+              Quality & Style
             </span>
           </motion.div>
 
@@ -59,14 +59,14 @@ export function PremiumCollection() {
             variants={fadeInUp}
             className="text-4xl sm:text-5xl lg:text-6xl font-bold text-brand-dark-blue mb-4 font-tango-sans"
           >
-            Our premium collection
+            Our featured collection
           </motion.h2>
 
           <motion.p
             variants={fadeInUp}
             className="text-lg text-brand-dark-blue/80 max-w-2xl mx-auto"
           >
-            Discover modern, functional and accessible furniture pieces that blend timeless design with contemporary comfort
+            Discover modern, affordable furniture pieces that blend great design with everyday comfort for your home
           </motion.p>
         </motion.div>
 
@@ -118,7 +118,7 @@ export function PremiumCollection() {
             href="/collections/all"
             className="inline-flex items-center gap-2 bg-brand-primary hover:bg-brand-primary/90 text-white px-8 py-4 rounded-full font-bold transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-brand"
           >
-            See All Collection
+            View All Products
             <ArrowRight className="w-5 h-5" />
           </Link>
         </motion.div>

@@ -7,12 +7,12 @@ export function CTASection() {
       <div className="grid md:grid-cols-2 gap-6 items-center">
         <div>
           <h2 className="text-[28px] md:text-[32px] font-bold text-[#0A0A0A]">
-            Craft Your Ideal Furniture Masterpieces Today
+            Find Your Perfect Furniture Today
           </h2>
           <p className="mt-3 text-[14px] text-[#4A4A4A] max-w-[580px] leading-[1.7]">
-            Whether it's a sleek wooden chair, a plush sofa, or a functional table with drawers, our platform offers endless possibilities. Start crafting your dream furniture now and bring your vision to life!
+            Whether you need a comfortable chair, a cozy sofa, or a practical table, we have quality furniture that fits your style and budget. Start shopping now and transform your space!
           </p>
-          <Button className="mt-6">Pre Order Now</Button>
+          <Button className="mt-6">Shop Now</Button>
         </div>
 
         <div className="relative h-[260px] md:h-[320px] rounded-md overflow-hidden">

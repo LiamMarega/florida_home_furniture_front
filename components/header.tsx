@@ -9,30 +9,30 @@ import { MiniCart } from '@/components/cart/mini-cart';
 
 export function Header() {
   // Estado para controlar si el usuario ha hecho scroll
-  const [scrolled, setScrolled] = useState(false);
+  // const [scrolled, setScrolled] = useState(false);
 
-  useEffect(() => {
-    // Función para manejar el scroll y cambiar el estado
-    const handleScroll = () => {
-      // Detectar cuando el scroll pasa los 40px (top-10)
-      // Solo entonces el navbar se vuelve sticky en top-0 y se aplican los efectos
-      if (window.scrollY >= 15) {
-        setScrolled(true);
-      } else {
-        setScrolled(false);
-      }
-    };
+  // useEffect(() => {
+  //   // Función para manejar el scroll y cambiar el estado
+  //   const handleScroll = () => {
+  //     // Detectar cuando el scroll pasa los 40px (top-10)
+  //     // Solo entonces el navbar se vuelve sticky en top-0 y se aplican los efectos
+  //     if (window.scrollY >= 50) {
+  //       setScrolled(true);
+  //     } else {
+  //       setScrolled(false);
+  //     }
+  //   };
 
-    window.addEventListener('scroll', handleScroll);
-    // Limpieza al desmontar
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  //   window.addEventListener('scroll', handleScroll);
+  //   // Limpieza al desmontar
+  //   return () => window.removeEventListener('scroll', handleScroll);
+  // }, []);
 
   return (
     <header
-      className={`left-0 right-0 z-50 transition-all duration-500 ${
-        scrolled
-          ? 'fixed top-0 bg-brand-dark-blue/90 backdrop-blur-md '
+      className={`left-0 right-0 z-50 transition-all  ${
+        false
+          ? 'fixed top-0 bg-brand-dark-blue backdrop-blur-md '
           : 'absolute top-0 pt-10'
       }`}
     >
