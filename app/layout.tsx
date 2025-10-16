@@ -46,9 +46,26 @@ const creatoDisplay = localFont({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'),
-  title: 'Florida Homes Furniture - Modern Furniture Store | Miami',
+  title: {
+    default: 'Florida Homes Furniture - Modern Furniture Store | Miami',
+    template: '%s | Florida Homes Furniture',
+  },
   description: 'Discover modern, affordable furniture from Miami. Shop sofas, chairs, tables, and more. Free shipping on orders over $200. 30-day returns guaranteed.',
   keywords: 'furniture, sofas, chairs, tables, home decor, office furniture, modern furniture, Miami furniture, Florida furniture',
+  authors: [{ name: 'Florida Homes Furniture' }],
+  creator: 'Florida Homes Furniture',
+  publisher: 'Florida Homes Furniture',
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
   icons: {
     icon: [
       { url: '/images/favicon/favicon.ico', sizes: 'any' },
@@ -64,11 +81,24 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     title: 'Florida Home Furniture',
+    statusBarStyle: 'default',
+    capable: true,
   },
   openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001',
+    siteName: 'Florida Homes Furniture',
     title: 'Florida Homes Furniture - Quality Furniture Store',
     description: 'Modern, affordable furniture from Miami. Create beautiful spaces that fit your budget.',
-    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Florida Homes Furniture - Quality Furniture Store',
+    description: 'Modern, affordable furniture from Miami. Create beautiful spaces that fit your budget.',
+  },
+  verification: {
+    // Agregar después: google, yandex, etc.
   },
 };
 

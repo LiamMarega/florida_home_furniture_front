@@ -32,7 +32,7 @@ export default async function ProductsPage() {
   const products: Product[] = result.data?.products?.items || [];
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 pt-32 pb-16">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-4">
           Nuestros Productos

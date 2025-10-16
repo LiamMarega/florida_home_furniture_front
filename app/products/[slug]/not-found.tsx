@@ -4,7 +4,7 @@ import { ArrowLeft, Search, Home } from 'lucide-react';
 
 export default function ProductNotFound() {
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center">
+    <div className="min-h-screen bg-white flex items-center justify-center pt-20">
       <div className="max-w-2xl mx-auto px-6 text-center">
         {/* 404 Illustration */}
         <div className="mb-8">
@@ -19,7 +19,7 @@ export default function ProductNotFound() {
             Product Not Found
           </h1>
           <p className="text-lg text-brand-dark-blue/80 mb-6">
-            Sorry, we couldn't find the product you're looking for. It might have been moved, deleted, or the link might be incorrect.
+            Sorry, we couldn&apos;t find the product you&apos;re looking for. It might have been moved, deleted, or the link might be incorrect.
           </p>
         </div>
 
@@ -46,7 +46,7 @@ export default function ProductNotFound() {
             Need Help?
           </h3>
           <p className="text-brand-dark-blue/70 mb-4">
-            If you're looking for a specific product, try searching our catalog or contact our customer service team.
+            If you&apos;re looking for a specific product, try searching our catalog or contact our customer service team.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button variant="ghost" size="sm" className="text-brand-primary hover:text-brand-primary/80">

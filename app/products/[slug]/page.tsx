@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getProductBySlug, getAllProducts } from '@/lib/vendure-server';
 import { ProductPage } from '@/components/product/product-page';
+import { Product } from '@/lib/types';
 
 interface ProductPageProps {
   params: {
@@ -15,48 +16,75 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 
     if (!result.data?.product) {
       return {
-        title: 'Product Not Found | Florida Homes Furniture',
+        title: 'Product Not Found',
         description: 'The requested product could not be found.',
+        robots: { index: false, follow: false },
       };
     }
 
     const product = result.data.product;
-    const price = product.variants?.[0]?.priceWithTax 
+    const variant = product.variants?.[0];
+    const price = variant?.priceWithTax 
       ? new Intl.NumberFormat('en-US', {
           style: 'currency',
-          currency: product.variants[0].currencyCode,
-        }).format(product.variants[0].priceWithTax / 100)
-      : 'Price available on request';
+          currency: variant.currencyCode,
+        }).format(variant.priceWithTax / 100)
+      : null;
+
+    const description = product.description || `Discover ${product.name} - Premium quality furniture for your home.${price ? ` Starting at ${price}.` : ''} Free shipping on orders over $200.`;
+    
+    const imageUrl = product.featuredAsset?.preview || '/images/logos/logo_compacto.png';
 
     return {
-      title: `${product.name} | Florida Homes Furniture`,
-      description: product.description || `Discover ${product.name} - Quality furniture for your home. ${price}`,
-      keywords: `furniture, ${product.name}, home decor, quality furniture, Florida furniture`,
+      title: product.name,
+      description,
+      keywords: `${product.name}, furniture, home decor, quality furniture, Miami furniture, Florida furniture, buy ${product.name}`,
+      authors: [{ name: 'Florida Homes Furniture' }],
       openGraph: {
-        title: `${product.name} | Florida Homes Furniture`,
-        description: product.description || `Quality ${product.name} for your home`,
         type: 'website',
-        images: product.featuredAsset?.preview ? [
+        locale: 'en_US',
+        url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'}/products/${params.slug}`,
+        siteName: 'Florida Homes Furniture',
+        title: `${product.name} | Florida Homes Furniture`,
+        description,
+        images: [
           {
-            url: product.featuredAsset.preview,
-            width: product.featuredAsset.width || 800,
-            height: product.featuredAsset.height || 600,
+            url: imageUrl,
+            width: product.featuredAsset?.width || 1200,
+            height: product.featuredAsset?.height || 630,
             alt: product.name,
+            type: 'image/jpeg',
           }
-        ] : [],
+        ],
       },
       twitter: {
         card: 'summary_large_image',
         title: `${product.name} | Florida Homes Furniture`,
-        description: product.description || `Quality ${product.name} for your home`,
-        images: product.featuredAsset?.preview ? [product.featuredAsset.preview] : [],
+        description,
+        images: [imageUrl],
+        creator: '@FloridaHomesFurn',
+      },
+      alternates: {
+        canonical: `/products/${params.slug}`,
+      },
+      robots: {
+        index: true,
+        follow: true,
+        googleBot: {
+          index: true,
+          follow: true,
+          'max-video-preview': -1,
+          'max-image-preview': 'large',
+          'max-snippet': -1,
+        },
       },
     };
   } catch (error) {
     console.error('Error generating metadata:', error);
     return {
-      title: 'Product | Florida Homes Furniture',
+      title: 'Product',
       description: 'Quality furniture for your home',
+      robots: { index: false, follow: true },
     };
   }
 }
@@ -65,7 +93,7 @@ export async function generateStaticParams() {
   try {
     const result = await getAllProducts();
 
-    return result.data?.products?.items?.map((product) => ({
+    return result.data?.products?.items?.map((product: Product) => ({
       slug: product.slug,
     })) || [];
   } catch (error) {
@@ -86,7 +114,7 @@ export default async function ProductPageRoute({ params }: ProductPageProps) {
     const relatedProductsResult = await getAllProducts();
 
     const relatedProducts = relatedProductsResult.data?.products?.items
-      ?.filter(p => p.id !== result.data.product.id)
+      ?.filter((p: Product) => p.id !== result.data.product.id)
       .slice(0, 4) || [];
 
     return (

@@ -4,7 +4,7 @@ export default async function TestVendurePage() {
   const result = await testVendureConnection();
 
   return (
-    <div className="min-h-screen bg-white p-8">
+    <div className="min-h-screen bg-white pt-32 pb-16 px-8">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-8">Vendure Connection Test</h1>
         

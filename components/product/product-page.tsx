@@ -21,14 +21,12 @@ export function ProductPage({ product, relatedProducts }: ProductPageProps) {
       initial="hidden"
       animate="visible"
       variants={staggerContainer}
-      className="min-h-screen bg-white w-full "
+      className="min-h-screen bg-white w-full"
     >
- 
-
       {/* Product Gallery and Details */}
       <motion.section 
         variants={fadeInUp}
-        className="py-16 bg-white"
+        className="pt-32 pb-16 bg-white"
       >
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">

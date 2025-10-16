@@ -28,6 +28,7 @@ export function EnhancedProductsGrid() {
   const [filteredProducts, setFilteredProducts] = useState<DisplayProduct[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'featured' | 'price-low' | 'price-high'>('featured');
+  const [isLoaded, setIsLoaded] = useState(false);
   const { ref, isVisible } = useScrollAnimation();
 
   useEffect(() => {
@@ -40,15 +41,33 @@ export function EnhancedProductsGrid() {
         if (data.products.items) {
           setProducts(data.products.items);
           setFilteredProducts(data.products.items);
+          setIsLoaded(true);
         }
       } catch (error) {
         console.error('Error loading products:', error);
         toast.error('Failed to load products');
+        setIsLoaded(true); // Still set loaded to show error state
       }
     }
 
     loadProducts();
   }, []);
+
+  // Fallback: ensure products are visible after a delay if intersection observer fails
+  useEffect(() => {
+    if (isLoaded && !isVisible) {
+      const fallbackTimer = setTimeout(() => {
+        // Force visibility after 2 seconds if intersection observer hasn't triggered
+        const element = ref.current;
+        if (element && !isVisible) {
+          // Trigger a re-render by updating a dummy state
+          setSearchQuery(prev => prev);
+        }
+      }, 2000);
+
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [isLoaded, isVisible, ref]);
 
   useEffect(() => {
     let filtered = [...products];
@@ -116,14 +135,19 @@ export function EnhancedProductsGrid() {
           </div>
         </div>
 
-        {filteredProducts.length === 0 ? (
+        {!isLoaded ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
+            <p className="text-brand-dark-blue/60 text-lg">Loading products...</p>
+          </div>
+        ) : filteredProducts.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-brand-dark-blue/60 text-lg">No products found matching your criteria.</p>
           </div>
         ) : (
           <motion.div
             initial="hidden"
-            animate={isVisible ? 'visible' : 'hidden'}
+            animate="visible"
             variants={staggerContainer}
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
           >

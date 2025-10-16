@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Search, Heart, User, Menu } from 'lucide-react';
@@ -8,31 +9,28 @@ import { navigationItems } from '@/lib/data';
 import { MiniCart } from '@/components/cart/mini-cart';
 
 export function Header() {
-  // Estado para controlar si el usuario ha hecho scroll
-  // const [scrolled, setScrolled] = useState(false);
+  const pathname = usePathname();
+  const [scrolled, setScrolled] = useState(false);
 
-  // useEffect(() => {
-  //   // Función para manejar el scroll y cambiar el estado
-  //   const handleScroll = () => {
-  //     // Detectar cuando el scroll pasa los 40px (top-10)
-  //     // Solo entonces el navbar se vuelve sticky en top-0 y se aplican los efectos
-  //     if (window.scrollY >= 50) {
-  //       setScrolled(true);
-  //     } else {
-  //       setScrolled(false);
-  //     }
-  //   };
+  // Detectar si estamos en páginas de productos o páginas internas
+  const isProductPage = pathname?.startsWith('/products/') && pathname !== '/products';
+  const isInternalPage = pathname !== '/' || scrolled;
+  const shouldBeFixed = isProductPage || isInternalPage;
 
-  //   window.addEventListener('scroll', handleScroll);
-  //   // Limpieza al desmontar
-  //   return () => window.removeEventListener('scroll', handleScroll);
-  // }, []);
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 50);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   return (
     <header
-      className={`left-0 right-0 z-50 transition-all  ${
-        false
-          ? 'fixed top-0 bg-brand-dark-blue backdrop-blur-md '
+      className={`left-0 right-0 z-50 transition-all duration-300 ${
+        shouldBeFixed
+          ? 'fixed top-0 bg-brand-dark-blue/95 backdrop-blur-md shadow-lg'
           : 'absolute top-0 pt-10'
       }`}
     >

@@ -3,40 +3,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function ProductLoading() {
   return (
     <div className="min-h-screen bg-white">
-      {/* Hero Section Skeleton */}
-      <section className="relative min-h-[60vh] bg-gradient-to-br from-brand-cream via-brand-accent/20 to-brand-dark-blue/50">
-        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-8 py-16">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            {/* Product Image Skeleton */}
-            <div className="relative">
-              <Skeleton className="aspect-square max-w-lg mx-auto rounded-2xl" />
-            </div>
-
-            {/* Product Info Skeleton */}
-            <div className="text-center lg:text-left space-y-6">
-              <Skeleton className="h-4 w-32 mx-auto lg:mx-0" />
-              <Skeleton className="h-16 w-full max-w-2xl mx-auto lg:mx-0" />
-              <Skeleton className="h-6 w-full max-w-xl mx-auto lg:mx-0" />
-              <Skeleton className="h-12 w-48 mx-auto lg:mx-0" />
-              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                <Skeleton className="h-12 w-40" />
-                <div className="flex gap-3 justify-center lg:justify-start">
-                  <Skeleton className="h-12 w-32" />
-                  <Skeleton className="h-12 w-32" />
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2 justify-center lg:justify-start">
-                <Skeleton className="h-6 w-24" />
-                <Skeleton className="h-6 w-28" />
-                <Skeleton className="h-6 w-26" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Gallery and Details Skeleton */}
-      <section className="py-16 bg-white">
+      <section className="pt-32 pb-16 bg-white">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
             {/* Gallery Skeleton */}

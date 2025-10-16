@@ -52,4 +52,26 @@
     font-family: var(--font-tango-sans), system-ui, sans-serif;
     color: #234465;
   }
+
+  /* Optimizaciones de rendimiento */
+  img {
+    content-visibility: auto;
+  }
+
+  /* Mejora de scroll suave */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Optimización de animaciones */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
