@@ -17,6 +17,15 @@ export interface ProductVariant {
   product?: Product;
 }
 
+export interface ProductCustomFields {
+  materials?: string;
+  dimensions?: string;
+  weight?: string;
+  color?: string;
+  assembly?: string;
+  warranty?: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -25,6 +34,7 @@ export interface Product {
   featuredAsset?: Asset;
   assets: Asset[];
   variants: ProductVariant[];
+  customFields?: ProductCustomFields;
 }
 
 export interface SearchResultProduct {

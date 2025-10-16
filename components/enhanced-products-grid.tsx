@@ -11,6 +11,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { toast } from 'sonner';
 import Image from 'next/image';
+import Link from 'next/link';
 
 interface DisplayProduct {
   id: string;
@@ -133,6 +134,11 @@ export function EnhancedProductsGrid() {
                 whileHover={{ y: -8, transition: { duration: 0.3 } }}
                 className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-brand transition-all duration-300"
               >
+                <Link 
+                  href={`/products/${product.slug}`}
+                  className="block"
+                  prefetch={true}
+                >
                 <div className="relative aspect-square overflow-hidden bg-brand-cream">
                   {product.featuredAsset?.preview ? (
                   <Image
@@ -154,32 +160,33 @@ export function EnhancedProductsGrid() {
                   )}
                 </div>
 
-                <div className="p-6">
-                  <h3 className="font-bold text-brand-dark-blue text-lg mb-2 line-clamp-1 font-tango-sans">
-                    {product.name}
-                  </h3>
+                  <div className="p-6">
+                    <h3 className="font-bold text-brand-dark-blue text-lg mb-2 line-clamp-1 font-tango-sans">
+                      {product.name}
+                    </h3>
 
-                  <p className="text-sm text-brand-dark-blue/70 mb-4 line-clamp-2">
-                    Available now - Click to view more details
-                  </p>
+                    <p className="text-sm text-brand-dark-blue/70 mb-4 line-clamp-2">
+                      Available now - Click to view more details
+                    </p>
 
-                  <div className="flex items-end justify-between">
-                    <div>
-                      <div className="text-lg font-semibold text-brand-dark-blue">
-                        View details
+                    <div className="flex items-end justify-between">
+                      <div>
+                        <div className="text-lg font-semibold text-brand-dark-blue">
+                          View details
+                        </div>
                       </div>
-                    </div>
 
-                    <Button
-                      size="sm"
-                      onClick={() => window.open(`/products/${product.slug}`, '_blank')}
-                      className="gap-2"
-                    >
-                      <ShoppingCart className="w-4 h-4" />
-                      View
-                    </Button>
+                      <Button
+                        size="sm"
+                        className="gap-2"
+                        onClick={(e) => e.preventDefault()}
+                      >
+                        <ShoppingCart className="w-4 h-4" />
+                        View
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                </Link>
               </motion.div>
             ))}
           </motion.div>

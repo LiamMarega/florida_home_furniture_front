@@ -1,5 +1,5 @@
 import { gql } from 'graphql-request';
-import { PRODUCT_FRAGMENT, ORDER_FRAGMENT, ASSET_FRAGMENT, SEARCH_RESULT_ASSET_FRAGMENT } from './fragments';
+import { PRODUCT_FRAGMENT, ORDER_FRAGMENT, ASSET_FRAGMENT, SEARCH_RESULT_ASSET_FRAGMENT, PRODUCT_VARIANT_FRAGMENT } from './fragments';
 
 export const GET_PRODUCTS = gql`
   ${PRODUCT_FRAGMENT}
@@ -46,6 +46,41 @@ export const GET_PRODUCT_BY_SLUG = gql`
   query GetProductBySlug($slug: String!) {
     product(slug: $slug) {
       ...Product
+    }
+  }
+`;
+
+export const GET_PRODUCT_DETAILS = gql`
+  ${ASSET_FRAGMENT}
+  ${PRODUCT_VARIANT_FRAGMENT}
+  query GetProductDetails($slug: String!) {
+    product(slug: $slug) {
+      id
+      name
+      slug
+      description
+      featuredAsset {
+        ...Asset
+      }
+      assets {
+        ...Asset
+      }
+      variants {
+        ...ProductVariant
+        product {
+          id
+          name
+          slug
+        }
+      }
+      customFields {
+        materials
+        dimensions
+        weight
+        color
+        assembly
+        warranty
+      }
     }
   }
 `;
