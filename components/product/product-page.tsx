@@ -21,12 +21,9 @@ export function ProductPage({ product, relatedProducts }: ProductPageProps) {
       initial="hidden"
       animate="visible"
       variants={staggerContainer}
-      className="min-h-screen bg-white"
+      className="min-h-screen bg-white w-full "
     >
-      {/* Product Hero Section */}
-      <motion.section variants={fadeInUp} className="relative">
-        <ProductHero product={product} />
-      </motion.section>
+ 
 
       {/* Product Gallery and Details */}
       <motion.section 

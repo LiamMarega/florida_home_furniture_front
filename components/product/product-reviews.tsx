@@ -94,6 +94,16 @@ export function ProductReviews({ product }: ProductReviewsProps) {
   const averageRating = 4.8;
   const totalReviews = 127;
 
+  // Consistent date formatting to prevent hydration errors
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric'
+    });
+  };
+
   const filteredReviews = mockReviews
     .filter(review => filterRating === null || review.rating === filterRating)
     .sort((a, b) => {
@@ -281,7 +291,7 @@ export function ProductReviews({ product }: ProductReviewsProps) {
                         <div className="flex items-center gap-2 mt-1">
                           {renderStars(review.rating, 'sm')}
                           <span className="text-sm text-brand-dark-blue/70">
-                            {new Date(review.date).toLocaleDateString()}
+                            {formatDate(review.date)}
                           </span>
                         </div>
                       </div>
