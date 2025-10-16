@@ -58,7 +58,7 @@ export function CartItem({ item }: CartItemProps) {
       <div className="relative w-16 h-16 flex-shrink-0">
         {item.productVariant.product?.featuredAsset?.preview ? (
           <Image
-            src={item.productVariant.product.featuredAsset.preview}
+            src={item.productVariant.product.featuredAsset?.preview}
             alt={item.productVariant.product.name}
             fill
             className="object-cover rounded-md"
