@@ -1,7 +1,6 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { vendureServer } from '@/lib/vendure-server';
-import { GET_PRODUCT_BY_SLUG, GET_ALL_PRODUCTS } from '@/lib/graphql/queries';
+import { getProductBySlug, getAllProducts } from '@/lib/vendure-server';
 import { ProductPage } from '@/components/product/product-page';
 
 interface ProductPageProps {
@@ -12,19 +11,16 @@ interface ProductPageProps {
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
   try {
-    const result = await vendureServer.request<{ product: any }>(
-      GET_PRODUCT_BY_SLUG,
-      { slug: params.slug }
-    );
+    const result = await getProductBySlug(params.slug);
 
-    if (!result.product) {
+    if (!result.data?.product) {
       return {
         title: 'Product Not Found | Florida Homes Furniture',
         description: 'The requested product could not be found.',
       };
     }
 
-    const product = result.product;
+    const product = result.data.product;
     const price = product.variants?.[0]?.priceWithTax 
       ? new Intl.NumberFormat('en-US', {
           style: 'currency',
@@ -39,7 +35,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
       openGraph: {
         title: `${product.name} | Florida Homes Furniture`,
         description: product.description || `Quality ${product.name} for your home`,
-        type: 'product',
+        type: 'website',
         images: product.featuredAsset?.preview ? [
           {
             url: product.featuredAsset.preview,
@@ -67,13 +63,11 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 
 export async function generateStaticParams() {
   try {
-    const result = await vendureServer.request<{ products: { items: any[] } }>(
-      GET_ALL_PRODUCTS
-    );
+    const result = await getAllProducts();
 
-    return result.products.items.map((product) => ({
+    return result.data?.products?.items?.map((product) => ({
       slug: product.slug,
-    }));
+    })) || [];
   } catch (error) {
     console.error('Error generating static params:', error);
     return [];
@@ -82,27 +76,22 @@ export async function generateStaticParams() {
 
 export default async function ProductPageRoute({ params }: ProductPageProps) {
   try {
-    const result = await vendureServer.request<{ product: any }>(
-      GET_PRODUCT_BY_SLUG,
-      { slug: params.slug }
-    );
+    const result = await getProductBySlug(params.slug);
 
-    if (!result.product) {
+    if (!result.data?.product) {
       notFound();
     }
 
     // Get related products (same category or random products)
-    const relatedProductsResult = await vendureServer.request<{ products: { items: any[] } }>(
-      GET_ALL_PRODUCTS
-    );
+    const relatedProductsResult = await getAllProducts();
 
-    const relatedProducts = relatedProductsResult.products.items
-      .filter(p => p.id !== result.product.id)
-      .slice(0, 4);
+    const relatedProducts = relatedProductsResult.data?.products?.items
+      ?.filter(p => p.id !== result.data.product.id)
+      .slice(0, 4) || [];
 
     return (
       <ProductPage 
-        product={result.product} 
+        product={result.data.product} 
         relatedProducts={relatedProducts}
       />
     );

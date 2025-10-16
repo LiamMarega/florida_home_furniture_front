@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { Product } from '@/lib/types';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { Badge } from '@/components/ui/badge';
-import { Zoom, Download, Share2 } from 'lucide-react';
+import { Search, Download, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface ProductGalleryProps {
@@ -61,7 +61,7 @@ export function ProductGallery({ product }: ProductGalleryProps) {
             size="sm"
             className="bg-white/90 backdrop-blur-sm hover:bg-white"
           >
-            <Zoom className="w-4 h-4" />
+            <Search className="w-4 h-4" />
           </Button>
           <Button
             variant="secondary"

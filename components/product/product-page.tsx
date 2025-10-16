@@ -2,13 +2,13 @@
 
 import { motion } from 'framer-motion';
 import { Product } from '@/lib/types';
+import { fadeInUp, staggerContainer } from '@/lib/animations';
 import { ProductHero } from './product-hero';
 import { ProductGallery } from './product-gallery';
 import { ProductDetails } from './product-details';
 import { ProductFeatures } from './product-features';
 import { ProductReviews } from './product-reviews';
 import { RelatedProducts } from './related-products';
-import { fadeInUp, staggerContainer } from '@/lib/animations';
 
 interface ProductPageProps {
   product: Product;
