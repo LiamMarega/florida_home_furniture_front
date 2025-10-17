@@ -10,10 +10,10 @@ import Link from 'next/link';
 export function CartPage() {
   const { items, itemCount, total, order, clearCart, isUpdating, isLoading } = useCart();
 
-  const formatPrice = (price: number, currencyCode: string) => {
+  const formatPrice = (price: number, currencyCode: string = 'USD') => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: currencyCode,
+      currency: currencyCode || 'USD',
     }).format(price / 100);
   };
 
@@ -77,7 +77,8 @@ export function CartPage() {
         <div className="lg:col-span-2">
           <div className="space-y-4">
             {items.map((item) => (
-              <CartItem key={item.id} item={item} />
+              <CartItem key={item.id} item={item} currencyCode={order?.currencyCode} />
+
             ))}
           </div>
         </div>

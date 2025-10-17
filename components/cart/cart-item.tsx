@@ -10,15 +10,16 @@ import Image from 'next/image';
 
 interface CartItemProps {
   item: OrderLine;
+  /** opcional: pásalo desde arriba si lo tenés (order.currencyCode) */
+  currencyCode?: string;
 }
 
-export function CartItem({ item }: CartItemProps) {
+export function CartItem({ item, currencyCode }: CartItemProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const { updateQuantity, removeItem } = useCart();
 
   const handleQuantityChange = async (newQuantity: number) => {
     if (isUpdating || newQuantity === item.quantity) return;
-
     try {
       setIsUpdating(true);
       await updateQuantity(item.id, newQuantity);
@@ -32,7 +33,6 @@ export function CartItem({ item }: CartItemProps) {
 
   const handleRemove = async () => {
     if (isUpdating) return;
-
     try {
       setIsUpdating(true);
       await removeItem(item.id);
@@ -45,12 +45,31 @@ export function CartItem({ item }: CartItemProps) {
     }
   };
 
-  const formatPrice = (price: number, currencyCode: string) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currencyCode,
-    }).format(price / 100);
+  // ✅ util robusto
+  const formatPrice = (price: number, code?: string) => {
+    const safeCode =
+      (code && /^[A-Z]{3}$/.test(code) ? code : undefined) ??
+      (item.productVariant?.currencyCode && /^[A-Z]{3}$/.test(item.productVariant.currencyCode)
+        ? item.productVariant.currencyCode
+        : undefined) ??
+      'USD';
+
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: safeCode,
+      }).format(price / 100);
+    } catch {
+      // fallback ultra defensivo
+      return `${(price / 100).toFixed(2)} ${safeCode}`;
+    }
   };
+
+  // 👇 usamos un currency “seguro” para todas las llamadas
+  const displayCurrency =
+    currencyCode ??
+    item.productVariant?.currencyCode ??
+    'USD';
 
   return (
     <div className="flex items-center space-x-4 p-4 border rounded-lg">
@@ -58,7 +77,7 @@ export function CartItem({ item }: CartItemProps) {
       <div className="relative w-16 h-16 flex-shrink-0">
         {item.productVariant.product?.featuredAsset?.preview ? (
           <Image
-            src={item.productVariant.product.featuredAsset?.preview}
+            src={item.productVariant.product.featuredAsset.preview}
             alt={item.productVariant.product.name}
             fill
             className="object-cover rounded-md"
@@ -79,7 +98,7 @@ export function CartItem({ item }: CartItemProps) {
           {item.productVariant.name}
         </p>
         <p className="text-sm font-medium text-brand-dark-blue">
-          {formatPrice(item.unitPriceWithTax, item.productVariant.currencyCode)}
+          {formatPrice(item.unitPriceWithTax, displayCurrency)}
         </p>
       </div>
 
@@ -98,11 +117,11 @@ export function CartItem({ item }: CartItemProps) {
             <Minus className="h-3 w-3" />
           )}
         </Button>
-        
+
         <span className="text-sm font-medium w-8 text-center">
           {item.quantity}
         </span>
-        
+
         <Button
           variant="outline"
           size="sm"
@@ -121,7 +140,7 @@ export function CartItem({ item }: CartItemProps) {
       {/* Total Price */}
       <div className="text-right">
         <p className="text-sm font-medium text-brand-dark-blue">
-          {formatPrice(item.linePriceWithTax, item.productVariant.currencyCode)}
+          {formatPrice(item.linePriceWithTax, displayCurrency)}
         </p>
       </div>
 
