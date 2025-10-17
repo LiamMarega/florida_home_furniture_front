@@ -1,5 +1,4 @@
 import { getAllProducts } from '@/lib/vendure-server';
-import { AddToCartButton } from '@/components/cart/add-to-cart-button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';

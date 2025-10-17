@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { REMOVE_ORDER_LINE } from '@/lib/graphql/mutations';
-
-const VENDURE_SHOP_API = process.env.VENDURE_SHOP_API_URL || 'http://localhost:3000/shop-api';
+import { fetchGraphQL } from '@/lib/vendure-server';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -19,31 +18,29 @@ export async function POST(request: NextRequest) {
 
     const cookieHeader = request.headers.get('cookie') || '';
 
-    const response = await fetch(VENDURE_SHOP_API, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cookie': cookieHeader,
-      },
-      body: JSON.stringify({
+    const response = await fetchGraphQL(
+      {
         query: REMOVE_ORDER_LINE,
         variables: {
           orderLineId,
         },
-      }),
-    });
+      },
+      {
+        headers: {
+          'Cookie': cookieHeader,
+        },
+      }
+    );
 
-    const data = await response.json();
-
-    if (data.errors) {
-      console.error('GraphQL errors:', data.errors);
+    if (response.errors) {
+      console.error('GraphQL errors:', response.errors);
       return NextResponse.json(
-        { error: 'Failed to remove cart item', details: data.errors },
+        { error: 'Failed to remove cart item', details: response.errors },
         { status: 400 }
       );
     }
 
-    return NextResponse.json(data.data);
+    return NextResponse.json(response.data);
   } catch (error) {
     console.error('Remove cart error:', error);
     return NextResponse.json(
