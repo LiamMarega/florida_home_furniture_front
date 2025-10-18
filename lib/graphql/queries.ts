@@ -170,3 +170,32 @@ export const GET_ALL_PRODUCTS = gql`
       }
     }
 `;
+
+export const GET_ELIGIBLE_SHIPPING_METHODS = gql`
+  query GetEligibleShippingMethods {
+    eligibleShippingMethods {
+      id
+      code
+      name
+      description
+      price
+      priceWithTax
+      metadata
+    }
+  }
+`;
+
+export const GET_ORDER_BY_CODE = gql`
+  ${ORDER_FRAGMENT}
+  query GetOrderByCode($code: String!) {
+    orderByCode(code: $code) {
+      ...Order
+    }
+  }
+`;
+
+export const GET_NEXT_ORDER_STATES = gql`
+  query GetNextOrderStates {
+    nextOrderStates
+  }
+`;

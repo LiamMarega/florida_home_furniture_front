@@ -85,9 +85,62 @@ export const ORDER_FRAGMENT = gql`
     id
     code
     state
+    active
+    createdAt
+    updatedAt
     total
     totalWithTax
+    subTotal
+    subTotalWithTax
     currencyCode
+    shipping
+    shippingWithTax
+    customer {
+      id
+      firstName
+      lastName
+      emailAddress
+    }
+    shippingAddress {
+      fullName
+      company
+      streetLine1
+      streetLine2
+      city
+      province
+      postalCode
+      country
+      phoneNumber
+    }
+    billingAddress {
+      fullName
+      company
+      streetLine1
+      streetLine2
+      city
+      province
+      postalCode
+      country
+      phoneNumber
+    }
+    shippingLines {
+      shippingMethod {
+        id
+        code
+        name
+        description
+      }
+      priceWithTax
+    }
+    payments {
+      id
+      state
+      method
+      amount
+      transactionId
+      errorMessage
+      metadata
+    }
     lines {
       ...OrderLine
     }

@@ -187,7 +187,11 @@ florida_home_front/
    
    # Next.js Configuration
    NEXT_PUBLIC_VENDURE_API_URL=http://localhost:3000/shop-api
-   NEXT_PUBLIC_SITE_URL=http://localhost:3000
+   NEXT_PUBLIC_SITE_URL=http://localhost:3001
+   
+   # Stripe Configuration
+   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_your_key_here
+   STRIPE_SECRET_KEY=sk_test_your_key_here
    ```
 
 4. **Start the development server**
@@ -228,7 +232,9 @@ florida_home_front/
 | `VENDURE_SHOP_API_URL` | Vendure Shop API endpoint | `http://localhost:3000/shop-api` |
 | `VENDURE_ADMIN_API_URL` | Vendure Admin API endpoint | `http://localhost:3000/admin-api` |
 | `NEXT_PUBLIC_VENDURE_API_URL` | Public Vendure API URL | `http://localhost:3000/shop-api` |
-| `NEXT_PUBLIC_SITE_URL` | Public site URL | `http://localhost:3000` |
+| `NEXT_PUBLIC_SITE_URL` | Public site URL | `http://localhost:3001` |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key | `pk_test_...` |
+| `STRIPE_SECRET_KEY` | Stripe secret key (server-side only) | `sk_test_...` |
 
 ### Next.js Configuration
 
@@ -432,6 +438,416 @@ await removeItem(orderLineId);
 - **Client-side**: Cart state managed by React Context
 - **Session**: Cart persists across browser sessions
 - **Optimistic Updates**: UI updates immediately, syncs with server
+
+## 💳 Checkout & Payment System (Stripe Integration)
+
+### Overview
+
+The checkout system implements a complete end-to-end payment flow using **Vendure** as the backend and **Stripe** as the payment gateway. The integration uses Stripe's **Payment Intents API** with the **Payment Element** for a secure, PCI-compliant checkout experience.
+
+### Architecture
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant API Routes
+    participant Vendure
+    participant Stripe
+    
+    User->>Frontend: Navigate to /checkout
+    Frontend->>API Routes: Load active cart
+    API Routes->>Vendure: GET activeOrder
+    Vendure-->>Frontend: Order data
+    
+    User->>Frontend: Fill customer info & address
+    Frontend->>API Routes: Set customer, address, shipping
+    API Routes->>Vendure: Multiple mutations
+    Vendure-->>Frontend: Updated order
+    
+    Frontend->>API Routes: Create Payment Intent
+    API Routes->>Vendure: createStripePaymentIntent
+    Vendure->>Stripe: Create Payment Intent
+    Stripe-->>Vendure: clientSecret
+    Vendure-->>Frontend: clientSecret
+    
+    User->>Frontend: Enter payment details
+    Frontend->>Stripe: confirmPayment
+    Stripe-->>Frontend: Redirect to confirmation
+    
+    Stripe->>Vendure: Webhook (payment_intent.succeeded)
+    Vendure-->>Stripe: 200 OK
+    
+    User->>Frontend: View confirmation page
+    Frontend->>API Routes: Get order by code
+    API Routes->>Vendure: orderByCode query
+    Vendure-->>Frontend: Order with payment status
+```
+
+### Checkout Flow Steps
+
+#### Step 1: Customer Information (`/checkout?step=customer`)
+
+Users provide:
+- **Contact Information**: First name, last name, email
+- **Shipping Address**: Full name, street address, city, state, postal code, phone
+- **Billing Address**: Optional separate billing address
+- **Shipping Method**: Select from eligible shipping methods provided by Vendure
+
+**API Calls:**
+```typescript
+// Set customer for order
+POST /api/checkout/set-customer
+Body: { firstName, lastName, emailAddress }
+
+// Set shipping address
+POST /api/checkout/set-shipping-address
+Body: { fullName, streetLine1, streetLine2, city, province, postalCode, countryCode, phoneNumber }
+
+// Set billing address (if different)
+POST /api/checkout/set-billing-address
+Body: { fullName, streetLine1, streetLine2, city, province, postalCode, countryCode, phoneNumber }
+
+// Set shipping method
+POST /api/checkout/set-shipping-method
+Body: { shippingMethodId }
+
+// Get eligible shipping methods
+GET /api/checkout/shipping-methods
+Response: { shippingMethods: [...] }
+```
+
+#### Step 2: Payment (`/checkout?step=payment`)
+
+The payment step uses Stripe's **Payment Element** for secure payment collection:
+
+**Features:**
+- Pre-built, customizable payment form
+- Supports multiple payment methods (cards, wallets, local payment methods)
+- Automatic SCA/3DS handling
+- Built-in validation and error handling
+- Mobile-optimized UI
+
+**Implementation:**
+```typescript
+// Create Payment Intent
+POST /api/checkout/payment-intent
+Body: { orderCode }
+Response: { clientSecret }
+
+// Payment Element initialization
+<Elements options={{ clientSecret }} stripe={stripePromise}>
+  <PaymentElement />
+</Elements>
+
+// Confirm payment
+stripe.confirmPayment({
+  elements,
+  confirmParams: {
+    return_url: `${SITE_URL}/checkout/confirmation/${orderCode}`
+  }
+})
+```
+
+#### Step 3: Confirmation (`/checkout/confirmation/[orderCode]`)
+
+After Stripe processes the payment, users are redirected to the confirmation page:
+
+**URL Parameters:**
+- `payment_intent`: Stripe Payment Intent ID
+- `payment_intent_client_secret`: Client secret for verification
+- `redirect_status`: Payment result (`succeeded`, `processing`, or `requires_payment_method`)
+
+**Order States:**
+- ✅ **Success**: Payment succeeded, order confirmed
+- ⏳ **Pending**: Payment processing (async payment methods)
+- ❌ **Failed**: Payment declined or error
+
+### API Routes
+
+#### Checkout API Endpoints
+
+```typescript
+// Get order by code
+GET /api/orders/[orderCode]
+Response: { order: Order }
+
+// Set customer information
+POST /api/checkout/set-customer
+Body: { firstName, lastName, emailAddress }
+Response: { order: Order }
+
+// Set shipping address
+POST /api/checkout/set-shipping-address
+Body: { fullName, streetLine1, streetLine2, city, province, postalCode, countryCode, phoneNumber }
+Response: { order: Order }
+
+// Set billing address
+POST /api/checkout/set-billing-address
+Body: { fullName, streetLine1, streetLine2, city, province, postalCode, countryCode, phoneNumber }
+Response: { order: Order }
+
+// Set shipping method
+POST /api/checkout/set-shipping-method
+Body: { shippingMethodId }
+Response: { order: Order }
+
+// Get eligible shipping methods
+GET /api/checkout/shipping-methods
+Response: { shippingMethods: ShippingMethod[] }
+
+// Create Stripe Payment Intent
+POST /api/checkout/payment-intent
+Body: { orderCode }
+Response: { clientSecret: string }
+```
+
+### GraphQL Mutations
+
+```graphql
+# Set customer for order
+mutation SetCustomerForOrder($input: CreateCustomerInput!) {
+  setCustomerForOrder(input: $input) {
+    ... on Order { ...Order }
+    ... on ErrorResult { errorCode message }
+  }
+}
+
+# Set shipping address
+mutation SetOrderShippingAddress($input: CreateAddressInput!) {
+  setOrderShippingAddress(input: $input) {
+    ... on Order { ...Order }
+    ... on ErrorResult { errorCode message }
+  }
+}
+
+# Set billing address
+mutation SetOrderBillingAddress($input: CreateAddressInput!) {
+  setOrderBillingAddress(input: $input) {
+    ... on Order { ...Order }
+    ... on ErrorResult { errorCode message }
+  }
+}
+
+# Set shipping method
+mutation SetOrderShippingMethod($shippingMethodId: [ID!]!) {
+  setOrderShippingMethod(shippingMethodId: $shippingMethodId) {
+    ... on Order { ...Order }
+    ... on ErrorResult { errorCode message }
+  }
+}
+
+# Create Stripe Payment Intent
+mutation CreateStripePaymentIntent($orderCode: String!) {
+  createStripePaymentIntent(orderCode: $orderCode)
+}
+```
+
+### GraphQL Queries
+
+```graphql
+# Get order by code
+query GetOrderByCode($code: String!) {
+  orderByCode(code: $code) {
+    ...Order
+  }
+}
+
+# Get eligible shipping methods
+query GetEligibleShippingMethods {
+  eligibleShippingMethods {
+    id
+    code
+    name
+    description
+    price
+    priceWithTax
+  }
+}
+```
+
+### Stripe Configuration
+
+#### Environment Variables
+
+Add these to your `.env.local`:
+
+```env
+# Stripe Configuration
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_SECRET_KEY=sk_test_...
+```
+
+#### Stripe Dashboard Setup
+
+1. **Enable Payment Methods**: Configure which payment methods to accept
+2. **Setup Webhooks**: Point to your Vendure webhook endpoint
+3. **Test Mode**: Use test keys for development
+
+#### Webhook Configuration
+
+The Stripe webhook is handled by Vendure's **StripePlugin**:
+
+**Webhook URL**: `https://your-vendure-backend.com/payments/stripe`
+
+**Events to listen:**
+- `payment_intent.succeeded` - Payment succeeded
+- `payment_intent.payment_failed` - Payment failed
+- `payment_intent.processing` - Payment processing (async methods)
+
+**Local Development:**
+```bash
+# Install Stripe CLI
+brew install stripe/stripe-cli/stripe
+
+# Login to Stripe
+stripe login
+
+# Forward webhooks to local Vendure
+stripe listen --forward-to http://localhost:3000/payments/stripe
+```
+
+### Vendure StripePlugin Setup
+
+Ensure Vendure is configured with the StripePlugin:
+
+```typescript
+// vendure-config.ts
+import { StripePlugin } from '@vendure/payments-plugin/package/stripe';
+
+export const config: VendureConfig = {
+  plugins: [
+    StripePlugin.init({
+      storeCustomersInStripe: true,
+    }),
+  ],
+};
+```
+
+### Security Best Practices
+
+1. **Never expose secret keys**: Only use `NEXT_PUBLIC_` prefix for publishable keys
+2. **Server-side API routes**: All Vendure mutations happen server-side
+3. **PCI Compliance**: Stripe Elements handles sensitive card data
+4. **HTTPS required**: Stripe requires HTTPS for production
+5. **Webhook signature verification**: Vendure automatically verifies webhook signatures
+
+### Error Handling
+
+The checkout flow includes comprehensive error handling:
+
+**Validation Errors:**
+- Form validation using Zod schema
+- Real-time field validation
+- Clear error messages
+
+**Payment Errors:**
+- Card declined
+- Insufficient funds
+- Invalid card details
+- 3DS authentication failure
+
+**Network Errors:**
+- API timeout handling
+- Retry mechanisms
+- User-friendly error messages
+
+### Testing
+
+#### Test Cards (Stripe Test Mode)
+
+```
+# Successful payment
+4242 4242 4242 4242
+
+# 3DS authentication required
+4000 0025 0000 3155
+
+# Card declined
+4000 0000 0000 9995
+
+# Insufficient funds
+4000 0000 0000 9995
+```
+
+#### Test Workflow
+
+1. **Add products to cart**
+2. **Navigate to checkout**
+3. **Fill customer information**
+4. **Select shipping method**
+5. **Enter test card details**
+6. **Complete payment**
+7. **Verify confirmation page**
+
+### Components
+
+#### OrderSummary Component
+
+Reusable component for displaying order information:
+
+```tsx
+// components/checkout/order-summary.tsx
+interface OrderSummaryProps {
+  order: Order;
+  showItems?: boolean;
+}
+
+<OrderSummary order={order} showItems={true} />
+```
+
+**Features:**
+- Order items with images
+- Subtotal, shipping, and total
+- Shipping method display
+- Address information
+- Responsive layout
+
+### Performance Optimizations
+
+1. **Lazy Loading**: Stripe.js loads only on payment step
+2. **Server Components**: Most checkout UI is server-rendered
+3. **Optimistic Updates**: UI updates immediately
+4. **Minimal JavaScript**: Only interactive parts are client components
+5. **Image Optimization**: Product images use Next.js Image component
+
+### Accessibility
+
+- **Keyboard Navigation**: Full keyboard support
+- **Screen Readers**: Proper ARIA labels
+- **Focus Management**: Logical focus order
+- **Error Announcements**: Screen reader announcements for errors
+- **High Contrast**: Meets WCAG AA standards
+
+### Analytics & Conversion Tracking
+
+Recommended events to track:
+
+```typescript
+// Begin checkout
+gtag('event', 'begin_checkout', {
+  currency: 'USD',
+  value: orderTotal,
+  items: orderItems
+});
+
+// Add payment info
+gtag('event', 'add_payment_info', {
+  currency: 'USD',
+  value: orderTotal,
+  payment_type: 'credit_card'
+});
+
+// Purchase
+gtag('event', 'purchase', {
+  transaction_id: orderCode,
+  value: orderTotal,
+  currency: 'USD',
+  tax: taxAmount,
+  shipping: shippingCost,
+  items: orderItems
+});
+```
 
 ## 🎨 Styling & Animations
 

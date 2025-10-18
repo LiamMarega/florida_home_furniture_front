@@ -28,13 +28,18 @@ export async function fetchGraphQL<T = any>(
     revalidate?: number;
     tags?: string[];
     headers?: Record<string, string>;
+    req?: Request; // Add NextRequest to pass cookies
   }
 ): Promise<GraphQLResponse<T>> {
   try {
+    // Extract cookies from the request if provided
+    const cookieHeader = options?.req?.headers.get('cookie') || '';
+    
     const response = await fetch(VENDURE_SHOP_API, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(cookieHeader && { 'Cookie': cookieHeader }), // Pass cookies
         ...options?.headers,
       },
       body: JSON.stringify(request),
