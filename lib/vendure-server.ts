@@ -50,7 +50,23 @@ export async function fetchGraphQL<T = any>(
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`HTTP ${response.status} error from Vendure:`, errorText);
+      
+      try {
+        const errorJson = JSON.parse(errorText);
+        return { 
+          errors: errorJson.errors || [{ 
+            message: `HTTP ${response.status}: ${errorJson.message || errorText}` 
+          }] 
+        };
+      } catch {
+        return { 
+          errors: [{ 
+            message: `HTTP ${response.status}: ${errorText || 'Unknown error'}` 
+          }] 
+        };
+      }
     }
 
     const result = await response.json();
@@ -62,7 +78,11 @@ export async function fetchGraphQL<T = any>(
     return result;
   } catch (error) {
     console.error('GraphQL fetch error:', error);
-    return { errors: [{ message: 'Failed to fetch data' }] };
+    return { 
+      errors: [{ 
+        message: error instanceof Error ? error.message : 'Failed to fetch data' 
+      }] 
+    };
   }
 }
 

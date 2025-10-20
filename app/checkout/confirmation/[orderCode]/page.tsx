@@ -37,24 +37,54 @@ export default function CheckoutConfirmationPage() {
   useEffect(() => {
     if (orderCode) {
       loadOrder();
+      
+      // If payment is pending, poll for updates
+      if (redirectStatus === 'processing') {
+        const pollInterval = setInterval(() => {
+          loadOrder();
+        }, 3000); // Poll every 3 seconds
+        
+        // Stop polling after 30 seconds
+        const timeout = setTimeout(() => {
+          clearInterval(pollInterval);
+        }, 30000);
+        
+        return () => {
+          clearInterval(pollInterval);
+          clearTimeout(timeout);
+        };
+      }
     }
-  }, [orderCode]);
+  }, [orderCode, redirectStatus]);
 
   const loadOrder = async () => {
     try {
       setLoading(true);
       setError(null);
 
+      console.log('📦 Loading order:', orderCode);
+      console.log('🔗 Stripe redirect params:', { 
+        paymentIntent, 
+        redirectStatus 
+      });
+
       const res = await fetch(`/api/orders/${orderCode}`);
       const data = await res.json();
 
       if (!res.ok) {
+        console.error('❌ Failed to load order:', data);
         throw new Error(data.error || 'Failed to load order');
       }
 
+      console.log('✅ Order loaded successfully:', {
+        code: data.order.code,
+        state: data.order.state,
+        paymentsCount: data.order.payments?.length || 0
+      });
+
       setOrder(data.order);
     } catch (err) {
-      console.error('Error loading order:', err);
+      console.error('💥 Error loading order:', err);
       setError(err instanceof Error ? err.message : 'Failed to load order');
     } finally {
       setLoading(false);
@@ -62,17 +92,35 @@ export default function CheckoutConfirmationPage() {
   };
 
   const getPaymentStatus = () => {
+    console.log('🔍 Checking payment status...');
+    console.log('📊 Stripe redirect status:', redirectStatus);
+    console.log('📊 Order payments:', order?.payments);
+
     // Check Stripe redirect status first
     if (redirectStatus === 'succeeded') {
+      console.log('✅ Payment succeeded per Stripe redirect');
       return 'succeeded';
+    }
+
+    if (redirectStatus === 'processing') {
+      console.log('⏳ Payment processing per Stripe redirect');
+      return 'processing';
+    }
+
+    if (redirectStatus === 'requires_payment_method') {
+      console.log('❌ Payment failed per Stripe redirect');
+      return 'failed';
     }
 
     // Then check order payment state
     if (order?.payments && order.payments.length > 0) {
       const lastPayment = order.payments[order.payments.length - 1];
-      return lastPayment.state?.toLowerCase();
+      const state = lastPayment.state?.toLowerCase();
+      console.log('💳 Last payment state:', state);
+      return state;
     }
 
+    console.log('❓ Payment status unknown');
     return 'unknown';
   };
 
@@ -115,8 +163,8 @@ export default function CheckoutConfirmationPage() {
 
   const paymentStatus = getPaymentStatus();
   const isSuccess = paymentStatus === 'succeeded' || paymentStatus === 'settled';
-  const isPending = paymentStatus === 'pending' || paymentStatus === 'authorized';
-  const isFailed = paymentStatus === 'failed' || paymentStatus === 'declined' || paymentStatus === 'error';
+  const isPending = paymentStatus === 'pending' || paymentStatus === 'authorized' || paymentStatus === 'processing';
+  const isFailed = paymentStatus === 'failed' || paymentStatus === 'declined' || paymentStatus === 'error' || paymentStatus === 'cancelled';
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white py-12">
@@ -164,7 +212,7 @@ export default function CheckoutConfirmationPage() {
                       Confirmation Email Sent
                     </h3>
                     <p className="text-sm text-brand-dark-blue/70">
-                      We've sent a confirmation email to{' '}
+                      We&apos;ve sent a confirmation email to{' '}
                       <strong>{order.customer?.emailAddress}</strong> with your order details.
                     </p>
                   </div>
@@ -177,7 +225,7 @@ export default function CheckoutConfirmationPage() {
                       Order Processing
                     </h3>
                     <p className="text-sm text-brand-dark-blue/70">
-                      Your order is being prepared for shipment. You'll receive tracking
+                      Your order is being prepared for shipment. You&apos;ll receive tracking
                       information once it ships.
                     </p>
                   </div>
@@ -242,7 +290,7 @@ export default function CheckoutConfirmationPage() {
                     Payment Authorization
                   </h3>
                   <p className="text-sm text-brand-dark-blue/70">
-                    Your payment is being authorized. This usually takes a few moments. You'll
+                    Your payment is being authorized. This usually takes a few moments. You&apos;ll
                     receive a confirmation email once the payment is complete.
                   </p>
                 </div>
@@ -271,7 +319,7 @@ export default function CheckoutConfirmationPage() {
                 Payment Failed
               </h1>
               <p className="text-xl text-brand-dark-blue/70 mb-4">
-                We couldn't process your payment
+                We couldn&apos;t process your payment
               </p>
             </div>
 
@@ -341,7 +389,7 @@ export default function CheckoutConfirmationPage() {
             <Card className="p-6 bg-brand-cream/30">
               <h3 className="text-lg font-semibold text-brand-dark-blue mb-3">Need Help?</h3>
               <p className="text-sm text-brand-dark-blue/70 mb-4">
-                If you have any questions about your order, please don't hesitate to contact us.
+                If you have any questions about your order, please don&apos;t hesitate to contact us.
               </p>
               <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2">

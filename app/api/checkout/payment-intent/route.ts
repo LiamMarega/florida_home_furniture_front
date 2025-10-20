@@ -6,9 +6,17 @@ import { GET_ACTIVE_ORDER } from '@/lib/graphql/queries';
 
 export async function POST(req: NextRequest) {
   try {
-    const { orderCode } = await req.json();
+    const body = await req.json();
+    const orderCode = body.orderCode || body.code;
 
     console.log('📝 Creating payment intent for order:', orderCode);
+
+    if (!orderCode) {
+      return NextResponse.json({ 
+        error: 'Order code is required',
+        details: 'Please provide an order code'
+      }, { status: 400 });
+    }
 
     // First, verify the order is ready for payment
     const orderCheck = await fetchGraphQL({
@@ -26,6 +34,11 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
+    // Validate order code matches
+    if (order.code !== orderCode) {
+      console.warn('⚠️ Order code mismatch:', { provided: orderCode, actual: order.code });
+    }
+
     // Validate order has required data
     const missingFields = [];
     if (!order.customer?.emailAddress) missingFields.push('customer email');
@@ -33,6 +46,7 @@ export async function POST(req: NextRequest) {
     if (!order.shippingLines || order.shippingLines.length === 0) missingFields.push('shipping method');
 
     if (missingFields.length > 0) {
+      console.error('❌ Order incomplete:', missingFields);
       return NextResponse.json({ 
         error: 'Order incomplete',
         details: `Missing required fields: ${missingFields.join(', ')}`,
@@ -44,11 +58,43 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    console.log('✅ Order validation passed, creating payment intent...');
+    // Check if order already has payments
+    if (order.payments && order.payments.length > 0) {
+      const lastPayment = order.payments[order.payments.length - 1];
+      const paymentState = lastPayment.state?.toLowerCase();
+      
+      console.log('🔍 Existing payment found:', {
+        state: paymentState,
+        amount: lastPayment.amount,
+        method: lastPayment.method
+      });
 
+      // If payment is already successful, don't create a new intent
+      if (paymentState === 'settled' || paymentState === 'succeeded') {
+        return NextResponse.json({ 
+          error: 'Payment already completed',
+          details: 'This order has already been paid for',
+          paymentState: paymentState
+        }, { status: 400 });
+      }
+
+      // If payment failed or was cancelled, we can create a new intent
+      if (paymentState === 'failed' || paymentState === 'declined' || paymentState === 'cancelled') {
+        console.log('🔄 Previous payment failed, creating new payment intent...');
+      }
+    }
+
+    console.log('✅ Order validation passed, creating payment intent...');
+    console.log('📋 Order details:', {
+      code: order.code,
+      customer: order.customer?.emailAddress,
+      total: order.totalWithTax,
+      currency: order.currencyCode
+    });
+
+    // The mutation uses the active order from the session, no orderCode needed
     const response = await fetchGraphQL({
       query: CREATE_PAYMENT_INTENT,
-      variables: { orderCode },
     }, {
       req // Pass the request to include cookies
     });
@@ -90,6 +136,7 @@ export async function POST(req: NextRequest) {
     }
 
     console.log('✅ Payment intent created successfully');
+    console.log('🔑 Client secret length:', result.length);
     return NextResponse.json({ clientSecret: result });
   } catch (error) {
     console.error('💥 Error creating payment intent:', error);

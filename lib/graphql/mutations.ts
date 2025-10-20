@@ -153,7 +153,7 @@ export const ADD_PAYMENT_TO_ORDER = gql`
 `;
 
 export const CREATE_PAYMENT_INTENT = gql`
-  mutation CreateStripePaymentIntent($orderCode: String!) {
-    createStripePaymentIntent(orderCode: $orderCode)
+  mutation CreateStripePaymentIntent {
+    createStripePaymentIntent
   }
 `;

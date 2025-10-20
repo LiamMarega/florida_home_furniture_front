@@ -72,9 +72,9 @@ export function CartItem({ item, currencyCode }: CartItemProps) {
     'USD';
 
   return (
-    <div className="flex items-center space-x-4 p-4 border rounded-lg">
+    <div className="flex items-start space-x-3 p-3 border-b border-gray-100 last:border-b-0">
       {/* Product Image */}
-      <div className="relative w-16 h-16 flex-shrink-0">
+      <div className="relative w-12 h-12 flex-shrink-0">
         {item.productVariant.product?.featuredAsset?.preview ? (
           <Image
             src={item.productVariant.product.featuredAsset.preview}
@@ -89,75 +89,76 @@ export function CartItem({ item, currencyCode }: CartItemProps) {
         )}
       </div>
 
-      {/* Product Info */}
+      {/* Product Info and Controls */}
       <div className="flex-1 min-w-0">
-        <h3 className="text-sm font-medium text-brand-dark-blue truncate">
+        {/* Product Name */}
+        <h3 className="text-sm font-medium text-brand-dark-blue truncate mb-1">
           {item.productVariant.product?.name || item.productVariant.name}
         </h3>
-        <p className="text-sm text-brand-dark-blue/70">
+        
+        {/* Variant Name */}
+        <p className="text-xs text-brand-dark-blue/70 mb-2">
           {item.productVariant.name}
         </p>
-        <p className="text-sm font-medium text-brand-dark-blue">
-          {formatPrice(item.unitPriceWithTax, displayCurrency)}
-        </p>
+
+        {/* Price and Quantity Controls Row */}
+        <div className="flex items-center justify-between">
+          {/* Price */}
+          <p className="text-sm font-medium text-brand-dark-blue">
+            {formatPrice(item.linePriceWithTax, displayCurrency)}
+          </p>
+
+          {/* Quantity Controls */}
+          <div className="flex items-center space-x-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleQuantityChange(item.quantity - 1)}
+              disabled={isUpdating || item.quantity <= 1}
+              className="h-6 w-6 p-0 border-gray-300 hover:border-gray-400"
+            >
+              {isUpdating ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Minus className="h-3 w-3" />
+              )}
+            </Button>
+
+            <span className="text-xs font-medium w-6 text-center">
+              {item.quantity}
+            </span>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleQuantityChange(item.quantity + 1)}
+              disabled={isUpdating}
+              className="h-6 w-6 p-0 border-gray-300 hover:border-gray-400"
+            >
+              {isUpdating ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Plus className="h-3 w-3" />
+              )}
+            </Button>
+
+            {/* Remove Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRemove}
+              disabled={isUpdating}
+              className="h-6 w-6 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 ml-2"
+            >
+              {isUpdating ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Trash2 className="h-3 w-3" />
+              )}
+            </Button>
+          </div>
+        </div>
       </div>
-
-      {/* Quantity Controls */}
-      <div className="flex items-center space-x-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => handleQuantityChange(item.quantity - 1)}
-          disabled={isUpdating || item.quantity <= 1}
-          className="h-8 w-8 p-0"
-        >
-          {isUpdating ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <Minus className="h-3 w-3" />
-          )}
-        </Button>
-
-        <span className="text-sm font-medium w-8 text-center">
-          {item.quantity}
-        </span>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => handleQuantityChange(item.quantity + 1)}
-          disabled={isUpdating}
-          className="h-8 w-8 p-0"
-        >
-          {isUpdating ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <Plus className="h-3 w-3" />
-          )}
-        </Button>
-      </div>
-
-      {/* Total Price */}
-      <div className="text-right">
-        <p className="text-sm font-medium text-brand-dark-blue">
-          {formatPrice(item.linePriceWithTax, displayCurrency)}
-        </p>
-      </div>
-
-      {/* Remove Button */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={handleRemove}
-        disabled={isUpdating}
-        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-      >
-        {isUpdating ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Trash2 className="h-4 w-4" />
-        )}
-      </Button>
     </div>
   );
 }

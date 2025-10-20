@@ -5,6 +5,7 @@ import { loadStripe, StripeElementsOptions } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -73,6 +74,24 @@ export default function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // Clear clientSecret when navigating away from payment step or on unmount
+  useEffect(() => {
+    if (step !== 'payment' && clientSecret) {
+      console.log('🧹 Clearing clientSecret - no longer on payment step');
+      setClientSecret(null);
+    }
+  }, [step, clientSecret]);
+
+  // Clear clientSecret on component unmount
+  useEffect(() => {
+    return () => {
+      if (clientSecret) {
+        console.log('🧹 Clearing clientSecret - component unmounting');
+        setClientSecret(null);
+      }
+    };
+  }, [clientSecret]);
 
   const {
     register,
@@ -170,35 +189,30 @@ export default function CheckoutPage() {
 
       console.log('✅ Shipping address set successfully');
 
-      // Check if user is already logged in before setting customer
-      console.log('🔍 Checking if user is already authenticated...');
-      const orderCheckRes = await fetch('/api/cart/active', { method: 'GET' });
-      const orderCheckData = await orderCheckRes.json();
-      
-      if (orderCheckData.activeOrder?.customer?.id) {
-        console.log('✅ User already logged in, skipping customer setup');
-        console.log('👤 Current customer:', orderCheckData.activeOrder.customer);
+      // Set customer for order (the API will handle already logged in users)
+      console.log('👤 Setting customer...');
+      const customerRes = await fetch('/api/checkout/set-customer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: data.firstName,
+          lastName: data.lastName,
+          emailAddress: data.email,
+        }),
+      });
+
+      const customerData = await customerRes.json();
+      console.log('👤 Customer response:', customerData);
+
+      if (!customerRes.ok) {
+        console.error('❌ Failed to set customer:', customerData);
+        throw new Error(customerData.error || 'Failed to set customer');
+      }
+
+      if (customerData.alreadyLoggedIn) {
+        console.log('✅ User already logged in, continuing with existing customer');
+        console.log('👤 Current customer:', customerData.customer);
       } else {
-        // NOW set customer for order (after address)
-        console.log('👤 Setting customer...');
-        const customerRes = await fetch('/api/checkout/set-customer', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            firstName: data.firstName,
-            lastName: data.lastName,
-            emailAddress: data.email,
-          }),
-        });
-
-        const customerData = await customerRes.json();
-        console.log('👤 Customer response:', customerData);
-
-        if (!customerRes.ok) {
-          console.error('❌ Failed to set customer:', customerData);
-          throw new Error(customerData.error || 'Failed to set customer');
-        }
-
         console.log('✅ Customer set successfully');
       }
 
@@ -267,6 +281,8 @@ export default function CheckoutPage() {
         throw new Error('Order not found');
       }
 
+      console.log('💳 Creating payment intent for order:', orderCode);
+
       const resIntent = await fetch('/api/checkout/payment-intent', {
         method: 'POST',
         body: JSON.stringify({ orderCode }),
@@ -274,13 +290,26 @@ export default function CheckoutPage() {
       });
 
       const data = await resIntent.json();
-      if (!data.clientSecret) throw new Error('Failed to create payment intent');
+      
+      console.log('💳 Payment intent response:', data);
 
+      if (!resIntent.ok) {
+        const errorMsg = data.details || data.error || 'Failed to create payment intent';
+        console.error('❌ Payment intent error:', errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      if (!data.clientSecret) {
+        throw new Error('No client secret received');
+      }
+
+      console.log('✅ Client secret received, navigating to payment step');
       setClientSecret(data.clientSecret);
       goToStep('payment');
     } catch (err) {
-      toast.error('Could not initiate payment');
-      console.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Could not initiate payment';
+      console.error('💥 Payment initiation error:', errorMessage);
+      toast.error(errorMessage);
     }
   };
 
@@ -308,7 +337,7 @@ export default function CheckoutPage() {
 
   // Step indicator
   const StepIndicator = () => (
-    <div className="mb-8">
+    <div className="mb-8 pt-20">
       <div className="flex items-center justify-center gap-4">
         {steps.map((stepName, index) => {
           const isActive = step === stepName;
@@ -350,9 +379,29 @@ export default function CheckoutPage() {
     </div>
   );
 
-  if (step === 'customer') {
+  // Show message if no order
+  if (!order && !orderCode) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white py-12">
+        <div className="max-w-2xl mx-auto px-4">
+          <Card className="p-8 text-center">
+            <Package className="w-16 h-16 text-brand-primary/50 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-brand-dark-blue mb-4">Cart is Empty</h2>
+            <p className="text-brand-dark-blue/70 mb-6">
+              Please add items to your cart before proceeding to checkout.
+            </p>
+            <Button asChild>
+              <Link href="/products">Browse Products</Link>
+            </Button>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'customer') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white py-12 ">
         <div className="max-w-6xl mx-auto px-4">
           <StepIndicator />
 
@@ -687,8 +736,8 @@ export default function CheckoutPage() {
             <div className="lg:col-span-2">
       <Elements options={{ clientSecret } as StripeElementsOptions} stripe={stripePromise}>
         <PaymentStep
-          returnUrl={`${process.env.NEXT_PUBLIC_SITE_URL}/checkout/confirmation/${orderCode}`}
-                  onBack={() => goToStep('customer')}
+          returnUrl={`${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/checkout/confirmation/${orderCode}`}
+          onBack={() => goToStep('customer')}
         />
       </Elements>
             </div>
@@ -711,27 +760,58 @@ function PaymentStep({ returnUrl, onBack }: { returnUrl: string; onBack: () => v
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Clear any existing errors when elements are ready
+  useEffect(() => {
+    if (elements && error) {
+      setError(null);
+    }
+  }, [elements, error]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!stripe || !elements) {
+      console.warn('⚠️ Stripe or Elements not ready');
       return;
     }
 
     setLoading(true);
     setError(null);
 
-    const result = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: returnUrl,
-      },
-    });
+    console.log('💳 Confirming payment...');
+    console.log('🔗 Return URL:', returnUrl);
 
-    if (result.error) {
-      setError(result.error.message || 'Payment failed');
+    try {
+      const result = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: returnUrl,
+        },
+      });
+
+      // If we reach here, it means the payment wasn't successful
+      // (successful payments redirect automatically)
+      if (result.error) {
+        const errorMsg = result.error.message || 'Payment failed';
+        console.error('❌ Payment error:', result.error);
+        
+        // Handle terminal PaymentIntent error specifically
+        if (result.error.type === 'invalid_request_error' && 
+            errorMsg.includes('terminal state')) {
+          setError('This payment session has expired. Please start a new payment.');
+        } else {
+          setError(errorMsg);
+        }
+        
+        toast.error(errorMsg);
+      }
+    } catch (err) {
+      console.error('💥 Payment confirmation error:', err);
+      const errorMsg = err instanceof Error ? err.message : 'An unexpected error occurred';
+      setError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
       setLoading(false);
-      toast.error(result.error.message || 'Payment failed');
     }
   };
 
@@ -748,14 +828,32 @@ function PaymentStep({ returnUrl, onBack }: { returnUrl: string; onBack: () => v
             id="payment-element"
             options={{
               layout: 'tabs',
+              business: { name: 'Florida Home Furniture' },
             }}
           />
         </div>
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            {error}
-      </div>
+            <div className="flex items-center justify-between">
+              <span>{error}</span>
+              {error.includes('expired') && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setError(null);
+                    // Clear the clientSecret to force a new payment intent
+                    window.location.reload();
+                  }}
+                  className="ml-4"
+                >
+                  Start New Payment
+                </Button>
+              )}
+            </div>
+          </div>
         )}
 
         <div className="flex gap-4">
@@ -781,9 +879,9 @@ function PaymentStep({ returnUrl, onBack }: { returnUrl: string; onBack: () => v
                 Processing...
               </>
             ) : (
-              'Pay Now'
+              'Complete Payment'
             )}
-      </Button>
+          </Button>
         </div>
 
         <div className="flex items-center justify-center gap-2 text-sm text-brand-dark-blue/60">

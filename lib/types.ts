@@ -71,14 +71,58 @@ export interface OrderLine {
   productVariant: ProductVariant;
 }
 
+export interface Address {
+  fullName?: string;
+  company?: string;
+  streetLine1?: string;
+  streetLine2?: string;
+  city?: string;
+  province?: string;
+  postalCode?: string;
+  country?: string;
+  phoneNumber?: string;
+}
+
+export interface ShippingLine {
+  shippingMethod: {
+    id: string;
+    code: string;
+    name: string;
+    description?: string;
+  };
+  priceWithTax: number;
+}
+
+export interface Payment {
+  id: string;
+  state: string;
+  method: string;
+  amount: number;
+  transactionId?: string;
+  errorMessage?: string;
+  metadata?: any;
+}
+
 export interface Order {
   id: string;
   code: string;
   state: string;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
   total: number;
   totalWithTax: number;
+  subTotal?: number;
+  subTotalWithTax?: number;
   currencyCode: string;
+  shipping?: number;
+  shippingWithTax?: number;
   lines: OrderLine[];
+  customer?: Customer;
+  shippingAddress?: Address;
+  billingAddress?: Address;
+  shippingLines?: ShippingLine[];
+  payments?: Payment[];
 }
 
 export interface Customer {

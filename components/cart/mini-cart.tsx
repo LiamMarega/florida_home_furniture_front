@@ -64,9 +64,9 @@ export function MiniCart({ className }: MiniCartProps) {
           />
           
           {/* Cart Panel */}
-          <div className="absolute right-0 top-full mt-2 w-96 bg-white border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden">
+          <div className="absolute right-0 top-full mt-2 w-80 bg-white border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b">
+            <div className="flex items-center justify-between p-3 border-b">
               <h3 className="text-lg font-semibold">Cart ({itemCount})</h3>
               <Button
                 variant="ghost"
@@ -86,7 +86,7 @@ export function MiniCart({ className }: MiniCartProps) {
                   <p>Your cart is empty</p>
                 </div>
               ) : (
-                <div className="p-4 space-y-4">
+                <div className="py-2">
                   {items.map((item) => (
                     <CartItem key={item.id} item={item} />
                   ))}
@@ -96,11 +96,11 @@ export function MiniCart({ className }: MiniCartProps) {
 
             {/* Footer */}
             {items.length > 0 && (
-              <div className="border-t p-4 space-y-4">
+              <div className="border-t p-3 space-y-3">
                 {/* Total */}
                 <div className="flex justify-between items-center">
-                  <span className="text-lg font-semibold">Total:</span>
-                  <span className="text-lg font-semibold">
+                  <span className="text-base font-semibold">Total:</span>
+                  <span className="text-base font-semibold">
                     {order && formatPrice(order.totalWithTax, order.currencyCode)}
                   </span>
                 </div>
@@ -112,15 +112,15 @@ export function MiniCart({ className }: MiniCartProps) {
                     size="sm"
                     onClick={handleClearCart}
                     disabled={isUpdating}
-                    className="flex-1"
+                    className="flex-1 text-xs"
                   >
                     {isUpdating ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                     ) : null}
                     Clear
                   </Button>
-                  <Button asChild size="sm" className="flex-1">
-                    <Link href="/cart">
+                  <Button asChild size="sm" className="flex-1 text-xs">
+                    <Link href="/cart" onClick={() => setIsOpen(false)}>
                       View cart
                     </Link>
                   </Button>

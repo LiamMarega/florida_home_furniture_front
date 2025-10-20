@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "stop": "pkill -f next || true"
+    "stop": "pkill -f next || true",
+    "test:stripe": "node scripts/test-stripe-config.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.2",
