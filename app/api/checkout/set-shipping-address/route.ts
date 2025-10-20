@@ -94,7 +94,18 @@ export async function POST(req: NextRequest) {
     }
 
     console.log('✅ Shipping address set successfully');
-    return NextResponse.json({ order: result });
+    
+    // Create response with data
+    const nextResponse = NextResponse.json({ order: result });
+
+    // Forward Set-Cookie headers from Vendure if present
+    if (response.setCookies && response.setCookies.length > 0) {
+      response.setCookies.forEach(cookie => {
+        nextResponse.headers.append('Set-Cookie', cookie);
+      });
+    }
+
+    return nextResponse;
   } catch (error) {
     console.error('💥 Error setting shipping address:', error);
     return NextResponse.json(

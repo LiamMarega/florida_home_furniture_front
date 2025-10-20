@@ -36,9 +36,20 @@ export async function GET(req: NextRequest) {
     }
 
     console.log(`✅ Found ${shippingMethods.length} shipping method(s)`);
-    return NextResponse.json({
+    
+    // Create response with data
+    const nextResponse = NextResponse.json({
       shippingMethods,
     });
+
+    // Forward Set-Cookie headers from Vendure if present
+    if (response.setCookies && response.setCookies.length > 0) {
+      response.setCookies.forEach(cookie => {
+        nextResponse.headers.append('Set-Cookie', cookie);
+      });
+    }
+
+    return nextResponse;
   } catch (error) {
     console.error('💥 Error fetching shipping methods:', error);
     return NextResponse.json(

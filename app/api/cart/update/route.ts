@@ -16,8 +16,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const cookieHeader = request.headers.get('cookie') || '';
-
     const response = await fetchGraphQL(
       {
         query: ADJUST_ORDER_LINE,
@@ -27,9 +25,7 @@ export async function POST(request: NextRequest) {
         },
       },
       {
-        headers: {
-          'Cookie': cookieHeader,
-        },
+        req: request, // Pass the request to include cookies
       }
     );
 
@@ -41,7 +37,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(response.data);
+    // Create response with data
+    const nextResponse = NextResponse.json(response.data);
+
+    // Forward Set-Cookie headers from Vendure if present
+    if (response.setCookies && response.setCookies.length > 0) {
+      response.setCookies.forEach(cookie => {
+        nextResponse.headers.append('Set-Cookie', cookie);
+      });
+    }
+
+    return nextResponse;
   } catch (error) {
     console.error('Update cart error:', error);
     return NextResponse.json(

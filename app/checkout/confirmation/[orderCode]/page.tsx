@@ -68,11 +68,31 @@ export default function CheckoutConfirmationPage() {
         redirectStatus 
       });
 
-      const res = await fetch(`/api/orders/${orderCode}`);
+      const res = await fetch(`/api/orders/${orderCode}`, {
+        credentials: 'include', // Include cookies in request
+      });
       const data = await res.json();
 
       if (!res.ok) {
         console.error('❌ Failed to load order:', data);
+        
+        // Handle the case where order is completed but not accessible (403)
+        if (res.status === 403 && data.requiresAuth) {
+          console.log('ℹ️ Order completed successfully but requires authentication to view');
+          // For completed orders with successful payment, show a success message anyway
+          if (redirectStatus === 'succeeded') {
+            console.log('✅ Payment succeeded - showing success message');
+            // Create a minimal order object for display
+            setOrder({
+              code: orderCode,
+              state: 'PaymentSettled',
+              customer: { emailAddress: '' }, // Will be shown from redirect params
+              payments: [{ state: 'Settled' }]
+            } as any);
+            return;
+          }
+        }
+        
         throw new Error(data.error || 'Failed to load order');
       }
 
@@ -212,8 +232,17 @@ export default function CheckoutConfirmationPage() {
                       Confirmation Email Sent
                     </h3>
                     <p className="text-sm text-brand-dark-blue/70">
-                      We&apos;ve sent a confirmation email to{' '}
-                      <strong>{order.customer?.emailAddress}</strong> with your order details.
+                      {order.customer?.emailAddress ? (
+                        <>
+                          We&apos;ve sent a confirmation email to{' '}
+                          <strong>{order.customer.emailAddress}</strong> with your order details.
+                        </>
+                      ) : (
+                        <>
+                          A confirmation email has been sent with your order details. 
+                          Please check your inbox for order #{order.code}.
+                        </>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -236,9 +265,17 @@ export default function CheckoutConfirmationPage() {
                   <div>
                     <h3 className="font-semibold text-brand-dark-blue mb-1">Payment Confirmed</h3>
                     <p className="text-sm text-brand-dark-blue/70">
-                      Your payment of{' '}
-                      <strong>{formatPrice(order.totalWithTax, order.currencyCode)}</strong> has been
-                      successfully processed.
+                      {order.totalWithTax && order.currencyCode ? (
+                        <>
+                          Your payment of{' '}
+                          <strong>{formatPrice(order.totalWithTax, order.currencyCode)}</strong> has been
+                          successfully processed.
+                        </>
+                      ) : (
+                        <>
+                          Your payment has been successfully processed. Thank you for your order!
+                        </>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -253,9 +290,11 @@ export default function CheckoutConfirmationPage() {
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Link>
                 </Button>
-                <Button asChild variant="outline" className="flex-1">
-                  <Link href={`/orders/${order.code}`}>View Order Details</Link>
-                </Button>
+                {order.customer?.emailAddress && (
+                  <Button asChild variant="outline" className="flex-1 text-sm">
+                    <Link href="/">Check your email for order details</Link>
+                  </Button>
+                )}
               </div>
             </Card>
           </motion.div>
@@ -353,13 +392,25 @@ export default function CheckoutConfirmationPage() {
 
         {/* Order Summary */}
         <div className="grid md:grid-cols-2 gap-6">
-          <div>
-            <OrderSummary order={order} />
-          </div>
+          {order.lines && order.lines.length > 0 ? (
+            <div>
+              <OrderSummary order={order} />
+            </div>
+          ) : (
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold text-brand-dark-blue mb-4">Order Summary</h3>
+              <div className="text-center py-8">
+                <Package className="w-16 h-16 text-brand-primary/30 mx-auto mb-4" />
+                <p className="text-brand-dark-blue/70">
+                  Order details are being processed. Please check your email for complete order information.
+                </p>
+              </div>
+            </Card>
+          )}
 
           <div className="space-y-6">
             {/* Shipping Information */}
-            {order.shippingAddress && (
+            {order.shippingAddress ? (
               <Card className="p-6">
                 <h3 className="text-lg font-semibold text-brand-dark-blue mb-4 flex items-center gap-2">
                   <Package className="w-5 h-5" />
@@ -383,7 +434,7 @@ export default function CheckoutConfirmationPage() {
                   )}
                 </div>
               </Card>
-            )}
+            ) : null}
 
             {/* Customer Support */}
             <Card className="p-6 bg-brand-cream/30">

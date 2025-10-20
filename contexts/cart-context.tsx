@@ -31,7 +31,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       setError(null);
       
-      const response = await fetch('/api/cart/active');
+      const response = await fetch('/api/cart/active', {
+        credentials: 'include', // Include cookies in request
+      });
       const data = await response.json();
 
       if (!response.ok) {
@@ -61,6 +63,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Include cookies in request
         body: JSON.stringify({
           productVariantId,
           quantity,
@@ -98,6 +101,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Include cookies in request
         body: JSON.stringify({
           orderLineId,
         }),
@@ -139,6 +143,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Include cookies in request
         body: JSON.stringify({
           orderLineId,
           quantity,
@@ -176,6 +181,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Include cookies in request
       });
 
       const data = await response.json();

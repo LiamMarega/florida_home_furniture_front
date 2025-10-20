@@ -144,7 +144,10 @@ export default function CheckoutPage() {
 
   const loadActiveOrder = async () => {
     try {
-      const res = await fetch('/api/cart/active', { method: 'GET' });
+      const res = await fetch('/api/cart/active', { 
+        method: 'GET',
+        credentials: 'include', // Include cookies in request
+      });
       const data = await res.json();
 
       if (data.activeOrder) {
@@ -165,7 +168,10 @@ export default function CheckoutPage() {
   const loadShippingMethods = async () => {
     try {
       setIsLoadingShipping(true);
-      const res = await fetch('/api/checkout/shipping-methods', { method: 'GET' });
+      const res = await fetch('/api/checkout/shipping-methods', { 
+        method: 'GET',
+        credentials: 'include', // Include cookies in request
+      });
       const data = await res.json();
 
       if (data.shippingMethods) {
@@ -191,6 +197,7 @@ export default function CheckoutPage() {
       const customerRes = await fetch('/api/checkout/set-customer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // Include cookies in request
         body: JSON.stringify({
           firstName: data.firstName,
           lastName: data.lastName,
@@ -217,6 +224,7 @@ export default function CheckoutPage() {
       const shippingAddressRes = await fetch('/api/checkout/set-shipping-address', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // Include cookies in request
         body: JSON.stringify({
           fullName: data.shippingFullName,
           streetLine1: data.shippingStreetLine1,
@@ -244,6 +252,7 @@ export default function CheckoutPage() {
         const billingAddressRes = await fetch('/api/checkout/set-billing-address', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', // Include cookies in request
           body: JSON.stringify({
             fullName: data.billingFullName,
             streetLine1: data.billingStreetLine1,
@@ -264,6 +273,7 @@ export default function CheckoutPage() {
       const shippingMethodRes = await fetch('/api/checkout/set-shipping-method', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // Include cookies in request
         body: JSON.stringify({
           shippingMethodId: data.shippingMethodId,
         }),
@@ -315,6 +325,7 @@ export default function CheckoutPage() {
 
       const resIntent = await fetch('/api/checkout/payment-intent', {
         method: 'POST',
+        credentials: 'include', // Include cookies in request
         body: JSON.stringify({ 
           orderCode,
           timestamp: Date.now(), // Add timestamp to prevent caching

@@ -12,6 +12,7 @@ export interface GraphQLResponse<T = any> {
     locations?: Array<{ line: number; column: number }>;
     path?: string[];
   }>;
+  setCookies?: string[]; // Add setCookies to response
 }
 
 export interface GraphQLRequest {
@@ -20,7 +21,7 @@ export interface GraphQLRequest {
 }
 
 /**
- * Server-side GraphQL fetch with error handling
+ * Server-side GraphQL fetch with error handling and cookie management
  */
 export async function fetchGraphQL<T = any>(
   request: GraphQLRequest,
@@ -33,7 +34,7 @@ export async function fetchGraphQL<T = any>(
 ): Promise<GraphQLResponse<T>> {
   try {
     // Extract cookies from the request if provided
-    const cookieHeader = options?.req?.headers.get('cookie') || '';
+    const cookieHeader = options?.req?.headers.get('cookie') || options?.headers?.['Cookie'] || '';
     
     const response = await fetch(VENDURE_SHOP_API, {
       method: 'POST',
@@ -43,6 +44,7 @@ export async function fetchGraphQL<T = any>(
         ...options?.headers,
       },
       body: JSON.stringify(request),
+      credentials: 'include', // Always include credentials
       next: {
         revalidate: options?.revalidate,
         tags: options?.tags,
@@ -73,6 +75,12 @@ export async function fetchGraphQL<T = any>(
     
     if (result.errors) {
       console.error('GraphQL errors:', result.errors);
+    }
+
+    // Capture Set-Cookie headers from Vendure response
+    const setCookies = response.headers.getSetCookie?.() || [];
+    if (setCookies.length > 0) {
+      result.setCookies = setCookies;
     }
 
     return result;

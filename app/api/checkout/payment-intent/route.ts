@@ -147,7 +147,17 @@ export async function POST(req: NextRequest) {
     const paymentIntentId = result.split('_secret_')[0];
     console.log('🆔 PaymentIntent ID:', paymentIntentId);
     
-    return NextResponse.json({ clientSecret: result });
+    // Create response with data
+    const nextResponse = NextResponse.json({ clientSecret: result });
+
+    // Forward Set-Cookie headers from Vendure if present
+    if (response.setCookies && response.setCookies.length > 0) {
+      response.setCookies.forEach(cookie => {
+        nextResponse.headers.append('Set-Cookie', cookie);
+      });
+    }
+
+    return nextResponse;
   } catch (error) {
     console.error('💥 Error creating payment intent:', error);
     return NextResponse.json({ 
