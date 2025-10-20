@@ -4,6 +4,7 @@ import { Header } from '@/components/header';
 import { CartProvider } from '@/contexts/cart-context';
 import { Toaster } from '@/components/ui/sonner';
 import localFont from 'next/font/local';
+import { ConditionalHeader } from '@/components/conditional-header';
 
 const tangoSans = localFont({
   src: [
@@ -111,7 +112,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${creatoDisplay.variable} ${tangoSans.variable} font-creato-display`}>
         <CartProvider>
-          <Header />
+          <ConditionalHeader />
           {children}
           <Toaster position="bottom-right" />
         </CartProvider>
