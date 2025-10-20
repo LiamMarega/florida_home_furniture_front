@@ -8,6 +8,7 @@ const VENDURE_SHOP_API = process.env.VENDURE_SHOP_API_URL || 'http://localhost:3
 export interface GraphQLResponse<T = any> {
   data?: T;
   errors?: Array<{
+    extensions: any;
     message: string;
     locations?: Array<{ line: number; column: number }>;
     path?: string[];
@@ -65,7 +66,8 @@ export async function fetchGraphQL<T = any>(
       } catch {
         return { 
           errors: [{ 
-            message: `HTTP ${response.status}: ${errorText || 'Unknown error'}` 
+            message: `HTTP ${response.status}: ${errorText || 'Unknown error'}`,
+            extensions: {}
           }] 
         };
       }
@@ -88,7 +90,8 @@ export async function fetchGraphQL<T = any>(
     console.error('GraphQL fetch error:', error);
     return { 
       errors: [{ 
-        message: error instanceof Error ? error.message : 'Failed to fetch data' 
+        message: error instanceof Error ? error.message : 'Failed to fetch data',
+        extensions: {}
       }] 
     };
   }
