@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
-import { SET_CUSTOMER_FOR_ORDER, TRANSITION_ORDER_TO_STATE } from '@/lib/graphql/mutations';
+import { SET_CUSTOMER_FOR_ORDER } from '@/lib/graphql/mutations';
 import { GET_ACTIVE_ORDER, GET_ACTIVE_CUSTOMER } from '@/lib/graphql/queries';
 
 export async function POST(req: NextRequest) {
@@ -30,34 +30,33 @@ export async function POST(req: NextRequest) {
 
     const activeCustomer = activeCustomerCheck.data?.activeCustomer;
     
-    if (activeCustomer?.id) {
-      console.log('✅ User already logged in (activeCustomer found)');
-      console.log('👤 Current customer:', { 
-        id: activeCustomer.id, 
-        email: activeCustomer.emailAddress 
-      });
-      
-      // Get the active order to return
-      const activeOrderCheck = await fetchGraphQL({
-        query: GET_ACTIVE_ORDER,
-      }, { req });
-      
-      return NextResponse.json({ 
-        order: activeOrderCheck.data?.activeOrder,
-        message: 'User already authenticated',
-        customer: activeCustomer,
-        alreadyLoggedIn: true
-      });
-    }
-
-    // Also check if the order already has a customer
+    // Check the active order
     const activeOrderCheck = await fetchGraphQL({
       query: GET_ACTIVE_ORDER,
     }, { req });
 
     const activeOrder = activeOrderCheck.data?.activeOrder;
+    console.log('🔍 Active order:', activeOrder?.id);
     console.log('🔍 Active order customer:', activeOrder?.customer);
     
+    // If user is already logged in, skip setCustomerForOrder (it's only for guest checkout)
+    if (activeCustomer?.id) {
+      console.log('✅ User already logged in - skipping setCustomerForOrder');
+      console.log('👤 Current customer:', { 
+        id: activeCustomer.id, 
+        email: activeCustomer.emailAddress 
+      });
+      
+      // Return the active order with the logged-in customer
+      return NextResponse.json({ 
+        order: activeOrder,
+        message: 'User already authenticated',
+        customer: activeCustomer,
+        alreadyLoggedIn: true
+      });
+    }
+    
+    // If order already has a customer (guest checkout was completed), return it
     if (activeOrder?.customer?.id) {
       console.log('✅ Order already has customer assigned');
       console.log('👤 Current customer:', { 
@@ -68,7 +67,7 @@ export async function POST(req: NextRequest) {
         order: activeOrder,
         message: 'Customer already assigned to order',
         customer: activeOrder.customer,
-        alreadyLoggedIn: true
+        alreadyLoggedIn: false
       });
     }
 
@@ -100,99 +99,32 @@ export async function POST(req: NextRequest) {
 
     const result = response.data?.setCustomerForOrder;
 
-    // Handle ALREADY_LOGGED_IN_ERROR as success
+    // Handle ALREADY_LOGGED_IN_ERROR (shouldn't happen now since we check earlier, but just in case)
     if (result?.errorCode === 'ALREADY_LOGGED_IN_ERROR') {
-      console.log('✅ User already logged in (detected via error)');
-      console.log('🔄 Transitioning order to ArrangingPayment to associate customer...');
+      console.log('⚠️ ALREADY_LOGGED_IN_ERROR received (this should have been caught earlier)');
       
-      // Transition order to ArrangingPayment to force customer association
-      const transitionResponse = await fetchGraphQL({
-        query: TRANSITION_ORDER_TO_STATE,
-        variables: { state: 'ArrangingPayment' },
-      }, { req });
-      
-      console.log('🔄 Transition response:', JSON.stringify(transitionResponse, null, 2));
-      
-      // Get the updated order
+      // Get the current active order and customer
       const currentOrderCheck = await fetchGraphQL({
         query: GET_ACTIVE_ORDER,
       }, { req });
       
-      const currentOrder = currentOrderCheck.data?.activeOrder;
+      const currentCustomerCheck = await fetchGraphQL({
+        query: GET_ACTIVE_CUSTOMER,
+      }, { req });
       
-      if (currentOrder) {
-        console.log('✅ Order updated with customer:', currentOrder.customer);
-        
-        // If customer is still null after transition, try logout and retry
-        if (!currentOrder.customer) {
-          console.error('❌ Customer still null after transition');
-          console.log('🔄 Attempting logout and retry...');
-          
-          // Logout the conflicting session
-          const LOGOUT_MUTATION = `
-            mutation Logout {
-              logout {
-                success
-              }
-            }
-          `;
-          
-          await fetchGraphQL({
-            query: LOGOUT_MUTATION,
-          }, { req });
-          
-          console.log('✅ Logged out, now retrying setCustomerForOrder...');
-          
-          // Retry setCustomerForOrder
-          const retryResponse = await fetchGraphQL({
-            query: SET_CUSTOMER_FOR_ORDER,
-            variables: {
-              input: {
-                firstName: firstName || '',
-                lastName: lastName || '',
-                emailAddress,
-              },
-            },
-          }, { req });
-          
-          console.log('📦 Retry response:', JSON.stringify(retryResponse, null, 2));
-          
-          const retryResult = retryResponse.data?.setCustomerForOrder;
-          
-          if (retryResult?.errorCode) {
-            console.error('❌ Retry also failed:', retryResult);
-            return NextResponse.json(
-              { 
-                error: 'Failed to set customer after logout',
-                details: retryResult.message || 'Could not associate customer with order',
-                errorCode: retryResult.errorCode
-              },
-              { status: 500 }
-            );
-          }
-          
-          if (retryResult?.id) {
-            console.log('✅ Customer set successfully after logout');
-            return NextResponse.json({ order: retryResult });
-          }
-          
-          return NextResponse.json(
-            { 
-              error: 'Failed to associate customer with order',
-              details: 'Tried logout but still could not set customer',
-              order: currentOrder
-            },
-            { status: 500 }
-          );
-        }
-        
-        return NextResponse.json({ 
-          order: currentOrder,
-          message: 'User already authenticated and associated with order',
-          customer: currentOrder.customer,
-          alreadyLoggedIn: true
-        });
-      }
+      const currentOrder = currentOrderCheck.data?.activeOrder;
+      const currentCustomer = currentCustomerCheck.data?.activeCustomer;
+      
+      console.log('📦 Current order:', currentOrder?.id);
+      console.log('👤 Current customer:', currentCustomer?.emailAddress);
+      
+      // Return success with the current state
+      return NextResponse.json({ 
+        order: currentOrder,
+        message: 'User already authenticated',
+        customer: currentCustomer || currentOrder?.customer,
+        alreadyLoggedIn: true
+      });
     }
 
     // Handle Vendure error results (check both __typename and errorCode)

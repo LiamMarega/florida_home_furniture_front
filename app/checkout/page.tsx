@@ -186,7 +186,33 @@ export default function CheckoutPage() {
       console.log('🚀 Starting checkout submission...');
       console.log('📝 Customer data:', { firstName: data.firstName, lastName: data.lastName, email: data.email });
 
-      // Set shipping address FIRST (some systems require this before customer)
+      // Set customer FIRST (this will handle logout if user is already authenticated)
+      console.log('👤 Setting customer...');
+      const customerRes = await fetch('/api/checkout/set-customer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: data.firstName,
+          lastName: data.lastName,
+          emailAddress: data.email,
+        }),
+      });
+
+      const customerData = await customerRes.json();
+      console.log('👤 Customer response:', customerData);
+
+      if (!customerRes.ok) {
+        console.error('❌ Failed to set customer:', customerData);
+        throw new Error(customerData.error || 'Failed to set customer');
+      }
+
+      if (customerData.alreadyLoggedIn) {
+        console.log('✅ User was logged in, logged out for guest checkout');
+      } else {
+        console.log('✅ Customer set successfully');
+      }
+
+      // Now set shipping address
       console.log('📍 Setting shipping address...');
       const shippingAddressRes = await fetch('/api/checkout/set-shipping-address', {
         method: 'POST',
@@ -212,33 +238,6 @@ export default function CheckoutPage() {
       }
 
       console.log('✅ Shipping address set successfully');
-
-      // Set customer for order (the API will handle already logged in users)
-      console.log('👤 Setting customer...');
-      const customerRes = await fetch('/api/checkout/set-customer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          firstName: data.firstName,
-          lastName: data.lastName,
-          emailAddress: data.email,
-        }),
-      });
-
-      const customerData = await customerRes.json();
-      console.log('👤 Customer response:', customerData);
-
-      if (!customerRes.ok) {
-        console.error('❌ Failed to set customer:', customerData);
-        throw new Error(customerData.error || 'Failed to set customer');
-      }
-
-      if (customerData.alreadyLoggedIn) {
-        console.log('✅ User already logged in, continuing with existing customer');
-        console.log('👤 Current customer:', customerData.customer);
-      } else {
-        console.log('✅ Customer set successfully');
-      }
 
       // Set billing address if different
       if (!data.billingSameAsShipping) {
