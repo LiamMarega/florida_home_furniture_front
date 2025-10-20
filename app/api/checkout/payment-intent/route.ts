@@ -8,8 +8,11 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const orderCode = body.orderCode || body.code;
+    const forceNew = body.forceNew;
+    const timestamp = body.timestamp;
 
     console.log('📝 Creating payment intent for order:', orderCode);
+    console.log('🔄 Request details:', { forceNew, timestamp, orderCode });
 
     if (!orderCode) {
       return NextResponse.json({ 
@@ -89,7 +92,8 @@ export async function POST(req: NextRequest) {
       code: order.code,
       customer: order.customer?.emailAddress,
       total: order.totalWithTax,
-      currency: order.currencyCode
+      currency: order.currencyCode,
+      existingPayments: order.payments?.length || 0
     });
 
     // The mutation uses the active order from the session, no orderCode needed
@@ -137,6 +141,12 @@ export async function POST(req: NextRequest) {
 
     console.log('✅ Payment intent created successfully');
     console.log('🔑 Client secret length:', result.length);
+    console.log('🔑 Client secret preview:', result.substring(0, 20) + '...');
+    
+    // Extract PaymentIntent ID from client secret for debugging
+    const paymentIntentId = result.split('_secret_')[0];
+    console.log('🆔 PaymentIntent ID:', paymentIntentId);
+    
     return NextResponse.json({ clientSecret: result });
   } catch (error) {
     console.error('💥 Error creating payment intent:', error);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { loadStripe, StripeElementsOptions } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
@@ -93,6 +93,30 @@ export default function CheckoutPage() {
     };
   }, [clientSecret]);
 
+  // Clear clientSecret on page load to prevent stale PaymentIntents
+  useEffect(() => {
+    console.log('🔄 Page loaded, clearing any existing clientSecret to prevent stale PaymentIntents');
+    setClientSecret(null);
+    
+    // Also clear any cached data that might contain stale PaymentIntents
+    try {
+      // Clear any Stripe-related data from localStorage/sessionStorage
+      Object.keys(localStorage).forEach(key => {
+        if (key.includes('stripe') || key.includes('payment')) {
+          localStorage.removeItem(key);
+        }
+      });
+      Object.keys(sessionStorage).forEach(key => {
+        if (key.includes('stripe') || key.includes('payment')) {
+          sessionStorage.removeItem(key);
+        }
+      });
+      console.log('🧹 Cleared any cached Stripe/payment data');
+    } catch (err) {
+      console.log('Could not clear cached data:', err);
+    }
+  }, []);
+
   const {
     register,
     handleSubmit,
@@ -133,10 +157,10 @@ export default function CheckoutPage() {
     }
   };
 
-  const goToStep = (next: CheckoutStep) => {
+  const goToStep = useCallback((next: CheckoutStep) => {
     setStep(next);
     router.replace(`/checkout?step=${next}`, { scroll: false });
-  };
+  }, [router]);
 
   const loadShippingMethods = async () => {
     try {
@@ -275,18 +299,34 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleStartPayment = async () => {
+  const handleStartPayment = useCallback(async () => {
     try {
       if (!orderCode) {
         throw new Error('Order not found');
       }
 
       console.log('💳 Creating payment intent for order:', orderCode);
+      console.log('🔍 Current clientSecret before creating new one:', clientSecret);
+
+      // Clear any existing clientSecret before creating a new one
+      if (clientSecret) {
+        console.log('🧹 Clearing existing clientSecret before creating new payment intent');
+        setClientSecret(null);
+      }
 
       const resIntent = await fetch('/api/checkout/payment-intent', {
         method: 'POST',
-        body: JSON.stringify({ orderCode }),
-        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          orderCode,
+          timestamp: Date.now(), // Add timestamp to prevent caching
+          forceNew: true // Flag to indicate we want a new PaymentIntent
+        }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
       });
 
       const data = await resIntent.json();
@@ -303,7 +343,18 @@ export default function CheckoutPage() {
         throw new Error('No client secret received');
       }
 
-      console.log('✅ Client secret received, navigating to payment step');
+      console.log('✅ New client secret received:', data.clientSecret.substring(0, 20) + '...');
+      
+      // Extract PaymentIntent ID for debugging
+      const paymentIntentId = data.clientSecret.split('_secret_')[0];
+      console.log('🆔 New PaymentIntent ID:', paymentIntentId);
+      
+      // Check if this is the same PaymentIntent ID that was causing issues
+      if (paymentIntentId === 'pi_3SKRRfQb3urStgSb1abzIdkO') {
+        console.warn('⚠️ WARNING: Received the same PaymentIntent ID that was in terminal state!');
+        console.warn('🔄 This might cause the terminal state error. Consider implementing PaymentIntent cancellation.');
+      }
+      
       setClientSecret(data.clientSecret);
       goToStep('payment');
     } catch (err) {
@@ -311,7 +362,15 @@ export default function CheckoutPage() {
       console.error('💥 Payment initiation error:', errorMessage);
       toast.error(errorMessage);
     }
-  };
+  }, [orderCode, goToStep, clientSecret]);
+
+  // Auto-create payment intent when on payment step without clientSecret
+  useEffect(() => {
+    if (step === 'payment' && !clientSecret && orderCode && order) {
+      console.log('🔄 Auto-creating payment intent for direct payment step access');
+      handleStartPayment();
+    }
+  }, [step, clientSecret, orderCode, order, handleStartPayment]);
 
   const getStepIcon = (stepName: CheckoutStep) => {
     switch (stepName) {
@@ -704,7 +763,7 @@ export default function CheckoutPage() {
     );
   }
 
-  if (step === 'payment' && clientSecret) {
+  if (step === 'payment') {
     if (!stripePromise) {
       return (
         <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white py-12">
@@ -727,6 +786,35 @@ export default function CheckoutPage() {
       );
     }
 
+    // If no clientSecret, show loading state and create payment intent
+    if (!clientSecret) {
+      return (
+        <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white py-12">
+          <div className="max-w-6xl mx-auto px-4">
+            <StepIndicator />
+            
+            <div className="grid lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2">
+                <Card className="p-8">
+                  <div className="text-center space-y-4">
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-brand-primary mx-auto"></div>
+                    <h2 className="text-2xl font-bold text-brand-dark-blue">Preparing Payment</h2>
+                    <p className="text-brand-dark-blue/70">
+                      Setting up your secure payment form...
+                    </p>
+                  </div>
+                </Card>
+              </div>
+              
+              <div className="lg:col-span-1">
+                {order && <OrderSummary order={order} showItems={false} />}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white py-12">
         <div className="max-w-6xl mx-auto px-4">
@@ -738,6 +826,7 @@ export default function CheckoutPage() {
         <PaymentStep
           returnUrl={`${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/checkout/confirmation/${orderCode}`}
           onBack={() => goToStep('customer')}
+          onRetryPayment={() => setClientSecret(null)}
         />
       </Elements>
             </div>
@@ -754,7 +843,7 @@ export default function CheckoutPage() {
   return null;
 }
 
-function PaymentStep({ returnUrl, onBack }: { returnUrl: string; onBack: () => void }) {
+function PaymentStep({ returnUrl, onBack, onRetryPayment }: { returnUrl: string; onBack: () => void; onRetryPayment: () => void }) {
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
@@ -766,6 +855,30 @@ function PaymentStep({ returnUrl, onBack }: { returnUrl: string; onBack: () => v
       setError(null);
     }
   }, [elements, error]);
+
+  // Handle Elements initialization errors more gracefully
+  useEffect(() => {
+    const handleElementsError = (event: any) => {
+      console.log('Elements error event:', event);
+      if (event.error?.type === 'invalid_request_error' && 
+          event.error?.message?.includes('terminal state')) {
+        console.error('🚨 PaymentIntent is in terminal state, clearing and retrying...');
+        setError('Payment session expired. Please try again.');
+        // Clear the clientSecret to force a new payment intent
+        setTimeout(() => {
+          onRetryPayment();
+        }, 1000);
+      }
+    };
+
+    // Listen for any global Stripe errors
+    if (typeof window !== 'undefined') {
+      window.addEventListener('stripe-error', handleElementsError);
+      return () => {
+        window.removeEventListener('stripe-error', handleElementsError);
+      };
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -837,21 +950,19 @@ function PaymentStep({ returnUrl, onBack }: { returnUrl: string; onBack: () => v
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
             <div className="flex items-center justify-between">
               <span>{error}</span>
-              {error.includes('expired') && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setError(null);
-                    // Clear the clientSecret to force a new payment intent
-                    window.location.reload();
-                  }}
-                  className="ml-4"
-                >
-                  Start New Payment
-                </Button>
-              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setError(null);
+                  // Clear the clientSecret to force a new payment intent
+                  onRetryPayment();
+                }}
+                className="ml-4"
+              >
+                Retry Payment
+              </Button>
             </div>
           </div>
         )}
