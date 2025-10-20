@@ -13,8 +13,8 @@ const trustElements = [
   },
   {
     icon: Truck,
-    title: 'Freeeee Shipping',
-    description: 'Free delivery on all orders over £500 directly to your doorstep'
+    title: 'Free Shipping',
+    description: 'Free delivery on all orders over $200 directly to your doorstep'
   },
   {
     icon: RotateCcw,
@@ -24,7 +24,7 @@ const trustElements = [
   {
     icon: Award,
     title: 'Quality Guaranteed',
-    description: 'Premium materials and expert craftsmanship in every piece'
+    description: 'Quality materials and careful craftsmanship in every piece'
   },
   {
     icon: Lock,
@@ -50,11 +50,11 @@ export function TrustSection() {
           variants={fadeInUp}
           className="text-center mb-16"
         >
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-brand-dark-blue mb-4 font-tango-sans">
             Why shop with us?
           </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            We are committed to providing you with the best shopping experience
+          <p className="text-lg text-brand-dark-blue/80 max-w-2xl mx-auto">
+            We are committed to providing you with quality furniture at great prices with excellent service
           </p>
         </motion.div>
 
@@ -112,7 +112,7 @@ export function TrustSection() {
 
             <div className="h-12 w-px bg-gray-300"></div>
 
-            <div className="text-sm text-gray-600 font-medium">
+            <div className="text-sm text-brand-dark-blue/80 font-medium">
               <Shield className="inline w-4 h-4 mr-2 text-green-600" />
               SSL Secured Payment
             </div>

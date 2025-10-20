@@ -1,20 +1,48 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Search, Heart, ShoppingCart, User, Menu } from 'lucide-react';
+import Image from 'next/image';
+import { Search, Heart, User, Menu } from 'lucide-react';
 import { navigationItems } from '@/lib/data';
-import { useCart } from '@/contexts/cart-context';
-import { motion } from 'framer-motion';
+import { MiniCart } from '@/components/cart/mini-cart';
 
 export function Header() {
-  const { itemCount } = useCart();
+  const pathname = usePathname();
+  const [scrolled, setScrolled] = useState(false);
+
+  // Detectar si estamos en páginas de productos o páginas internas
+  const isProductPage = pathname?.startsWith('/products/') && pathname !== '/products';
+  const isInternalPage = pathname !== '/' || scrolled;
+  const shouldBeFixed = isProductPage || isInternalPage;
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 50);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   return (
-    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm">
+    <header
+      className={`left-0 right-0 z-50 transition-all duration-300 ${
+        shouldBeFixed
+          ? 'fixed top-0 bg-brand-dark-blue/95 backdrop-blur-md shadow-lg'
+          : 'absolute top-0 pt-10'
+      }`}
+    >
       <div className="w-full">
         <div className="flex items-center justify-between px-6 lg:px-8 py-4 max-w-7xl mx-auto">
-          <Link href="/" className="text-2xl font-bold tracking-tight text-gray-900 hover:text-orange-600 transition-colors">
-            Mavren
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/images/logos/logo_compacto.png"
+              alt="Florida Homes Furniture"
+              width={120}
+              height={120}
+            />
           </Link>
 
           <nav className="hidden lg:flex gap-8">
@@ -22,57 +50,43 @@ export function Header() {
               <Link
                 key={item.name}
                 href={item.href}
-                className="text-sm font-medium text-gray-700 hover:text-orange-600 transition-colors relative group"
+                className="text-sm font-medium text-white hover:text-brand-accent transition-colors relative group"
               >
                 {item.name}
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-orange-600 group-hover:w-full transition-all duration-300"></span>
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-brand-accent group-hover:w-full transition-all duration-300"></span>
               </Link>
             ))}
           </nav>
 
-          <div className="flex gap-4 items-center text-gray-900">
+          <div className="flex gap-4 items-center text-white">
             <button
               aria-label="Open search"
-              className="hover:text-orange-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 rounded p-2"
+              className="hover:text-brand-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2 rounded p-2"
             >
-              <Search className="w-5 h-5" />
+              <Search className="w-5 h-5 text-white" />
             </button>
 
             <button
               aria-label="Open wishlist"
-              className="hover:text-orange-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 rounded p-2"
+              className="hover:text-brand-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2 rounded p-2"
             >
-              <Heart className="w-5 h-5" />
+              <Heart className="w-5 h-5 text-white" />
             </button>
 
-            <button
-              aria-label="Open cart"
-              className="relative hover:text-orange-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 rounded p-2"
-            >
-              <ShoppingCart className="w-5 h-5" />
-              {itemCount > 0 && (
-                <motion.span
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="absolute -top-1 -right-1 bg-orange-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"
-                >
-                  {itemCount}
-                </motion.span>
-              )}
-            </button>
+            <MiniCart className="text-white" />
 
             <button
               aria-label="Open account"
-              className="hover:text-orange-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 rounded p-2"
+              className="hover:text-brand-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2 rounded p-2"
             >
-              <User className="w-5 h-5" />
+              <User className="w-5 h-5 text-white" />
             </button>
 
             <button
               aria-label="Open menu"
-              className="lg:hidden hover:text-orange-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 rounded p-2"
+              className="lg:hidden hover:text-brand-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2 rounded p-2"
             >
-              <Menu className="w-6 h-6" />
+              <Menu className="w-6 h-6 text-white" />
             </button>
           </div>
         </div>

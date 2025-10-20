@@ -9,6 +9,10 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        'tango-sans': ['var(--font-tango-sans)', 'system-ui', 'sans-serif'],
+        'creato-display': ['var(--font-creato-display)', 'system-ui', 'sans-serif'],
+      },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
         'gradient-conic':
@@ -16,14 +20,15 @@ const config: Config = {
       },
       borderRadius: {
         'sm': '8px',
-        'md': '14px',
-        'lg': '18px',
-        'xl': '22px',
+        'md': '12px',
+        'lg': '16px',
+        'xl': '20px',
         'pill': '999px',
       },
       boxShadow: {
         'soft': '0 6px 20px rgba(0,0,0,0.06)',
         'elevated': '0 10px 30px rgba(0,0,0,0.10)',
+        'brand': '0 8px 25px rgba(229, 106, 44, 0.15)',
       },
       spacing: {
         '18': '4.5rem',
@@ -70,6 +75,13 @@ const config: Config = {
           '4': 'hsl(var(--chart-4))',
           '5': 'hsl(var(--chart-5))',
         },
+        // Brand Colors
+        'brand-primary': '#E56A2C',
+        'brand-secondary': '#7493B2',
+        'brand-accent': '#FDA46C',
+        'brand-cream': '#E9E2CF',
+        'brand-dark-blue': '#234465',
+        'brand-white': '#FFFFFF',
       },
       keyframes: {
         'accordion-down': {

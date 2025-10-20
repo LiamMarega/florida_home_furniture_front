@@ -106,3 +106,54 @@ export const TRANSITION_ORDER_TO_STATE = gql`
     }
   }
 `;
+
+export const SET_ORDER_SHIPPING_METHOD = gql`
+  ${ORDER_FRAGMENT}
+  mutation SetOrderShippingMethod($shippingMethodId: [ID!]!) {
+    setOrderShippingMethod(shippingMethodId: $shippingMethodId) {
+      ... on Order {
+        ...Order
+      }
+      ... on ErrorResult {
+        errorCode
+        message
+      }
+    }
+  }
+`;
+
+export const SET_ORDER_BILLING_ADDRESS = gql`
+  ${ORDER_FRAGMENT}
+  mutation SetOrderBillingAddress($input: CreateAddressInput!) {
+    setOrderBillingAddress(input: $input) {
+      ... on Order {
+        ...Order
+      }
+      ... on ErrorResult {
+        errorCode
+        message
+      }
+    }
+  }
+`;
+
+export const ADD_PAYMENT_TO_ORDER = gql`
+  ${ORDER_FRAGMENT}
+  mutation AddPaymentToOrder($input: PaymentInput!) {
+    addPaymentToOrder(input: $input) {
+      ... on Order {
+        ...Order
+      }
+      ... on ErrorResult {
+        errorCode
+        message
+      }
+    }
+  }
+`;
+
+export const CREATE_PAYMENT_INTENT = gql`
+  mutation CreateStripePaymentIntent {
+    createStripePaymentIntent
+  }
+`;

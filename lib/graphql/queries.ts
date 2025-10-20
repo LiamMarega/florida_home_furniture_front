@@ -1,5 +1,5 @@
 import { gql } from 'graphql-request';
-import { PRODUCT_FRAGMENT, ORDER_FRAGMENT, ASSET_FRAGMENT } from './fragments';
+import { PRODUCT_FRAGMENT, ORDER_FRAGMENT, ASSET_FRAGMENT, SEARCH_RESULT_ASSET_FRAGMENT, PRODUCT_VARIANT_FRAGMENT } from './fragments';
 
 export const GET_PRODUCTS = gql`
   ${PRODUCT_FRAGMENT}
@@ -14,7 +14,7 @@ export const GET_PRODUCTS = gql`
 `;
 
 export const SEARCH_PRODUCTS = gql`
-  ${ASSET_FRAGMENT}
+  ${SEARCH_RESULT_ASSET_FRAGMENT}
   query SearchProducts($input: SearchInput!) {
     search(input: $input) {
       items {
@@ -33,7 +33,7 @@ export const SEARCH_PRODUCTS = gql`
         }
         currencyCode
         productAsset {
-          ...Asset
+          ...SearchResultAsset
         }
       }
       totalItems
@@ -46,6 +46,41 @@ export const GET_PRODUCT_BY_SLUG = gql`
   query GetProductBySlug($slug: String!) {
     product(slug: $slug) {
       ...Product
+    }
+  }
+`;
+
+export const GET_PRODUCT_DETAILS = gql`
+  ${ASSET_FRAGMENT}
+  ${PRODUCT_VARIANT_FRAGMENT}
+  query GetProductDetails($slug: String!) {
+    product(slug: $slug) {
+      id
+      name
+      slug
+      description
+      featuredAsset {
+        ...Asset
+      }
+      assets {
+        ...Asset
+      }
+      variants {
+        ...ProductVariant
+        product {
+          id
+          name
+          slug
+        }
+      }
+      customFields {
+        materials
+        dimensions
+        weight
+        color
+        assembly
+        warranty
+      }
     }
   }
 `;
@@ -116,5 +151,51 @@ export const GET_ACTIVE_CUSTOMER = gql`
       lastName
       emailAddress
     }
+  }
+`;
+
+export const GET_ALL_PRODUCTS = gql`
+    query GetAllProducts {
+      products {
+        items {
+          id
+          name
+          slug
+          featuredAsset {
+            id
+            preview
+          }
+        }
+        totalItems
+      }
+    }
+`;
+
+export const GET_ELIGIBLE_SHIPPING_METHODS = gql`
+  query GetEligibleShippingMethods {
+    eligibleShippingMethods {
+      id
+      code
+      name
+      description
+      price
+      priceWithTax
+      metadata
+    }
+  }
+`;
+
+export const GET_ORDER_BY_CODE = gql`
+  ${ORDER_FRAGMENT}
+  query GetOrderByCode($code: String!) {
+    orderByCode(code: $code) {
+      ...Order
+    }
+  }
+`;
+
+export const GET_NEXT_ORDER_STATES = gql`
+  query GetNextOrderStates {
+    nextOrderStates
   }
 `;

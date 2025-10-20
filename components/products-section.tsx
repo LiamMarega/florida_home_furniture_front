@@ -43,7 +43,7 @@ export function ProductsSection() {
     <section className="mt-12">
       <div className="flex items-center justify-between">
         <h2 className="text-[28px] md:text-[32px] font-bold text-[#0A0A0A]">
-          Interiors by Prabott.
+          Featured Products
         </h2>
         <div className="flex gap-2">
           <button

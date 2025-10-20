@@ -43,8 +43,8 @@ const staticReviews: Review[] = [
     customer_avatar: null,
     customer_location: 'Birmingham, UK',
     rating: 5,
-    title: 'Worth Every Penny',
-    comment: 'Initially hesitant about the price, but the quality and durability make it a worthwhile investment. Best furniture purchase we\'ve made!',
+    title: 'Great Value',
+    comment: 'Found exactly what we needed at a price we could afford. The quality is solid and it looks great in our home!',
     verified_purchase: true,
   },
   {
@@ -63,8 +63,8 @@ const staticReviews: Review[] = [
     customer_avatar: null,
     customer_location: 'Bristol, UK',
     rating: 5,
-    title: 'Exceeded Expectations',
-    comment: 'From ordering to delivery, everything was smooth. The chairs are even more beautiful in person than in the photos!',
+    title: 'Great Service',
+    comment: 'From ordering to delivery, everything was smooth. The chairs look even better in person than in the photos!',
     verified_purchase: true,
   },
   {
@@ -73,8 +73,8 @@ const staticReviews: Review[] = [
     customer_avatar: null,
     customer_location: 'Leeds, UK',
     rating: 5,
-    title: 'Outstanding Service',
-    comment: 'Not only is the furniture top-notch, but the customer service was exceptional. They helped us choose the perfect pieces for our space.',
+    title: 'Helpful Service',
+    comment: 'The furniture is great quality, and the customer service was really helpful. They helped us find the right pieces for our budget.',
     verified_purchase: true,
   },
 ];
@@ -84,7 +84,7 @@ export function TestimonialsSection() {
   const reviews = staticReviews;
 
   return (
-    <section ref={ref} className="py-20 bg-gradient-to-b from-white to-orange-50/30">
+    <section ref={ref} className="py-20 bg-gradient-to-b from-white to-brand-cream/30">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <motion.div
           initial="hidden"
@@ -92,24 +92,24 @@ export function TestimonialsSection() {
           variants={staggerContainer}
           className="text-center mb-16"
         >
-          <motion.div variants={fadeInUp} className="inline-flex items-center gap-2 bg-orange-100 px-4 py-2 rounded-full mb-4">
-            <span className="text-sm font-semibold text-orange-600 uppercase tracking-wider">
+          <motion.div variants={fadeInUp} className="inline-flex items-center gap-2 bg-brand-accent/20 px-4 py-2 rounded-full mb-4">
+            <span className="text-sm font-semibold text-brand-primary uppercase tracking-wider">
               Testimonials
             </span>
           </motion.div>
 
           <motion.h2
             variants={fadeInUp}
-            className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 mb-4"
+            className="text-4xl sm:text-5xl lg:text-6xl font-bold text-brand-dark-blue mb-4 font-tango-sans"
           >
             Hear from happy customers
           </motion.h2>
 
           <motion.p
             variants={fadeInUp}
-            className="text-lg text-gray-600 max-w-2xl mx-auto"
+            className="text-lg text-brand-dark-blue/80 max-w-2xl mx-auto"
           >
-            Real experiences from people who transformed their spaces with our furniture
+            Real experiences from people who found great furniture at great prices
           </motion.p>
         </motion.div>
 
@@ -126,10 +126,10 @@ export function TestimonialsSection() {
               whileHover={{ y: -8, transition: { duration: 0.3 } }}
               className="bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-shadow relative"
             >
-              <Quote className="absolute top-6 right-6 w-12 h-12 text-orange-100" />
+              <Quote className="absolute top-6 right-6 w-12 h-12 text-brand-accent/30" />
 
               <div className="flex items-center gap-4 mb-4 relative z-10">
-                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-xl overflow-hidden">
+                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-brand-primary to-brand-accent flex items-center justify-center text-white font-bold text-xl overflow-hidden">
                   {review.customer_avatar ? (
                     <img
                       src={review.customer_avatar}
@@ -142,9 +142,9 @@ export function TestimonialsSection() {
                 </div>
 
                 <div className="flex-1">
-                  <h4 className="font-bold text-gray-900">{review.customer_name}</h4>
+                  <h4 className="font-bold text-brand-dark-blue">{review.customer_name}</h4>
                   {review.customer_location && (
-                    <p className="text-sm text-gray-500">{review.customer_location}</p>
+                    <p className="text-sm text-brand-dark-blue/60">{review.customer_location}</p>
                   )}
                 </div>
 
@@ -161,7 +161,7 @@ export function TestimonialsSection() {
                     key={i}
                     className={`w-5 h-5 ${
                       i < review.rating
-                        ? 'fill-orange-400 text-orange-400'
+                        ? 'fill-brand-primary text-brand-primary'
                         : 'fill-gray-200 text-gray-200'
                     }`}
                   />
@@ -169,10 +169,10 @@ export function TestimonialsSection() {
               </div>
 
               {review.title && (
-                <h5 className="font-bold text-gray-900 mb-2">{review.title}</h5>
+                <h5 className="font-bold text-brand-dark-blue mb-2">{review.title}</h5>
               )}
 
-              <p className="text-gray-600 leading-relaxed">{review.comment}</p>
+              <p className="text-brand-dark-blue/80 leading-relaxed">{review.comment}</p>
             </motion.div>
           ))}
         </motion.div>

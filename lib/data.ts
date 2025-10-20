@@ -1,19 +1,19 @@
 import { Stat, NavigationItem } from './types';
 
 export const navigationItems: NavigationItem[] = [
-  { name: 'Furniture', href: '/collections/furniture' },
+  { name: 'Living Room', href: '/collections/living-room' },
+  { name: 'Bedroom', href: '/collections/bedroom' },
+  { name: 'Dining Room', href: '/collections/dining-room' },
+  { name: 'Office', href: '/collections/office' },
   { name: 'Outdoor', href: '/collections/outdoor' },
-  { name: 'Lighting', href: '/collections/lighting' },
-  { name: 'Dining', href: '/collections/dining' },
-  { name: 'Bathrooms', href: '/collections/bathrooms' },
-  { name: 'Mirrors & Decors', href: '/collections/mirrors-decors' },
+  { name: 'Accessories', href: '/collections/accessories' },
 ];
 
 export const stats: Stat[] = [
   {
     value: '10+',
     description:
-      'With a decade of expertise, Prabott crafts high-quality, bespoke furniture that blends style and functionality.',
+      'With a decade of expertise, Florida Homes Furniture crafts modern, functional and accessible furniture from Miami.',
   },
   {
     value: '800+',
@@ -23,6 +23,6 @@ export const stats: Stat[] = [
   {
     value: '1200+',
     description:
-      'Prabott has crafted over 1200 unique furniture pieces, from elegant sofas to functional cabinets, with precision and care.',
+      'Florida Homes Furniture has crafted over 1200 unique furniture pieces, from elegant sofas to functional cabinets, with precision and care.',
   },
 ];
