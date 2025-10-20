@@ -3,12 +3,20 @@ import { Instagram, Facebook } from 'lucide-react';
 
 export default function ComingSoon() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-brand-cream via-white to-brand-cream/50 flex items-center justify-center p-6">
-      <div className="max-w-5xl w-full">
-        <div className="text-center mb-16">
-          <div className="inline-block mb-8">
+    <main className="min-h-screen bg-gradient-to-br from-brand-cream via-white to-brand-cream/50 flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Subtle background gradient circles */}
+      <div className="absolute -top-10 -left-20 w-80 h-80 bg-gradient-to-br from-brand-primary/50 to-brand-primary/5 rounded-full blur-xl"></div>
+      <div className="absolute top-40 right-20 w-24 h-24 bg-gradient-to-br from-brand-dark-blue/8 to-brand-dark-blue/3 rounded-full blur-lg"></div>
+      <div className="absolute bottom-32 left-1/4 w-40 h-40 bg-gradient-to-br from-brand-primary/6 to-transparent rounded-full blur-2xl"></div>
+      <div className="absolute bottom-20 right-1/3 w-28 h-28 bg-gradient-to-br from-brand-dark-blue/7 to-brand-dark-blue/2 rounded-full blur-xl"></div>
+      <div className="absolute top-1/2 left-5 w-20 h-20 bg-gradient-to-br from-brand-primary/8 to-transparent rounded-full blur-lg"></div>
+      <div className="absolute top-1/3 right-5 w-36 h-36 bg-gradient-to-br from-brand-dark-blue/5 to-transparent rounded-full blur-2xl"></div>
+      
+      <div className="max-w-5xl w-full relative z-10">
+        <div className="text-center mb-8">
+          <div className="inline-block mb-4">
             <Image
-              src="/images/logos/logo_compacto.png"
+              src="/images/logos/logo_compacto_5.png"
               alt="Florida Homes Furniture"
               width={180}
               height={180}
