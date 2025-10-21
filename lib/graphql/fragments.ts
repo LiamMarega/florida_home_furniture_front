@@ -100,6 +100,7 @@ export const ORDER_FRAGMENT = gql`
       firstName
       lastName
       emailAddress
+      customFields
     }
     shippingAddress {
       fullName

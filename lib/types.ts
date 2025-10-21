@@ -131,6 +131,7 @@ export interface Customer {
   firstName: string;
   lastName: string;
   emailAddress: string;
+  customFields?: Record<string, any> | null;
 }
 
 export interface Stat {

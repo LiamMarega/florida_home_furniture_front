@@ -2,18 +2,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
 import { CREATE_PAYMENT_INTENT } from '@/lib/graphql/mutations';
-import { GET_ACTIVE_ORDER } from '@/lib/graphql/queries';
+import { GET_ACTIVE_ORDER, GET_ACTIVE_CUSTOMER } from '@/lib/graphql/queries';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const orderCode = body.orderCode || body.code;
-    const forceNew = body.forceNew;
-    const timestamp = body.timestamp;
 
-    console.log('📝 Creating payment intent for order:', orderCode);
-    console.log('🔄 Request details:', { forceNew, timestamp, orderCode });
-
+ 
     if (!orderCode) {
       return NextResponse.json({ 
         error: 'Order code is required',
@@ -42,9 +38,64 @@ export async function POST(req: NextRequest) {
       console.warn('⚠️ Order code mismatch:', { provided: orderCode, actual: order.code });
     }
 
+    // Check if there's an active customer (logged-in user) even if order.customer is null
+    let hasCustomerEmail = false;
+    let customerEmail = null;
+    let stripeCustomerId = null;
+    
+    console.log('🔍 Order customer check:', {
+      hasOrderCustomer: !!order.customer,
+      orderCustomerEmail: order.customer?.emailAddress,
+      orderCustomerId: order.customer?.id,
+      orderCustomerStripeId: order.customer?.customFields?.stripeCustomerId
+    });
+    
+    if (order.customer?.emailAddress) {
+      hasCustomerEmail = true;
+      customerEmail = order.customer.emailAddress;
+      stripeCustomerId = order.customer.customFields?.stripeCustomerId as string | undefined;
+      console.log('✅ Using order customer email:', customerEmail);
+      console.log('💳 Order customer Stripe ID:', stripeCustomerId || 'Not set');
+    } else {
+      // Check if there's an active customer (logged-in user)
+      console.log('🔍 Order has no customer, checking for active customer...');
+      const activeCustomerCheck = await fetchGraphQL({
+        query: GET_ACTIVE_CUSTOMER,
+      }, { req });
+      
+      console.log('🔍 Active customer check response:', JSON.stringify(activeCustomerCheck, null, 2));
+      
+      const activeCustomer = activeCustomerCheck.data?.activeCustomer;
+      if (activeCustomer?.emailAddress) {
+        hasCustomerEmail = true;
+        customerEmail = activeCustomer.emailAddress;
+        stripeCustomerId = activeCustomer.customFields?.stripeCustomerId as string | undefined;
+        console.log('✅ Found active customer email:', customerEmail);
+        console.log('💳 Active customer Stripe ID:', stripeCustomerId || 'Not set');
+      } else {
+        console.log('❌ No active customer found or no email address');
+        console.log('🔍 Active customer data:', activeCustomer);
+      }
+    }
+
+    // Final customer email status
+    console.log('📧 Final customer email status:', {
+      hasCustomerEmail,
+      customerEmail,
+      stripeCustomerId,
+      source: order.customer?.emailAddress ? 'order' : 'activeCustomer'
+    });
+    
+    // Log Stripe customer ID status
+    if (stripeCustomerId) {
+      console.log('✅ Stripe customer ID found - Vendure will use this for Payment Intent');
+    } else {
+      console.log('⚠️ No Stripe customer ID found - Vendure will create a new Stripe customer or use email');
+    }
+
     // Validate order has required data
     const missingFields = [];
-    if (!order.customer?.emailAddress) missingFields.push('customer email');
+    if (!hasCustomerEmail) missingFields.push('customer email');
     if (!order.shippingAddress?.streetLine1) missingFields.push('shipping address');
     if (!order.shippingLines || order.shippingLines.length === 0) missingFields.push('shipping method');
 
@@ -54,9 +105,10 @@ export async function POST(req: NextRequest) {
         error: 'Order incomplete',
         details: `Missing required fields: ${missingFields.join(', ')}`,
         order: {
-          hasCustomer: !!order.customer,
+          hasCustomer: hasCustomerEmail,
           hasShippingAddress: !!order.shippingAddress,
           hasShippingMethod: order.shippingLines?.length > 0,
+          customerEmail: customerEmail
         }
       }, { status: 400 });
     }
@@ -86,15 +138,6 @@ export async function POST(req: NextRequest) {
         console.log('🔄 Previous payment failed, creating new payment intent...');
       }
     }
-
-    console.log('✅ Order validation passed, creating payment intent...');
-    console.log('📋 Order details:', {
-      code: order.code,
-      customer: order.customer?.emailAddress,
-      total: order.totalWithTax,
-      currency: order.currencyCode,
-      existingPayments: order.payments?.length || 0
-    });
 
     // The mutation uses the active order from the session, no orderCode needed
     const response = await fetchGraphQL({

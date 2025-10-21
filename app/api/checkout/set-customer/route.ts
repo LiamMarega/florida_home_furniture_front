@@ -30,49 +30,69 @@ export async function POST(req: NextRequest) {
 
     const activeCustomer = activeCustomerCheck.data?.activeCustomer;
     
-    // Check the active order
-    const activeOrderCheck = await fetchGraphQL({
-      query: GET_ACTIVE_ORDER,
-    }, { req });
-
-    const activeOrder = activeOrderCheck.data?.activeOrder;
-    console.log('🔍 Active order:', activeOrder?.id);
-    console.log('🔍 Active order customer:', activeOrder?.customer);
-    
-    // If user is already logged in, skip setCustomerForOrder (it's only for guest checkout)
+    // Per Vendure docs: "If the customer is already logged in, then this step is skipped"
+    // The order is automatically associated with the logged-in customer
     if (activeCustomer?.id) {
-      console.log('✅ User already logged in - skipping setCustomerForOrder');
-      console.log('👤 Current customer:', { 
+      console.log('✅ Customer already logged in - skipping setCustomerForOrder (per Vendure documentation)');
+      console.log('👤 Logged-in customer:', { 
         id: activeCustomer.id, 
-        email: activeCustomer.emailAddress 
+        email: activeCustomer.emailAddress,
+        firstName: activeCustomer.firstName,
+        lastName: activeCustomer.lastName
       });
       
-      // Return the active order with the logged-in customer
+      // Get the active order (should already have customer associated)
+      const orderCheck = await fetchGraphQL({
+        query: GET_ACTIVE_ORDER,
+      }, { req });
+      
+      const order = orderCheck.data?.activeOrder;
+      
+      console.log('📦 Active order for logged-in user:', {
+        id: order?.id,
+        code: order?.code,
+        customerId: order?.customer?.id,
+        customerEmail: order?.customer?.emailAddress
+      });
+      
+      // Verify order has customer associated (should be automatic for logged-in users)
+      if (!order?.customer?.emailAddress) {
+        console.warn('⚠️ Order does not have customer associated yet, waiting...');
+        
+        // Wait a bit for Vendure to associate customer with order
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        const retryOrderCheck = await fetchGraphQL({
+          query: GET_ACTIVE_ORDER,
+        }, { req });
+        
+        const retryOrder = retryOrderCheck.data?.activeOrder;
+        
+        console.log('🔄 Retry order check:', {
+          customerId: retryOrder?.customer?.id,
+          customerEmail: retryOrder?.customer?.emailAddress
+        });
+        
+        return NextResponse.json({ 
+          order: retryOrder || order,
+          customer: retryOrder?.customer || activeCustomer,
+          alreadyLoggedIn: true,
+          message: 'Customer already logged in - setCustomerForOrder skipped'
+        });
+      }
+      
+      // Order already has customer, return it
       return NextResponse.json({ 
-        order: activeOrder,
-        message: 'User already authenticated',
-        customer: activeCustomer,
-        alreadyLoggedIn: true
+        order,
+        customer: order.customer,
+        alreadyLoggedIn: true,
+        message: 'Customer already logged in - setCustomerForOrder skipped'
       });
     }
+
+    // User is NOT logged in, proceed with guest checkout using setCustomerForOrder
+    console.log('👤 No active session - proceeding with guest checkout (setCustomerForOrder)...');
     
-    // If order already has a customer (guest checkout was completed), return it
-    if (activeOrder?.customer?.id) {
-      console.log('✅ Order already has customer assigned');
-      console.log('👤 Current customer:', { 
-        id: activeOrder.customer.id, 
-        email: activeOrder.customer.emailAddress 
-      });
-      return NextResponse.json({ 
-        order: activeOrder,
-        message: 'Customer already assigned to order',
-        customer: activeOrder.customer,
-        alreadyLoggedIn: false
-      });
-    }
-
-    console.log('👤 No existing customer found, proceeding with customer setup...');
-
     const response = await fetchGraphQL({
       query: SET_CUSTOMER_FOR_ORDER,
       variables: {
@@ -99,37 +119,9 @@ export async function POST(req: NextRequest) {
 
     const result = response.data?.setCustomerForOrder;
 
-    // Handle ALREADY_LOGGED_IN_ERROR (shouldn't happen now since we check earlier, but just in case)
-    if (result?.errorCode === 'ALREADY_LOGGED_IN_ERROR') {
-      console.log('⚠️ ALREADY_LOGGED_IN_ERROR received (this should have been caught earlier)');
-      
-      // Get the current active order and customer
-      const currentOrderCheck = await fetchGraphQL({
-        query: GET_ACTIVE_ORDER,
-      }, { req });
-      
-      const currentCustomerCheck = await fetchGraphQL({
-        query: GET_ACTIVE_CUSTOMER,
-      }, { req });
-      
-      const currentOrder = currentOrderCheck.data?.activeOrder;
-      const currentCustomer = currentCustomerCheck.data?.activeCustomer;
-      
-      console.log('📦 Current order:', currentOrder?.id);
-      console.log('👤 Current customer:', currentCustomer?.emailAddress);
-      
-      // Return success with the current state
-      return NextResponse.json({ 
-        order: currentOrder,
-        message: 'User already authenticated',
-        customer: currentCustomer || currentOrder?.customer,
-        alreadyLoggedIn: true
-      });
-    }
-
-    // Handle Vendure error results (check both __typename and errorCode)
-    if (result?.__typename && result.__typename !== 'Order') {
-      console.error('❌ ErrorResult by __typename:', result);
+    // Handle Vendure error results
+    if (result?.errorCode || (result?.__typename && result.__typename !== 'Order')) {
+      console.error('❌ ErrorResult:', result);
       return NextResponse.json(
         { 
           error: result.message || 'Failed to set customer',
@@ -140,19 +132,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (result?.errorCode) {
-      console.error('❌ ErrorResult by errorCode:', result);
-      return NextResponse.json(
-        { 
-          error: result.message || 'Failed to set customer',
-          errorCode: result.errorCode,
-          details: result
-        },
-        { status: 400 }
-      );
-    }
-
-    // Verify we have a valid order
+    // Verify we have a valid order with customer
     if (!result || !result.id) {
       console.error('❌ Invalid response: No order returned');
       return NextResponse.json(
@@ -162,9 +142,18 @@ export async function POST(req: NextRequest) {
     }
 
     console.log('✅ Customer set successfully');
+    console.log('👤 Order customer:', {
+      id: result.customer?.id,
+      email: result.customer?.emailAddress,
+      firstName: result.customer?.firstName,
+      lastName: result.customer?.lastName
+    });
     
     // Create response with data
-    const nextResponse = NextResponse.json({ order: result });
+    const nextResponse = NextResponse.json({ 
+      order: result,
+      customer: result.customer
+    });
 
     // Forward Set-Cookie headers from Vendure if present
     if (response.setCookies && response.setCookies.length > 0) {

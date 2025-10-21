@@ -14,6 +14,8 @@ export async function POST(req: NextRequest) {
       postalCode,
       country,
       phoneNumber,
+      customerId,
+      customerEmail,
     } = body;
 
     console.log('📍 Setting shipping address:', { fullName, streetLine1, city, province, postalCode });
@@ -26,7 +28,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log('🍪 Request cookies:', req.headers.get('cookie')?.substring(0, 50) + '...');
 
     const response = await fetchGraphQL({
       query: SET_ORDER_SHIPPING_ADDRESS,
@@ -40,13 +41,13 @@ export async function POST(req: NextRequest) {
           postalCode,
           countryCode: country || 'US',
           phoneNumber: phoneNumber || '',
+          customerId: customerId || '',
+          customerEmail: customerEmail || '',
         },
       },
     }, {
       req // Pass the request to include cookies
     });
-
-    console.log('📦 Vendure response:', JSON.stringify(response, null, 2));
 
     // Handle GraphQL-level errors
     if (response.errors) {

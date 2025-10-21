@@ -157,3 +157,21 @@ export const CREATE_PAYMENT_INTENT = gql`
     createStripePaymentIntent
   }
 `;
+
+export const UPDATE_CUSTOMER = gql`
+  mutation UpdateCustomer($input: UpdateCustomerInput!) {
+    updateCustomer(input: $input) {
+      ... on Customer {
+        id
+        firstName
+        lastName
+        emailAddress
+        customFields
+      }
+      ... on ErrorResult {
+        errorCode
+        message
+      }
+    }
+  }
+`;

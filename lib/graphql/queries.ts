@@ -150,6 +150,7 @@ export const GET_ACTIVE_CUSTOMER = gql`
       firstName
       lastName
       emailAddress
+      customFields
     }
   }
 `;
