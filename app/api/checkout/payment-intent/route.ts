@@ -1,160 +1,208 @@
-// app/api/checkout/payment-intent/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { fetchGraphQL } from '@/lib/vendure-server';
-import { CREATE_PAYMENT_INTENT, SET_CUSTOMER_FOR_ORDER } from '@/lib/graphql/mutations';
-import { GET_ACTIVE_ORDER, GET_ACTIVE_CUSTOMER } from '@/lib/graphql/queries';
+import { fetchGraphQL } from "@/lib/vendure-server";
+import { gql } from "graphql-request";
+import { NextRequest, NextResponse } from "next/server";
+import Stripe from 'stripe';
+
 
 export async function POST(req: NextRequest) {
+
+
+
   try {
+
     const body = await req.json();
-    const orderCode = body.orderCode || body.code;
-    const emailFromBody = (body.emailAddress || body.email || '').trim();
+    const { emailAddress: bodyEmail } = body; // 🔑 Extraer email del body
+    
 
-    if (!orderCode) {
-      return NextResponse.json({ error: 'Order code is required', details: 'Please provide an order code' }, { status: 400 });
-    }
-
-    // 1) Cargar estado actual
-    const [orderCheck, activeCustomerCheck] = await Promise.all([
-      fetchGraphQL({ query: GET_ACTIVE_ORDER }, { req }),
-      fetchGraphQL({ query: GET_ACTIVE_CUSTOMER }, { req }),
-    ]);
-
-    const order = orderCheck.data?.activeOrder ?? null;
-    const activeCustomer = activeCustomerCheck.data?.activeCustomer ?? null;
-
-    if (!order) {
-      return NextResponse.json({ error: 'No active order found', details: 'Please add items to cart first' }, { status: 400 });
-    }
-
-    if (order.code !== orderCode) {
-      console.warn('⚠️ Order code mismatch', { provided: orderCode, actual: order.code });
-    }
-
-    const hasOrderCustomerEmail = !!order.customer?.emailAddress;
-    const authHeader = !!req.headers.get('authorization');
-
-    // 2) Si falta email, resolverlo
-    if (!hasOrderCustomerEmail) {
-      // a) Si hay cliente activo (sesión autenticada), intentar que se asocie
-      if (activeCustomer?.emailAddress || authHeader) {
-        // Pequeño delay + re-check por si es tema de timing
-        await new Promise(r => setTimeout(r, 250));
-        const retry = await fetchGraphQL({ query: GET_ACTIVE_ORDER }, { req });
-        const retryOrder = retry.data?.activeOrder;
-
-        if (!retryOrder?.customer?.emailAddress) {
-          // En este punto no podemos llamar setCustomerForOrder (está logueado).
-          return NextResponse.json({
-            error: 'Order incomplete',
-            details: 'Active session detected but order is not linked to the customer yet. Ensure Shop API requests include cookies and not an incompatible Authorization header.',
-            order: {
-              hasCustomer: false,
-              hasShippingAddress: !!order.shippingAddress,
-              hasShippingMethod: order.shippingLines?.length > 0,
-              customerEmail: null,
-            },
-          }, { status: 409 });
-        }
-      } else {
-        // b) Guest checkout: necesitamos un email en el cuerpo para setCustomerForOrder
-        const emailToUse = emailFromBody;
-        if (!emailToUse) {
-          return NextResponse.json({
-            error: 'Order incomplete',
-            details: 'Missing required fields: customer email (provide `emailAddress` in the payload for guest checkout).',
-            order: {
-              hasCustomer: false,
-              hasShippingAddress: !!order.shippingAddress,
-              hasShippingMethod: order.shippingLines?.length > 0,
-              customerEmail: null,
-            },
-          }, { status: 400 });
-        }
-
-        // Intentar asociar el email a la orden anónima
-        const setCustomerRes = await fetchGraphQL(
-          {
-            query: SET_CUSTOMER_FOR_ORDER,
-            variables: {
-              input: {
-                // nombres opcionales si los tenés en el body
-                firstName: (body.firstName || '').trim(),
-                lastName : (body.lastName  || '').trim(),
-                emailAddress: emailToUse,
-              },
-            },
-          },
-          { req }
-        );
-
-        if (setCustomerRes.errors?.length) {
-          // Si falló por ALREADY_LOGGED_IN_ERROR es que se logueó entre medio: reintentar leyendo el estado.
-          const msg = setCustomerRes.errors[0]?.message || 'Failed to set customer';
-          if (/ALREADY_LOGGED_IN_ERROR/i.test(msg)) {
-            const retry = await fetchGraphQL({ query: GET_ACTIVE_ORDER }, { req });
-            const retryOrder = retry.data?.activeOrder;
-            if (!retryOrder?.customer?.emailAddress) {
-              return NextResponse.json({ error: 'Order incomplete', details: 'Customer is logged in but order is not linked yet.' }, { status: 409 });
-            }
-          } else {
-            return NextResponse.json({ error: 'Failed to set customer', details: setCustomerRes.errors }, { status: 400 });
+  
+  
+    // 🍪 CRITICAL: Leer cookies del request
+    const cookieHeader = req.headers.get('cookie');
+    console.log('🍪 Payment intent cookies:', cookieHeader?.substring(0, 80) + '...');
+    console.log('📧 Email from body:', bodyEmail);
+    
+    // Obtener la orden activa con TODOS los campos que puedan tener el email
+    const GET_ORDER_FOR_PAYMENT = gql`
+      query GetActiveOrderForPayment {
+        activeOrder {
+          id
+          code
+          total
+          totalWithTax
+          customer {
+            id
+            emailAddress
+            firstName
+            lastName
           }
-        } else {
-          const setResult = setCustomerRes.data?.setCustomerForOrder;
-          if (setResult?.__typename && setResult.__typename !== 'Order') {
-            // Otro ErrorResult
-            return NextResponse.json({ error: setResult.message || 'Failed to set customer', details: setResult }, { status: 400 });
+          shippingAddress {
+            fullName
+            streetLine1
+            city
+            postalCode
+            phoneNumber
+          }
+          shippingLines {
+            shippingMethod {
+              id
+              name
+            }
           }
         }
       }
-    }
-
-    // 3) Releer la orden ya con email (o fallamos antes)
-    const finalOrderRes = await fetchGraphQL({ query: GET_ACTIVE_ORDER }, { req });
-    const finalOrder = finalOrderRes.data?.activeOrder;
-
-    // Validaciones mínimas antes del intent
-    const missing: string[] = [];
-    if (!finalOrder?.customer?.emailAddress) missing.push('customer email');
-    if (!finalOrder?.shippingAddress?.streetLine1) missing.push('shipping address');
-    if (!finalOrder?.shippingLines?.length) missing.push('shipping method');
-    if (missing.length) {
-      return NextResponse.json({
-        error: 'Order incomplete',
-        details: `Missing required fields: ${missing.join(', ')}`,
-        order: {
-          hasCustomer: !!finalOrder?.customer?.emailAddress,
-          hasShippingAddress: !!finalOrder?.shippingAddress,
-          hasShippingMethod: !!finalOrder?.shippingLines?.length,
-          customerEmail: finalOrder?.customer?.emailAddress ?? null,
+    `;
+    
+    // 🍪 Pasar las cookies al fetchGraphQL
+    const orderRes = await fetchGraphQL({ 
+      query: GET_ORDER_FOR_PAYMENT 
+    }, { 
+      req,
+      cookie: cookieHeader || undefined  // Asegurar que las cookies se pasen
+    });
+    
+    console.log('📦 Order response:', {
+      hasOrder: !!orderRes.data?.activeOrder,
+      orderId: orderRes.data?.activeOrder?.id,
+      orderCode: orderRes.data?.activeOrder?.code,
+      hasCustomer: !!orderRes.data?.activeOrder?.customer,
+      hasCustomFields: !!orderRes.data?.activeOrder?.customFields,
+    });
+    
+    const order = orderRes.data?.activeOrder;
+    
+    if (!order) {
+      console.error('❌ No active order found');
+      console.error('Cookies received:', cookieHeader);
+      console.error('GraphQL response:', JSON.stringify(orderRes, null, 2));
+      
+      return NextResponse.json({ 
+        error: 'No active order found',
+        debug: {
+          hasCookies: !!cookieHeader,
+          cookiePreview: cookieHeader?.substring(0, 50),
+          graphqlErrors: orderRes.errors,
         }
       }, { status: 400 });
     }
 
-    // 4) Crear el Payment Intent
-    const response = await fetchGraphQL({ query: CREATE_PAYMENT_INTENT }, { req });
+    // 🎯 VALIDACIÓN: Buscar el email en múltiples lugares + body como PRIORIDAD
+    // Nota: customFields es JSON, no un objeto con propiedades
+    const customerEmail = bodyEmail ||  // 🔑 PRIMERO: email del body (más confiable)
+                         order.customer?.emailAddress || 
+                         body.email; // Fallback adicional
 
-    if (response.errors?.length) {
-      return NextResponse.json({ error: 'GraphQL error', details: response.errors }, { status: 500 });
+    console.log('📧 Email detection:', {
+      fromBody: bodyEmail,
+      fromCustomer: order.customer?.emailAddress,
+      final: customerEmail,
+    });
+
+    const hasShippingAddress = !!(
+      order.shippingAddress?.streetLine1 &&
+      order.shippingAddress?.city &&
+      order.shippingAddress?.postalCode
+    );
+
+    const hasShippingMethod = order.shippingLines?.length > 0;
+
+    // Validar campos requeridos
+    const missingFields: string[] = [];
+    
+    if (!customerEmail) {
+      missingFields.push('customer email');
+    }
+    if (!hasShippingAddress) {
+      missingFields.push('shipping address');
+    }
+    if (!hasShippingMethod) {
+      missingFields.push('shipping method');
     }
 
-    const clientSecret = response.data?.createStripePaymentIntent;
-    if (!clientSecret || typeof clientSecret !== 'string') {
-      return NextResponse.json({
-        error: 'Failed to create payment intent',
-        details: 'No client secret returned from Vendure. Check StripePlugin configuration and order state.',
-        response
+    if (missingFields.length > 0) {
+      console.error('❌ Order validation failed:', {
+        hasCustomer: !!order.customer?.id,
+        hasCustomerEmail: !!customerEmail,
+        hasShippingAddress,
+        hasShippingMethod,
+        customerEmail,
+        shippingAddress: order.shippingAddress,
+        bodyData: body,
+      });
+      
+      return NextResponse.json({ 
+        error: 'Order incomplete',
+        details: `Missing required fields: ${missingFields.join(', ')}`,
+        order: {
+          hasCustomer: !!order.customer?.id,
+          hasCustomerEmail: !!customerEmail,
+          hasShippingAddress,
+          hasShippingMethod,
+          customerEmail,
+        },
+        debug: {
+          orderData: order,
+          bodyData: body,
+        }
+      }, { status: 400 });
+    }
+
+    console.log('✅ Order validation passed:', {
+      orderCode: order.code,
+      customerEmail,
+      hasCustomer: !!order.customer?.id,
+      total: order.totalWithTax,
+    });
+
+    // 💳 CREAR PAYMENT INTENT CON STRIPE
+    console.log('💳 Creating Stripe PaymentIntent...');
+    
+    // Importar Stripe (deberías tener esto instalado: npm install stripe)
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+      apiVersion: '2025-09-30.clover', // O la versión que tengas
+    });
+    
+    if (!process.env.STRIPE_SECRET_KEY) {
+      console.error('❌ STRIPE_SECRET_KEY not configured');
+      return NextResponse.json({ 
+        error: 'Payment system not configured',
+        details: 'Stripe secret key is missing'
       }, { status: 500 });
     }
 
-    const nextResponse = NextResponse.json({ clientSecret });
-    if (response.setCookies?.length) {
-      response.setCookies.forEach((c: string) => nextResponse.headers.append('Set-Cookie', c));
-    }
-    return nextResponse;
+    try {
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: order.totalWithTax, // Vendure usa centavos
+        currency: order.currencyCode?.toLowerCase() || 'usd',
+        metadata: {
+          orderCode: order.code,
+          orderId: order.id,
+          customerEmail,
+        },
+        description: `Order ${order.code}`,
+        receipt_email: customerEmail,
+      });
 
+      console.log('✅ Stripe PaymentIntent created:', paymentIntent.id);
+
+      return NextResponse.json({
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        orderCode: order.code,
+        total: order.totalWithTax,
+      });
+    } catch (stripeError: any) {
+      console.error('❌ Stripe error:', stripeError);
+      return NextResponse.json({ 
+        error: 'Failed to create payment intent',
+        details: stripeError.message
+      }, { status: 500 });
+    }
+    
   } catch (error) {
-    return NextResponse.json({ error: 'Server error', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
+    console.error('💥 Error creating payment intent:', error);
+    return NextResponse.json({ 
+      error: 'Failed to create payment intent',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    }, { status: 500 });
   }
 }

@@ -178,6 +178,8 @@ export const UPDATE_CUSTOMER = gql`
 
 export const LOGOUT = gql`
   mutation Logout {
-    logout
+    logout {
+      success
+    }
   }
 `;

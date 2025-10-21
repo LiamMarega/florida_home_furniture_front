@@ -20,6 +20,7 @@ interface CustomerData {
   firstName: string;
   lastName: string;
   emailAddress: string;
+  phoneNumber?: string;
   forceGuest?: boolean;
 }
 

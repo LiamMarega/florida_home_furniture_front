@@ -19,6 +19,8 @@ import { toast } from 'sonner';
 import { Order } from '@/lib/types';
 import { ArrowLeft, ArrowRight, Check, CreditCard, Package, Truck, User } from 'lucide-react';
 import { useActiveCart } from '@/hooks/use-cart';
+import { useQueryClient } from '@tanstack/react-query';
+
 import { 
   useShippingMethods, 
   useSetCustomer, 
@@ -80,6 +82,8 @@ export default function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
+
 
   // React Query hooks
   const { data: cartData, isLoading: isLoadingCart } = useActiveCart();
@@ -171,26 +175,29 @@ export default function CheckoutPage() {
   }, [router]);
 
 
+  // Reemplazar solo la función onCustomerSubmit
+
   const onCustomerSubmit = async (data: CustomerFormData) => {
     try {
       setIsSubmitting(true);
-
+  
       // Set customer information
       console.log('👤 Setting customer...');
       const customerData = await setCustomerMutation.mutateAsync({
         firstName: data.firstName,
         lastName: data.lastName,
         emailAddress: data.email,
-        forceGuest: true,
+        phoneNumber: data.shippingPhoneNumber,
+        // forceGuest: true,
       });
       console.log('👤 Customer response:', customerData);
-
+  
       if (customerData.alreadyLoggedIn) {
         console.log('✅ User was logged in, logged out for guest checkout');
       } else {
         console.log('✅ Customer set successfully');
       }
-
+  
       // Set shipping address
       console.log('📍 Setting shipping address...');
       const shippingData = await setShippingAddressMutation.mutateAsync({
@@ -205,7 +212,7 @@ export default function CheckoutPage() {
       });
       console.log('📍 Shipping address response:', shippingData);
       console.log('✅ Shipping address set successfully');
-
+  
       // Set billing address if different
       if (!data.billingSameAsShipping) {
         console.log('📍 Setting billing address...');
@@ -221,7 +228,7 @@ export default function CheckoutPage() {
         });
         console.log('✅ Billing address set successfully');
       }
-
+  
       // Set shipping method
       console.log('🚚 Setting shipping method:', data.shippingMethodId);
       const shippingMethodData = await setShippingMethodMutation.mutateAsync({
@@ -229,22 +236,53 @@ export default function CheckoutPage() {
       });
       console.log('🚚 Shipping method response:', shippingMethodData);
       console.log('✅ Shipping method set successfully');
-
-      // Start payment flow (guest email fallback)
+  
+      // 🔑 CRITICAL: Esperar a que las cookies se propaguen
+      console.log('⏳ Waiting for cookies to propagate...');
+      await new Promise(resolve => setTimeout(resolve, 300));
+  
+      // 🔄 Invalidar y refetch el cart para asegurar que tenemos la data más fresca
+      console.log('🔄 Refetching cart data...');
+      await queryClient.invalidateQueries({ queryKey: ['activeCart'] });
+      
+      // Esperar un poco más para que el refetch complete
+      await new Promise(resolve => setTimeout(resolve, 200));
+  
+      // Verificar que la orden tenga customer antes de proceder
+      const freshCart = queryClient.getQueryData(['activeCart']) as any;
+      const freshOrder = freshCart?.activeOrder;
+      
+      console.log('🔍 Fresh order state before payment:', {
+        hasOrder: !!freshOrder,
+        orderCode: freshOrder?.code,
+        hasCustomer: !!freshOrder?.customer,
+        hasShippingAddress: !!freshOrder?.shippingAddress,
+        customerEmail: freshOrder?.customer?.emailAddress,
+      });
+  
+      // Start payment flow con el email como fallback
       console.log('💳 Starting payment flow...');
       await handleStartPayment(data.email);
       
       console.log('🎉 Checkout submission completed!');
     } catch (error) {
       console.error('💥 Error submitting customer data:', error);
+      
+      // Logging detallado del error
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
+      
       toast.error(error instanceof Error ? error.message : 'Failed to process information');
-      // Don't navigate away on error
+      
+      // No navegamos en caso de error
       return;
     } finally {
       setIsSubmitting(false);
     }
   };
-
+  
   const handleStartPayment = useCallback(async (guestEmail?: string) => {
     try {
       if (!orderCode) {

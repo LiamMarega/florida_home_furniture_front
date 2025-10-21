@@ -31,11 +31,15 @@ export async function fetchGraphQL<T = any>(
     tags?: string[];
     headers?: Record<string, string>;
     req?: Request; // Add NextRequest to pass cookies
+    cookie?: string; // Direct cookie override for cookie jar pattern
   }
 ): Promise<GraphQLResponse<T>> {
   try {
-    // Extract cookies from the request if provided
-    const cookieHeader = options?.req?.headers.get('cookie') || options?.headers?.['Cookie'] || '';
+    // Priority: direct cookie > req cookies > headers
+    const cookieHeader = options?.cookie 
+      || options?.req?.headers.get('cookie') 
+      || options?.headers?.['Cookie'] 
+      || '';
     
     const response = await fetch(VENDURE_SHOP_API, {
       method: 'POST',
