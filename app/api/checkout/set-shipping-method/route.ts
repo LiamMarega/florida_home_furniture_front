@@ -28,7 +28,6 @@ export async function POST(req: NextRequest) {
       req // Pass the request to include cookies
     });
 
-    console.log('📦 Vendure response:', JSON.stringify(response, null, 2));
 
     // Handle GraphQL-level errors
     if (response.errors) {

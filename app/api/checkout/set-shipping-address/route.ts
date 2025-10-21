@@ -12,22 +12,19 @@ export async function POST(req: NextRequest) {
       city,
       province,
       postalCode,
-      country,
+      country,      // ej: 'AR' o 'US'
       phoneNumber,
-      customerId,
-      customerEmail,
+      // ❌ eliminar estos:
+      // customerId,
+      // customerEmail,
     } = body;
 
-    console.log('📍 Setting shipping address:', { fullName, streetLine1, city, province, postalCode });
-
     if (!fullName || !streetLine1 || !city || !province || !postalCode) {
-      console.error('❌ Missing required address fields');
-      return NextResponse.json(
-        { error: 'Missing required address fields' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing required address fields' }, { status: 400 });
     }
 
+    // Validar countryCode: Vendure usa ISO 3166-1 alpha-2 (ej: 'AR', 'US')
+    const countryCode = (country || 'US').toUpperCase();
 
     const response = await fetchGraphQL({
       query: SET_ORDER_SHIPPING_ADDRESS,
@@ -39,80 +36,45 @@ export async function POST(req: NextRequest) {
           city,
           province,
           postalCode,
-          countryCode: country || 'US',
+          countryCode,          // ✅ correcto
           phoneNumber: phoneNumber || '',
-          customerId: customerId || '',
-          customerEmail: customerEmail || '',
+          // ❌ NO agregar customerId / customerEmail aquí
         },
       },
-    }, {
-      req // Pass the request to include cookies
-    });
+    }, { req });
 
-    // Handle GraphQL-level errors
     if (response.errors) {
-      console.error('❌ GraphQL errors:', response.errors);
       return NextResponse.json(
         { error: 'Failed to set shipping address', details: response.errors },
-        { status: 500 }
+        { status: 400 } // es input inválido, mejor 400 que 500
       );
     }
 
     const result = response.data?.setOrderShippingAddress;
 
-    // Handle Vendure error results (check both __typename and errorCode)
     if (result?.__typename && result.__typename !== 'Order') {
-      console.error('❌ ErrorResult by __typename:', result);
       return NextResponse.json(
-        { 
-          error: result.message || 'Failed to set shipping address',
-          errorCode: result.errorCode,
-          details: result
-        },
+        { error: result.message || 'Failed to set shipping address', errorCode: result.errorCode, details: result },
         { status: 400 }
       );
     }
 
-    if (result?.errorCode) {
-      console.error('❌ ErrorResult by errorCode:', result);
-      return NextResponse.json(
-        { 
-          error: result.message || 'Failed to set shipping address',
-          errorCode: result.errorCode,
-          details: result
-        },
-        { status: 400 }
-      );
+    if (!result?.id) {
+      return NextResponse.json({ error: 'Invalid response from server' }, { status: 500 });
     }
 
-    // Verify we have a valid order
-    if (!result || !result.id) {
-      console.error('❌ Invalid response: No order returned');
-      return NextResponse.json(
-        { error: 'Invalid response from server' },
-        { status: 500 }
-      );
-    }
-
-    console.log('✅ Shipping address set successfully');
-    
-    // Create response with data
     const nextResponse = NextResponse.json({ order: result });
 
-    // Forward Set-Cookie headers from Vendure if present
-    if (response.setCookies && response.setCookies.length > 0) {
-      response.setCookies.forEach(cookie => {
+    if (response.setCookies?.length) {
+      response.setCookies.forEach((cookie: string) => {
         nextResponse.headers.append('Set-Cookie', cookie);
       });
     }
-
     return nextResponse;
   } catch (error) {
-    console.error('💥 Error setting shipping address:', error);
     return NextResponse.json(
       { error: 'Failed to set shipping address', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
 }
-
