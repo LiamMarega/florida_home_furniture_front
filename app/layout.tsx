@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Header } from '@/components/header';
 import { CartProvider } from '@/contexts/cart-context';
+import { QueryProvider } from '@/lib/query-client';
 import { Toaster } from '@/components/ui/sonner';
 import localFont from 'next/font/local';
 import { ConditionalHeader } from '@/components/conditional-header';
@@ -111,11 +112,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${creatoDisplay.variable} ${tangoSans.variable} font-creato-display`}>
-        <CartProvider>
-          <ConditionalHeader />
-          {children}
-          <Toaster position="bottom-right" />
-        </CartProvider>
+        <QueryProvider>
+          <CartProvider>
+            <ConditionalHeader />
+            {children}
+            <Toaster position="bottom-right" />
+          </CartProvider>
+        </QueryProvider>
       </body>
     </html>
   );

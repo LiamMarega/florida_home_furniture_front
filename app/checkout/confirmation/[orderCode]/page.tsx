@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { OrderSummary } from '@/components/checkout/order-summary';
 import { Order } from '@/lib/types';
+import { useOrderByCode } from '@/hooks/use-orders';
 import {
   CheckCircle,
   XCircle,
@@ -25,23 +26,30 @@ export default function CheckoutConfirmationPage() {
   const searchParams = useSearchParams();
   const orderCode = params.orderCode as string;
   
-  const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   // Stripe redirect params
   const paymentIntent = searchParams.get('payment_intent');
   const paymentIntentClientSecret = searchParams.get('payment_intent_client_secret');
   const redirectStatus = searchParams.get('redirect_status');
 
+  // Use React Query to fetch order
+  const { 
+    data: order, 
+    isLoading: loading, 
+    error: queryError,
+    refetch 
+  } = useOrderByCode(orderCode, {
+    enabled: !!orderCode,
+    retry: redirectStatus !== 'processing' // Don't retry if payment is processing
+  });
+
+  const error = queryError?.message || null;
+
   useEffect(() => {
     if (orderCode) {
-      loadOrder();
-      
       // If payment is pending, poll for updates
       if (redirectStatus === 'processing') {
         const pollInterval = setInterval(() => {
-          loadOrder();
+          refetch();
         }, 3000); // Poll every 3 seconds
         
         // Stop polling after 30 seconds
@@ -55,66 +63,29 @@ export default function CheckoutConfirmationPage() {
         };
       }
     }
-  }, [orderCode, redirectStatus]);
+  }, [orderCode, redirectStatus, refetch]);
 
-  const loadOrder = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      console.log('📦 Loading order:', orderCode);
-      console.log('🔗 Stripe redirect params:', { 
-        paymentIntent, 
-        redirectStatus 
-      });
-
-      const res = await fetch(`/api/orders/${orderCode}`, {
-        credentials: 'include', // Include cookies in request
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        console.error('❌ Failed to load order:', data);
-        
-        // Handle the case where order is completed but not accessible (403)
-        if (res.status === 403 && data.requiresAuth) {
-          console.log('ℹ️ Order completed successfully but requires authentication to view');
-          // For completed orders with successful payment, show a success message anyway
-          if (redirectStatus === 'succeeded') {
-            console.log('✅ Payment succeeded - showing success message');
-            // Create a minimal order object for display
-            setOrder({
-              code: orderCode,
-              state: 'PaymentSettled',
-              customer: { emailAddress: '' }, // Will be shown from redirect params
-              payments: [{ state: 'Settled' }]
-            } as any);
-            return;
-          }
-        }
-        
-        throw new Error(data.error || 'Failed to load order');
-      }
-
-      console.log('✅ Order loaded successfully:', {
-        code: data.order.code,
-        state: data.order.state,
-        paymentsCount: data.order.payments?.length || 0
-      });
-
-      setOrder(data.order);
-    } catch (err) {
-      console.error('💥 Error loading order:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load order');
-    } finally {
-      setLoading(false);
+  // Handle special case for completed orders that require auth
+  const displayOrder = useMemo(() => {
+    if (order) return order;
+    
+    // If we have a successful payment but no order data, create a minimal order for display
+    if (redirectStatus === 'succeeded' && error?.includes('requires authentication')) {
+      return {
+        code: orderCode,
+        state: 'PaymentSettled',
+        customer: { emailAddress: '' },
+        payments: [{ state: 'Settled' }]
+      } as Order;
     }
-  };
+    
+    return null;
+  }, [order, redirectStatus, error, orderCode]);
 
   const getPaymentStatus = () => {
     console.log('🔍 Checking payment status...');
     console.log('📊 Stripe redirect status:', redirectStatus);
-    console.log('📊 Order payments:', order?.payments);
+    console.log('📊 Order payments:', displayOrder?.payments);
 
     // Check Stripe redirect status first
     if (redirectStatus === 'succeeded') {
@@ -133,8 +104,8 @@ export default function CheckoutConfirmationPage() {
     }
 
     // Then check order payment state
-    if (order?.payments && order.payments.length > 0) {
-      const lastPayment = order.payments[order.payments.length - 1];
+    if (displayOrder?.payments && displayOrder.payments.length > 0) {
+      const lastPayment = displayOrder.payments[displayOrder.payments.length - 1];
       const state = lastPayment.state?.toLowerCase();
       console.log('💳 Last payment state:', state);
       return state;
@@ -162,7 +133,7 @@ export default function CheckoutConfirmationPage() {
     );
   }
 
-  if (error || !order) {
+  if (error || !displayOrder) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white py-12">
         <div className="max-w-2xl mx-auto px-4">
@@ -217,7 +188,7 @@ export default function CheckoutConfirmationPage() {
                 <div className="inline-block bg-brand-cream px-6 py-2 rounded-full">
                   <span className="text-sm text-brand-dark-blue/70">Order Number:</span>
                   <span className="font-mono font-bold text-brand-dark-blue ml-2">
-                    #{order.code}
+                    #{displayOrder.code}
                   </span>
                 </div>
               </div>
@@ -232,15 +203,15 @@ export default function CheckoutConfirmationPage() {
                       Confirmation Email Sent
                     </h3>
                     <p className="text-sm text-brand-dark-blue/70">
-                      {order.customer?.emailAddress ? (
+                      {displayOrder.customer?.emailAddress ? (
                         <>
                           We&apos;ve sent a confirmation email to{' '}
-                          <strong>{order.customer.emailAddress}</strong> with your order details.
+                          <strong>{displayOrder.customer.emailAddress}</strong> with your order details.
                         </>
                       ) : (
                         <>
                           A confirmation email has been sent with your order details. 
-                          Please check your inbox for order #{order.code}.
+                          Please check your inbox for order #{displayOrder.code}.
                         </>
                       )}
                     </p>
@@ -265,10 +236,10 @@ export default function CheckoutConfirmationPage() {
                   <div>
                     <h3 className="font-semibold text-brand-dark-blue mb-1">Payment Confirmed</h3>
                     <p className="text-sm text-brand-dark-blue/70">
-                      {order.totalWithTax && order.currencyCode ? (
+                      {displayOrder.totalWithTax && displayOrder.currencyCode ? (
                         <>
                           Your payment of{' '}
-                          <strong>{formatPrice(order.totalWithTax, order.currencyCode)}</strong> has been
+                          <strong>{formatPrice(displayOrder.totalWithTax, displayOrder.currencyCode)}</strong> has been
                           successfully processed.
                         </>
                       ) : (
@@ -290,7 +261,7 @@ export default function CheckoutConfirmationPage() {
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Link>
                 </Button>
-                {order.customer?.emailAddress && (
+                {displayOrder.customer?.emailAddress && (
                   <Button asChild variant="outline" className="flex-1 text-sm">
                     <Link href="/">Check your email for order details</Link>
                   </Button>
@@ -392,9 +363,9 @@ export default function CheckoutConfirmationPage() {
 
         {/* Order Summary */}
         <div className="grid md:grid-cols-2 gap-6">
-          {order.lines && order.lines.length > 0 ? (
+          {displayOrder.lines && displayOrder.lines.length > 0 ? (
             <div>
-              <OrderSummary order={order} />
+              <OrderSummary order={displayOrder} />
             </div>
           ) : (
             <Card className="p-6">
@@ -410,26 +381,26 @@ export default function CheckoutConfirmationPage() {
 
           <div className="space-y-6">
             {/* Shipping Information */}
-            {order.shippingAddress ? (
+            {displayOrder.shippingAddress ? (
               <Card className="p-6">
                 <h3 className="text-lg font-semibold text-brand-dark-blue mb-4 flex items-center gap-2">
                   <Package className="w-5 h-5" />
                   Shipping Information
                 </h3>
                 <div className="text-sm text-brand-dark-blue/80 space-y-1">
-                  <div className="font-medium">{order.shippingAddress.fullName}</div>
-                  <div>{order.shippingAddress.streetLine1}</div>
-                  {order.shippingAddress.streetLine2 && (
-                    <div>{order.shippingAddress.streetLine2}</div>
+                  <div className="font-medium">{displayOrder.shippingAddress.fullName}</div>
+                  <div>{displayOrder.shippingAddress.streetLine1}</div>
+                  {displayOrder.shippingAddress.streetLine2 && (
+                    <div>{displayOrder.shippingAddress.streetLine2}</div>
                   )}
                   <div>
-                    {order.shippingAddress.city}, {order.shippingAddress.province}{' '}
-                    {order.shippingAddress.postalCode}
+                    {displayOrder.shippingAddress.city}, {displayOrder.shippingAddress.province}{' '}
+                    {displayOrder.shippingAddress.postalCode}
                   </div>
-                  <div>{order.shippingAddress.country}</div>
-                  {order.shippingAddress.phoneNumber && (
+                  <div>{displayOrder.shippingAddress.country}</div>
+                  {displayOrder.shippingAddress.phoneNumber && (
                     <div className="mt-2 pt-2 border-t">
-                      📞 {order.shippingAddress.phoneNumber}
+                      📞 {displayOrder.shippingAddress.phoneNumber}
                     </div>
                   )}
                 </div>

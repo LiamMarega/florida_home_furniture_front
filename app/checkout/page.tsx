@@ -18,6 +18,15 @@ import { OrderSummary } from '@/components/checkout/order-summary';
 import { toast } from 'sonner';
 import { Order } from '@/lib/types';
 import { ArrowLeft, ArrowRight, Check, CreditCard, Package, Truck, User } from 'lucide-react';
+import { useActiveCart } from '@/hooks/use-cart';
+import { 
+  useShippingMethods, 
+  useSetCustomer, 
+  useSetShippingAddress, 
+  useSetBillingAddress, 
+  useSetShippingMethod, 
+  useCreatePaymentIntent 
+} from '@/hooks/use-checkout';
 
 // Initialize Stripe with error handling
 const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
@@ -68,12 +77,22 @@ export default function CheckoutPage() {
   const [step, setStep] = useState<CheckoutStep>('customer');
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderCode, setOrderCode] = useState<string | null>(null);
-  const [order, setOrder] = useState<Order | null>(null);
-  const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([]);
-  const [isLoadingShipping, setIsLoadingShipping] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // React Query hooks
+  const { data: cartData, isLoading: isLoadingCart } = useActiveCart();
+  const { data: shippingMethodsData, isLoading: isLoadingShipping } = useShippingMethods();
+  const setCustomerMutation = useSetCustomer();
+  const setShippingAddressMutation = useSetShippingAddress();
+  const setBillingAddressMutation = useSetBillingAddress();
+  const setShippingMethodMutation = useSetShippingMethod();
+  const createPaymentIntentMutation = useCreatePaymentIntent();
+
+  // Derived state
+  const order = cartData?.activeOrder || null;
+  const shippingMethods = shippingMethodsData?.shippingMethods || [];
 
   // Clear clientSecret when navigating away from payment step or on unmount
   useEffect(() => {
@@ -139,76 +158,32 @@ export default function CheckoutPage() {
     if (urlStep && steps.includes(urlStep)) setStep(urlStep);
   }, [searchParams]);
 
+  // Update orderCode when order changes
   useEffect(() => {
-    loadActiveOrder();
-  }, []);
-
-  const loadActiveOrder = async () => {
-    try {
-      const res = await fetch('/api/cart/active', { 
-        method: 'GET',
-        credentials: 'include', // Include cookies in request
-      });
-      const data = await res.json();
-
-      if (data.activeOrder) {
-        setOrder(data.activeOrder);
-        setOrderCode(data.activeOrder.code);
-      }
-    } catch (error) {
-      console.error('Error loading cart:', error);
-      toast.error('Failed to load cart');
+    if (order?.code) {
+      setOrderCode(order.code);
     }
-  };
+  }, [order]);
 
   const goToStep = useCallback((next: CheckoutStep) => {
     setStep(next);
     router.replace(`/checkout?step=${next}`, { scroll: false });
   }, [router]);
 
-  const loadShippingMethods = async () => {
-    try {
-      setIsLoadingShipping(true);
-      const res = await fetch('/api/checkout/shipping-methods', { 
-        method: 'GET',
-        credentials: 'include', // Include cookies in request
-      });
-      const data = await res.json();
-
-      if (data.shippingMethods) {
-        setShippingMethods(data.shippingMethods);
-      }
-    } catch (error) {
-      console.error('Error loading shipping methods:', error);
-      toast.error('Failed to load shipping methods');
-    } finally {
-      setIsLoadingShipping(false);
-    }
-  };
 
   const onCustomerSubmit = async (data: CustomerFormData) => {
     try {
       setIsSubmitting(true);
 
-      const customerRes =await fetch('/api/checkout/set-customer', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          firstName: data.firstName,
-          lastName : data.lastName,
-          emailAddress: data.email,
-          forceGuest: true, 
-        }),
+      // Set customer information
+      console.log('👤 Setting customer...');
+      const customerData = await setCustomerMutation.mutateAsync({
+        firstName: data.firstName,
+        lastName: data.lastName,
+        emailAddress: data.email,
+        forceGuest: true,
       });
-
-      const customerData = await customerRes.json();
       console.log('👤 Customer response:', customerData);
-
-      if (!customerRes.ok) {
-        console.error('❌ Failed to set customer:', customerData);
-        throw new Error(customerData.error || 'Failed to set customer');
-      }
 
       if (customerData.alreadyLoggedIn) {
         console.log('✅ User was logged in, logged out for guest checkout');
@@ -216,79 +191,44 @@ export default function CheckoutPage() {
         console.log('✅ Customer set successfully');
       }
 
-      // Now set shipping address
+      // Set shipping address
       console.log('📍 Setting shipping address...');
-      const shippingAddressRes = await fetch('/api/checkout/set-shipping-address', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // Include cookies in request
-        body: JSON.stringify({
-          fullName: data.shippingFullName,
-          streetLine1: data.shippingStreetLine1,
-          streetLine2: data.shippingStreetLine2 || '',
-          city: data.shippingCity,
-          province: data.shippingProvince,
-          postalCode: data.shippingPostalCode,
-          country: data.shippingCountry,
-          phoneNumber: data.shippingPhoneNumber,
-        }),
+      const shippingData = await setShippingAddressMutation.mutateAsync({
+        fullName: data.shippingFullName,
+        streetLine1: data.shippingStreetLine1,
+        streetLine2: data.shippingStreetLine2 || '',
+        city: data.shippingCity,
+        province: data.shippingProvince,
+        postalCode: data.shippingPostalCode,
+        country: data.shippingCountry,
+        phoneNumber: data.shippingPhoneNumber,
       });
-
-      const shippingData = await shippingAddressRes.json();
       console.log('📍 Shipping address response:', shippingData);
-
-      if (!shippingAddressRes.ok) {
-        console.error('❌ Failed to set shipping address:', shippingData);
-        throw new Error(shippingData.error || 'Failed to set shipping address');
-      }
-
       console.log('✅ Shipping address set successfully');
 
       // Set billing address if different
       if (!data.billingSameAsShipping) {
-        const billingAddressRes = await fetch('/api/checkout/set-billing-address', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include', // Include cookies in request
-          body: JSON.stringify({
-            fullName: data.billingFullName,
-            streetLine1: data.billingStreetLine1,
-            streetLine2: data.billingStreetLine2 || '',
-            city: data.billingCity,
-            province: data.billingProvince,
-            postalCode: data.billingPostalCode,
-            country: data.billingCountry || 'US',
-            phoneNumber: data.billingPhoneNumber,
-          }),
+        console.log('📍 Setting billing address...');
+        await setBillingAddressMutation.mutateAsync({
+          fullName: data.billingFullName!,
+          streetLine1: data.billingStreetLine1!,
+          streetLine2: data.billingStreetLine2 || '',
+          city: data.billingCity!,
+          province: data.billingProvince!,
+          postalCode: data.billingPostalCode!,
+          country: data.billingCountry || 'US',
+          phoneNumber: data.billingPhoneNumber!,
         });
-
-        if (!billingAddressRes.ok) throw new Error('Failed to set billing address');
+        console.log('✅ Billing address set successfully');
       }
 
       // Set shipping method
       console.log('🚚 Setting shipping method:', data.shippingMethodId);
-      const shippingMethodRes = await fetch('/api/checkout/set-shipping-method', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // Include cookies in request
-        body: JSON.stringify({
-          shippingMethodId: data.shippingMethodId,
-        }),
+      const shippingMethodData = await setShippingMethodMutation.mutateAsync({
+        shippingMethodId: data.shippingMethodId,
       });
-
-      const shippingMethodData = await shippingMethodRes.json();
       console.log('🚚 Shipping method response:', shippingMethodData);
-
-      if (!shippingMethodRes.ok) {
-        console.error('❌ Failed to set shipping method:', shippingMethodData);
-        throw new Error(shippingMethodData.error || 'Failed to set shipping method');
-      }
-
       console.log('✅ Shipping method set successfully');
-
-      // Reload order to get updated totals
-      console.log('🔄 Reloading order...');
-      await loadActiveOrder();
 
       // Start payment flow (guest email fallback)
       console.log('💳 Starting payment flow...');
@@ -320,38 +260,14 @@ export default function CheckoutPage() {
         setClientSecret(null);
       }
 
-      const resIntent = await fetch('/api/checkout/payment-intent', {
-        method: 'POST',
-        credentials: 'include', // Include cookies in request
-        body: JSON.stringify({ 
-          orderCode,
-          timestamp: Date.now(), // Add timestamp to prevent caching
-          forceNew: true, // Flag to indicate we want a new PaymentIntent
-          // 👇 enviar email si es guest; el backend lo usa solo si falta el email en la orden
-          emailAddress: guestEmail || undefined,
-        }),
-        headers: { 
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        },
+      const data = await createPaymentIntentMutation.mutateAsync({
+        orderCode,
+        timestamp: Date.now(),
+        forceNew: true,
+        emailAddress: guestEmail,
       });
-
-      const data = await resIntent.json();
       
       console.log('💳 Payment intent response:', data);
-
-      if (!resIntent.ok) {
-        const errorMsg = data.details || data.error || 'Failed to create payment intent';
-        console.error('❌ Payment intent error:', errorMsg);
-        throw new Error(errorMsg);
-      }
-
-      if (!data.clientSecret) {
-        throw new Error('No client secret received');
-      }
-
       console.log('✅ New client secret received:', data.clientSecret.substring(0, 20) + '...');
       
       // Extract PaymentIntent ID for debugging
@@ -371,7 +287,7 @@ export default function CheckoutPage() {
       console.error('💥 Payment initiation error:', errorMessage);
       toast.error(errorMessage);
     }
-  }, [orderCode, goToStep, clientSecret]);
+  }, [orderCode, goToStep, clientSecret, createPaymentIntentMutation]);
 
   // Auto-create payment intent when on payment step without clientSecret
   useEffect(() => {
@@ -696,14 +612,17 @@ export default function CheckoutPage() {
                     </h2>
 
                     {shippingMethods.length === 0 && !isLoadingShipping && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={loadShippingMethods}
-                        className="w-full"
-                      >
-                        Load Shipping Methods
-                      </Button>
+                      <div className="text-center py-4">
+                        <p className="text-brand-dark-blue/70 mb-4">No shipping methods available</p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => window.location.reload()}
+                          className="w-full"
+                        >
+                          Refresh Page
+                        </Button>
+                      </div>
                     )}
 
                     {isLoadingShipping && (

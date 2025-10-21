@@ -1,12 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Search, SlidersHorizontal, Star, ShoppingCart } from 'lucide-react';
-import { vendureClient } from '@/lib/vendure-client';
-import { GET_ALL_PRODUCTS } from '@/lib/graphql/queries';
 import { staggerContainer, staggerItem } from '@/lib/animations';
 import { useScrollAnimation } from '@/hooks/use-scroll-animation';
+import { useAllProducts } from '@/hooks/use-products';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { toast } from 'sonner';
@@ -24,38 +23,46 @@ interface DisplayProduct {
 }
 
 export function EnhancedProductsGrid() {
-  const [products, setProducts] = useState<DisplayProduct[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<DisplayProduct[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'featured' | 'price-low' | 'price-high'>('featured');
-  const [isLoaded, setIsLoaded] = useState(false);
   const { ref, isVisible } = useScrollAnimation();
+  
+  // Use React Query to fetch products
+  const { data: products = [], isLoading, error } = useAllProducts();
 
-  useEffect(() => {
-    async function loadProducts() {
-      try {
-        const data = await vendureClient.request<{ products: { items: DisplayProduct[] } }>(
-          GET_ALL_PRODUCTS
-        );
+  // Memoize filtered and sorted products
+  const filteredProducts = useMemo(() => {
+    let filtered = products;
 
-        if (data.products.items) {
-          setProducts(data.products.items);
-          setFilteredProducts(data.products.items);
-          setIsLoaded(true);
-        }
-      } catch (error) {
-        console.error('Error loading products:', error);
-        toast.error('Failed to load products');
-        setIsLoaded(true); // Still set loaded to show error state
-      }
+    // Apply search filter
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(product =>
+        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
     }
 
-    loadProducts();
-  }, []);
+    // Apply sorting
+    switch (sortBy) {
+      case 'price-low':
+        // Note: You'll need to add price information to DisplayProduct interface
+        // filtered = filtered.sort((a, b) => a.price - b.price);
+        break;
+      case 'price-high':
+        // filtered = filtered.sort((a, b) => b.price - a.price);
+        break;
+      case 'featured':
+      default:
+        // Keep original order (featured)
+        break;
+    }
+
+    return filtered;
+  }, [products, searchQuery, sortBy]);
 
   // Fallback: ensure products are visible after a delay if intersection observer fails
   useEffect(() => {
-    if (isLoaded && !isVisible) {
+    if (!isLoading && !isVisible) {
       const fallbackTimer = setTimeout(() => {
         // Force visibility after 2 seconds if intersection observer hasn't triggered
         const element = ref.current;
@@ -67,30 +74,8 @@ export function EnhancedProductsGrid() {
 
       return () => clearTimeout(fallbackTimer);
     }
-  }, [isLoaded, isVisible, ref]);
+  }, [isLoading, isVisible, ref]);
 
-  useEffect(() => {
-    let filtered = [...products];
-
-    if (searchQuery) {
-      filtered = filtered.filter((product) =>
-        product.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    // Since we don't have price data, we'll just sort by name for now
-    switch (sortBy) {
-      case 'price-low':
-      case 'price-high':
-        filtered.sort((a, b) => a.name.localeCompare(b.name));
-        break;
-      default:
-        // Keep original order for 'featured'
-        break;
-    }
-
-    setFilteredProducts(filtered);
-  }, [searchQuery, sortBy, products]);
 
 
   return (
@@ -135,10 +120,15 @@ export function EnhancedProductsGrid() {
           </div>
         </div>
 
-        {!isLoaded ? (
+        {isLoading ? (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
             <p className="text-brand-dark-blue/60 text-lg">Loading products...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <p className="text-red-600 text-lg mb-4">Failed to load products</p>
+            <p className="text-brand-dark-blue/60">{error.message}</p>
           </div>
         ) : filteredProducts.length === 0 ? (
           <div className="text-center py-12">
