@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -12,36 +12,41 @@ export default function ConfirmationPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const { clearCart } = useCart();
-  const [isClearing, setIsClearing] = useState(false);
+  const hasCleared = useRef(false); // 🔑 Flag para evitar bucle infinito
   
   const orderCode = params.orderCode as string;
   const paymentIntent = searchParams.get('payment_intent');
-  const paymentIntentClientSecret = searchParams.get('payment_intent_client_secret');
   const redirectStatus = searchParams.get('redirect_status');
 
-  // Limpiar el carrito cuando llegamos a esta página
+  // Limpiar el carrito cuando llegamos a esta página (solo una vez)
   useEffect(() => {
     const cleanupCart = async () => {
-      if (isClearing) return;
+      // 🔑 Evitar bucle: solo ejecutar una vez
+      if (hasCleared.current) {
+        console.log('ℹ️ Cart already cleared, skipping...');
+        return;
+      }
+
+      // Solo limpiar si el pago fue exitoso
+      if (redirectStatus !== 'succeeded') {
+        console.log('ℹ️ Payment not succeeded, skipping cart clear');
+        return;
+      }
       
       try {
-        setIsClearing(true);
+        hasCleared.current = true; // 🔑 Marcar como ejecutado
         console.log('🧹 Clearing cart after successful payment...');
         await clearCart();
         console.log('✅ Cart cleared successfully');
       } catch (error) {
         console.error('Error clearing cart:', error);
-        // No mostramos error al usuario, solo logueamos
-      } finally {
-        setIsClearing(false);
+        // Si falla, permitir reintentar
+        hasCleared.current = false;
       }
     };
 
-    // Solo limpiar si el pago fue exitoso
-    if (redirectStatus === 'succeeded') {
-      cleanupCart();
-    }
-  }, [redirectStatus, clearCart, isClearing]);
+    cleanupCart();
+  }, [clearCart, redirectStatus]); // 🔑 Solo depender de redirectStatus, NO de clearCart
 
   const isSuccess = redirectStatus === 'succeeded';
 
