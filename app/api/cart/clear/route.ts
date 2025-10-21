@@ -1,35 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { REMOVE_ALL_ORDER_LINES } from '@/lib/graphql/mutations';
 import { fetchGraphQL } from '@/lib/vendure-server';
 
-// Force dynamic rendering
-export const dynamic = 'force-dynamic';
-
-export async function POST(request: NextRequest) {
-  try {
-    const response = await fetchGraphQL(
-      {
-        query: REMOVE_ALL_ORDER_LINES,
-        variables: {},
-      },
-      {
-        req: request, // Pass the request to include cookies
+// Mutation para limpiar el carrito actual
+const CLEAR_CART = `
+  mutation {
+    clearOrder {
+      __typename
+      ... on Order {
+        id
+        code
       }
-    );
+    }
+  }
+`;
+
+export async function POST(req: NextRequest) {
+  try {
+    console.log('🧹 Clearing cart...');
+
+    const response = await fetchGraphQL({
+      query: CLEAR_CART,
+    }, { req });
 
     if (response.errors) {
-      console.error('GraphQL errors:', response.errors);
+      console.error('❌ Error clearing cart:', response.errors);
       return NextResponse.json(
         { error: 'Failed to clear cart', details: response.errors },
-        { status: 400 }
+        { status: 500 }
       );
     }
 
-    // Create response with data
-    const nextResponse = NextResponse.json(response.data);
+    console.log('✅ Cart cleared successfully');
 
-    // Forward Set-Cookie headers from Vendure if present
-    if (response.setCookies && response.setCookies.length > 0) {
+    // Crear respuesta y pasar las cookies actualizadas
+    const nextResponse = NextResponse.json({
+      success: true,
+      message: 'Cart cleared successfully',
+    });
+
+    // Forward cookies si hay
+    if (response.setCookies?.length) {
       response.setCookies.forEach(cookie => {
         nextResponse.headers.append('Set-Cookie', cookie);
       });
@@ -37,9 +47,9 @@ export async function POST(request: NextRequest) {
 
     return nextResponse;
   } catch (error) {
-    console.error('Clear cart error:', error);
+    console.error('💥 Error in clear cart:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to clear cart' },
       { status: 500 }
     );
   }

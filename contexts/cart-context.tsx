@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Order, OrderLine } from '@/lib/types';
 import { 
   useActiveCart, 
@@ -18,6 +19,7 @@ interface CartContextType {
   removeItem: (orderLineId: string) => Promise<void>;
   updateQuantity: (orderLineId: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
+  resetSession: () => Promise<void>; // 🆕 Para limpiar sesión completa
   isLoading: boolean;
   isUpdating: boolean;
   error: string | null;
@@ -28,6 +30,8 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
+  
   // React Query hooks
   const { data: cartData, isLoading, error: cartError, refetch } = useActiveCart();
   const addToCartMutation = useAddToCart();
@@ -38,7 +42,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // Derived state
   const order = cartData?.activeOrder || null;
   const items = order?.lines || [];
-  const itemCount = items.reduce((total, item) => total + item.quantity, 0);
+  const itemCount = items.reduce((total: number, item: OrderLine) => total + item.quantity, 0);
   const total = order?.totalWithTax || 0;
   
   // Combined loading and error states
@@ -54,12 +58,40 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                clearCartMutation.error?.message || 
                null;
 
-  // Wrapper functions that use React Query mutations
+  // 🆕 Wrapper mejorado con auto-recovery
   const addItem = async (productVariantId: string, quantity = 1) => {
     try {
+      console.log('🛒 Adding item to cart:', { productVariantId, quantity });
       await addToCartMutation.mutateAsync({ productVariantId, quantity });
-    } catch (error) {
-      console.error('Error adding item to cart:', error);
+      console.log('✅ Item added successfully');
+    } catch (error: any) {
+      console.error('❌ Error adding item to cart:', error);
+      
+      // 🔄 Si el error es por estado inválido de la orden, intentar recuperar
+      if (
+        error?.message?.includes('state') || 
+        error?.message?.includes('AddingItems') ||
+        error?.message?.includes('requiresClearCart')
+      ) {
+        console.log('🔄 Order in invalid state, attempting auto-recovery...');
+        
+        try {
+          // Limpiar el carrito
+          await clearCartMutation.mutateAsync();
+          console.log('✅ Cart cleared, retrying...');
+          
+          // Reintentar agregar el producto
+          await addToCartMutation.mutateAsync({ productVariantId, quantity });
+          console.log('✅ Item added after recovery');
+          
+          return; // Éxito después de recovery
+        } catch (retryError) {
+          console.error('❌ Auto-recovery failed:', retryError);
+          throw new Error('Cart was in an invalid state. Please refresh the page and try again.');
+        }
+      }
+      
+      // Si no es un error de estado, propagar el error original
       throw error;
     }
   };
@@ -89,9 +121,45 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clearCart = async () => {
     try {
+      console.log('🧹 Clearing cart...');
       await clearCartMutation.mutateAsync();
+      console.log('✅ Cart cleared');
     } catch (error) {
       console.error('Error clearing cart:', error);
+      throw error;
+    }
+  };
+
+  // 🆕 Reset completo de la sesión (para casos extremos)
+  const resetSession = async () => {
+    try {
+      console.log('🔄 Resetting session...');
+      
+      // 1. Limpiar carrito en el servidor
+      try {
+        await clearCartMutation.mutateAsync();
+      } catch (e) {
+        console.log('Cart already empty or error clearing:', e);
+      }
+      
+      // 2. Limpiar cache de React Query
+      queryClient.clear();
+      
+      // 3. Limpiar cookies del cliente (solo las que podemos acceder)
+      if (typeof document !== 'undefined') {
+        document.cookie.split(";").forEach((c) => {
+          document.cookie = c
+            .replace(/^ +/, "")
+            .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+        });
+      }
+      
+      // 4. Refetch para crear nueva sesión
+      await refetch();
+      
+      console.log('✅ Session reset complete');
+    } catch (error) {
+      console.error('Error resetting session:', error);
       throw error;
     }
   };
@@ -110,6 +178,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         removeItem,
         updateQuantity,
         clearCart,
+        resetSession, // 🆕
         isLoading,
         isUpdating,
         error,

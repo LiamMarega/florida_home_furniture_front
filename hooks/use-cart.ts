@@ -1,65 +1,66 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Order } from '@/lib/types';
 
-// Query keys for cart operations
+// Query keys
 export const cartKeys = {
   all: ['cart'] as const,
   active: () => [...cartKeys.all, 'active'] as const,
 };
 
-// Fetch active cart/order
-async function fetchActiveCart(): Promise<{ activeOrder: Order | null }> {
-  const response = await fetch('/api/cart/active', {
+// Types
+interface AddToCartParams {
+  productVariantId: string;
+  quantity: number;
+}
+
+interface RemoveFromCartParams {
+  orderLineId: string;
+}
+
+interface UpdateQuantityParams {
+  orderLineId: string;
+  quantity: number;
+}
+
+// API functions
+async function fetchActiveCart() {
+  const response = await fetch('/api/cart', {
     credentials: 'include',
   });
-  
+
   if (!response.ok) {
-    const data = await response.json();
-    throw new Error(data.error || 'Failed to fetch cart');
+    throw new Error('Failed to fetch cart');
   }
-  
+
   return response.json();
 }
 
-// Add item to cart
-async function addItemToCart({ productVariantId, quantity }: { productVariantId: string; quantity: number }): Promise<Order> {
+async function addToCart({ productVariantId, quantity }: AddToCartParams) {
   const response = await fetch('/api/cart/add', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({
-      productVariantId,
-      quantity,
-    }),
+    body: JSON.stringify({ productVariantId, quantity }),
   });
 
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error || 'Failed to add item to cart');
+    // 🔑 Propagar información del error incluyendo requiresClearCart
+    const error: any = new Error(data.error || 'Failed to add item to cart');
+    error.requiresClearCart = data.requiresClearCart;
+    error.errorCode = data.errorCode;
+    throw error;
   }
 
-  // Check if the result is an error
-  if (data.addItemToOrder?.__typename === 'ErrorResult') {
-    throw new Error(data.addItemToOrder.message || 'Failed to add item to cart');
-  }
-
-  return data.addItemToOrder;
+  return data;
 }
 
-// Remove item from cart
-async function removeItemFromCart({ orderLineId }: { orderLineId: string }): Promise<Order> {
+async function removeFromCart({ orderLineId }: RemoveFromCartParams) {
   const response = await fetch('/api/cart/remove', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({
-      orderLineId,
-    }),
+    body: JSON.stringify({ orderLineId }),
   });
 
   const data = await response.json();
@@ -68,49 +69,29 @@ async function removeItemFromCart({ orderLineId }: { orderLineId: string }): Pro
     throw new Error(data.error || 'Failed to remove item from cart');
   }
 
-  // Check if the result is an error
-  if (data.removeOrderLine?.__typename === 'ErrorResult') {
-    throw new Error(data.removeOrderLine.message || 'Failed to remove item from cart');
-  }
-
-  return data.removeOrderLine;
+  return data;
 }
 
-// Update item quantity in cart
-async function updateCartItemQuantity({ orderLineId, quantity }: { orderLineId: string; quantity: number }): Promise<Order> {
+async function updateCartQuantity({ orderLineId, quantity }: UpdateQuantityParams) {
   const response = await fetch('/api/cart/update', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({
-      orderLineId,
-      quantity,
-    }),
+    body: JSON.stringify({ orderLineId, quantity }),
   });
 
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error || 'Failed to update cart item');
+    throw new Error(data.error || 'Failed to update quantity');
   }
 
-  // Check if the result is an error
-  if (data.adjustOrderLine?.__typename === 'ErrorResult') {
-    throw new Error(data.adjustOrderLine.message || 'Failed to update cart item');
-  }
-
-  return data.adjustOrderLine;
+  return data;
 }
 
-// Clear cart
-async function clearCart(): Promise<Order> {
+async function clearCart() {
   const response = await fetch('/api/cart/clear', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     credentials: 'include',
   });
 
@@ -120,71 +101,62 @@ async function clearCart(): Promise<Order> {
     throw new Error(data.error || 'Failed to clear cart');
   }
 
-  // Check if the result is an error
-  if (data.removeAllOrderLines?.__typename === 'ErrorResult') {
-    throw new Error(data.removeAllOrderLines.message || 'Failed to clear cart');
-  }
-
-  return data.removeAllOrderLines;
+  return data;
 }
 
-// Hook to get active cart
+// Hooks
 export function useActiveCart() {
   return useQuery({
     queryKey: cartKeys.active(),
     queryFn: fetchActiveCart,
     staleTime: 30 * 1000, // 30 seconds
+    retry: 1,
   });
 }
 
-// Hook to add item to cart
 export function useAddToCart() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: addItemToCart,
+    mutationFn: addToCart,
     onSuccess: () => {
-      // Invalidate and refetch cart data
+      // Invalidar cache para refetch automático
       queryClient.invalidateQueries({ queryKey: cartKeys.active() });
     },
+    // 🔑 NO hacer onError aquí para que el error se propague al cart-context
   });
 }
 
-// Hook to remove item from cart
 export function useRemoveFromCart() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: removeItemFromCart,
+    mutationFn: removeFromCart,
     onSuccess: () => {
-      // Invalidate and refetch cart data
       queryClient.invalidateQueries({ queryKey: cartKeys.active() });
     },
   });
 }
 
-// Hook to update cart item quantity
 export function useUpdateCartQuantity() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: updateCartItemQuantity,
+    mutationFn: updateCartQuantity,
     onSuccess: () => {
-      // Invalidate and refetch cart data
       queryClient.invalidateQueries({ queryKey: cartKeys.active() });
     },
   });
 }
 
-// Hook to clear cart
 export function useClearCart() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: clearCart,
     onSuccess: () => {
-      // Invalidate and refetch cart data
-      queryClient.invalidateQueries({ queryKey: cartKeys.active() });
+      // Limpiar el cache completamente después de clear
+      queryClient.invalidateQueries({ queryKey: cartKeys.all });
     },
   });
 }
