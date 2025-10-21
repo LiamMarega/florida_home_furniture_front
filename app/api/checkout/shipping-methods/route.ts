@@ -4,8 +4,6 @@ import { GET_ELIGIBLE_SHIPPING_METHODS } from '@/lib/graphql/queries';
 
 export async function GET(req: NextRequest) {
   try {
-    console.log('🚚 Fetching eligible shipping methods...');
-    console.log('🍪 Request cookies:', req.headers.get('cookie')?.substring(0, 50) + '...');
 
     const response = await fetchGraphQL({
       query: GET_ELIGIBLE_SHIPPING_METHODS,
@@ -13,11 +11,9 @@ export async function GET(req: NextRequest) {
       req // Pass the request to include cookies
     });
     
-    console.log('📦 Vendure response:', JSON.stringify(response, null, 2));
 
     // Handle GraphQL-level errors
     if (response.errors) {
-      console.error('❌ GraphQL errors:', response.errors);
       return NextResponse.json(
         { error: 'Failed to fetch shipping methods', details: response.errors },
         { status: 500 }
@@ -28,7 +24,6 @@ export async function GET(req: NextRequest) {
 
     // Verify we got a valid response
     if (!shippingMethods || !Array.isArray(shippingMethods)) {
-      console.error('❌ Invalid response: No shipping methods array returned');
       return NextResponse.json(
         { error: 'Invalid response from server', shippingMethods: [] },
         { status: 500 }
@@ -51,7 +46,6 @@ export async function GET(req: NextRequest) {
 
     return nextResponse;
   } catch (error) {
-    console.error('💥 Error fetching shipping methods:', error);
     return NextResponse.json(
       { error: 'Failed to fetch shipping methods', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
