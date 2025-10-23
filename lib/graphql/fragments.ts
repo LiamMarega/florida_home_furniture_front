@@ -133,7 +133,16 @@ export const ORDER_LINE_FRAGMENT = gql`
       id
       name
       sku
+      product {
+        id
+        name
+        featuredAsset {
+          id
+          preview
+        }
+      }
     }
+    
   }
 `;
 
