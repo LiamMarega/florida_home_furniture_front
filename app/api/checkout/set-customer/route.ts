@@ -4,25 +4,14 @@ import { fetchGraphQL } from '@/lib/vendure-server';
 import { gql } from 'graphql-request';
 
 const SET_CUSTOMER_FOR_ORDER = gql`
-  mutation SetCustomerForOrder($input: CreateCustomerInput!) {
-    setCustomerForOrder(input: $input) {
-      ... on Order {
-        id
-        code
-        state
-        customer {
-          id
-          emailAddress
-          firstName
-          lastName
-        }
-      }
-      ... on ErrorResult {
-        errorCode
-        message
-      }
-    }
+ mutation SetCustomer($input: CreateCustomerInput!) {
+  setCustomerForOrder(input: $input) {
+    __typename
+    ... on Order { id code state customer { id emailAddress } }
+    ... on ErrorResult { errorCode message }
   }
+}
+
 `;
 
 const GET_ACTIVE_ORDER = gql`
