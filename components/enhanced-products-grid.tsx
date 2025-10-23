@@ -5,12 +5,15 @@ import { motion } from 'framer-motion';
 import { Search, SlidersHorizontal, Star, ShoppingCart } from 'lucide-react';
 import { staggerContainer, staggerItem } from '@/lib/animations';
 import { useScrollAnimation } from '@/hooks/use-scroll-animation';
-import { useAllProducts } from '@/hooks/use-products';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { toast } from 'sonner';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
+import { productKeys } from '@/hooks/use-products';
+import { GET_ALL_PRODUCTS } from '@/lib/graphql/queries';
+import { fetchGraphQL } from '@/lib/vendure-server';
 
 interface DisplayProduct {
   id: string;
@@ -28,38 +31,17 @@ export function EnhancedProductsGrid() {
   const { ref, isVisible } = useScrollAnimation();
   
   // Use React Query to fetch products
-  const { data: products = [], isLoading, error } = useAllProducts();
+  const { data: productsResponse, isLoading, error } = useQuery({
+    queryKey: productKeys.lists(),
+    queryFn: () => fetchGraphQL({ query: GET_ALL_PRODUCTS }),
+  });
 
   // Memoize filtered and sorted products
   const filteredProducts = useMemo(() => {
-    let filtered = products;
-
-    // Apply search filter
-    if (searchQuery.trim()) {
-      filtered = filtered.filter(product =>
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.description?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    // Apply sorting
-    switch (sortBy) {
-      case 'price-low':
-        // Note: You'll need to add price information to DisplayProduct interface
-        // filtered = filtered.sort((a, b) => a.price - b.price);
-        break;
-      case 'price-high':
-        // filtered = filtered.sort((a, b) => b.price - a.price);
-        break;
-      case 'featured':
-      default:
-        // Keep original order (featured)
-        break;
-    }
-
+    let filtered = productsResponse?.data?.products?.items || [];
     return filtered;
-  }, [products, searchQuery, sortBy]);
-
+  }, [productsResponse, searchQuery, sortBy as any]);
+  
   // Fallback: ensure products are visible after a delay if intersection observer fails
   useEffect(() => {
     if (!isLoading && !isVisible) {
@@ -95,9 +77,9 @@ export function EnhancedProductsGrid() {
               <Input
                 type="text"
                 placeholder="Search furniture..."
+                className="pl-12 h-12 text-base border-brand-cream focus:border-brand-primary focus:ring-brand-primary"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 h-12 text-base border-brand-cream focus:border-brand-primary focus:ring-brand-primary"
               />
             </div>
 
@@ -141,7 +123,7 @@ export function EnhancedProductsGrid() {
             variants={staggerContainer}
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
           >
-            {filteredProducts.map((product) => (
+            {filteredProducts.map((product: DisplayProduct) => (
               <motion.div
                 key={product.id}
                 variants={staggerItem}

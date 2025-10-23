@@ -2,13 +2,16 @@ import { gql } from 'graphql-request';
 import { ORDER_FRAGMENT, CUSTOMER_FRAGMENT } from './fragments';
 
 export const ADD_ITEM_TO_ORDER = gql`
-  ${ORDER_FRAGMENT}
-  mutation AddItemToOrder($productVariantId: ID!, $quantity: Int!) {
-    addItemToOrder(productVariantId: $productVariantId, quantity: $quantity) {
+  mutation AddItemToOrder($productVariantId: ID!, $qty: Int!) {
+    addItemToOrder(productVariantId: $productVariantId, quantity: $qty) {
       ... on Order {
-        ...Order
+        ...OrderSummary
       }
       ... on ErrorResult {
+        errorCode
+        message
+      }
+      ... on InsufficientStockError {
         errorCode
         message
       }
@@ -62,12 +65,17 @@ export const REMOVE_ALL_ORDER_LINES = gql`
 `;
 
 export const SET_CUSTOMER_FOR_ORDER = gql`
-  ${ORDER_FRAGMENT}
-  ${CUSTOMER_FRAGMENT}
   mutation SetCustomerForOrder($input: CreateCustomerInput!) {
     setCustomerForOrder(input: $input) {
       ... on Order {
-        ...Order
+        id
+        code
+        customer {
+          id
+          firstName
+          lastName
+          emailAddress
+        }
       }
       ... on ErrorResult {
         errorCode

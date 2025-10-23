@@ -124,62 +124,40 @@ export const PRODUCT_FRAGMENT = gql`
 `;
 
 export const ORDER_LINE_FRAGMENT = gql`
-  ${ASSET_FRAGMENT}
   fragment OrderLine on OrderLine {
     id
-    createdAt
-    updatedAt
+    quantity
+    linePriceWithTax
+    discountedLinePriceWithTax
     productVariant {
       id
       name
       sku
-      price
-      priceWithTax
-      currencyCode
-      stockLevel
-      product {
-        id
-        name
-        slug
-        featuredAsset {
-          ...Asset
-        }
-      }
     }
-    featuredAsset {
-      ...Asset
-    }
-    unitPrice
-    unitPriceWithTax
-    unitPriceChangeSinceAdded
-    unitPriceWithTaxChangeSinceAdded
-    discountedUnitPrice
-    discountedUnitPriceWithTax
-    proratedUnitPrice
-    proratedUnitPriceWithTax
-    quantity
-    orderPlacedQuantity
-    taxRate
-    linePrice
-    linePriceWithTax
-    discountedLinePrice
-    discountedLinePriceWithTax
-    proratedLinePrice
-    proratedLinePriceWithTax
-    lineTax
-    discounts {
-      adjustmentSource
-      type
-      description
-      amount
-      amountWithTax
-    }
-    taxLines {
-      description
-      taxRate
-    }
-    customFields
   }
+`;
+
+export const ORDER_SUMMARY_FRAGMENT = gql`
+  fragment OrderSummary on Order {
+    id
+    code
+    state
+    active
+    total
+    totalWithTax
+    currencyCode
+    lines {
+      ...OrderLine
+    }
+    shippingWithTax
+    subTotalWithTax
+    discounts {
+      description
+      amountWithTax
+      adjustmentSource
+    }
+  }
+  ${ORDER_LINE_FRAGMENT}
 `;
 
 export const SEARCH_RESULT_ASSET_FRAGMENT = gql`
