@@ -249,3 +249,38 @@ export const GET_AUTH_STATE = gql`
 }
 `;
 
+export const GET_ACTIVE_ORDER_FOR_PAYMENT = gql`
+  query GetActiveOrderForPayment {
+    activeOrder {
+      id
+      code
+      state
+      totalWithTax
+      currencyCode
+      customer { id emailAddress }
+    }
+  }
+`;
+
+
+export const TRANSITION_TO_ARRANGING = gql`
+  mutation ToArrangingPayment {
+    transitionOrderToState(state: "ArrangingPayment") {
+      __typename
+      ... on Order { id code state }
+      ... on OrderStateTransitionError { errorCode message transitionError fromState toState }
+    }
+  }
+`;
+
+export const ADD_PAYMENT_TO_ORDER = gql`
+  mutation AddPaymentToOrder($input: PaymentInput!) {
+    addPaymentToOrder(input: $input) {
+      __typename
+      ... on Order {
+        id code state totalWithTax currencyCode
+      }
+      ... on ErrorResult { errorCode message }
+    }
+  }
+`;

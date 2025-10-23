@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -59,6 +59,11 @@ export default function CheckoutPage() {
   });
 
   const billingSameAsShipping = watch('billingSameAsShipping');
+
+  // Fetch shipping methods when component mounts
+  useEffect(() => {
+    fetchShippingMethods();
+  }, []);
 
   // Function to fetch eligible shipping methods
   const fetchShippingMethods = async () => {
@@ -127,14 +132,13 @@ export default function CheckoutPage() {
         const shippingResult = await shippingResponse.json();
         console.log('Shipping Result:', shippingResult);
 
-        // Fetch and set shipping methods after setting shipping address
-        await fetchShippingMethods();
-
         // Set the selected shipping method if we have one
-        if (selectedShippingMethod) {
+        if (!selectedShippingMethod) {
           await setShippingMethod(selectedShippingMethod);
         }
 
+
+        
        
     } catch (error) {
       console.error('Error:', error);
