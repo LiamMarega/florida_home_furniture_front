@@ -1,54 +1,33 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CheckCircle2, Package, ArrowRight } from 'lucide-react';
-import { useCart } from '@/contexts/cart-context';
 
 export default function ConfirmationPage() {
   const params = useParams();
   const searchParams = useSearchParams();
-  const { clearCart } = useCart();
-  const hasCleared = useRef(false); // 🔑 Flag para evitar bucle infinito
   
   const orderCode = params.orderCode as string;
   const paymentIntent = searchParams.get('payment_intent');
   const redirectStatus = searchParams.get('redirect_status');
 
-  // Limpiar el carrito cuando llegamos a esta página (solo una vez)
-  useEffect(() => {
-    const cleanupCart = async () => {
-      // 🔑 Evitar bucle: solo ejecutar una vez
-      if (hasCleared.current) {
-        console.log('ℹ️ Cart already cleared, skipping...');
-        return;
-      }
-
-      // Solo limpiar si el pago fue exitoso
-      if (redirectStatus !== 'succeeded') {
-        console.log('ℹ️ Payment not succeeded, skipping cart clear');
-        return;
-      }
-      
-      try {
-        hasCleared.current = true; // 🔑 Marcar como ejecutado
-        console.log('🧹 Clearing cart after successful payment...');
-        await clearCart();
-        console.log('✅ Cart cleared successfully');
-      } catch (error) {
-        console.error('Error clearing cart:', error);
-        // Si falla, permitir reintentar
-        hasCleared.current = false;
-      }
-    };
-
-    cleanupCart();
-  }, [clearCart, redirectStatus]); // 🔑 Solo depender de redirectStatus, NO de clearCart
-
   const isSuccess = redirectStatus === 'succeeded';
+
+  // ✅ NO limpiamos el carrito aquí
+  // El webhook se encargará de procesar el pago y cambiar el estado de la orden
+  // La orden quedará en estado "PaymentSettled" con todos sus productos
+
+  useEffect(() => {
+    if (isSuccess) {
+      console.log('✅ Payment successful! Order:', orderCode);
+      console.log('🎯 Webhook will process the payment and update order state');
+      console.log('📦 Order items are preserved in Vendure');
+    }
+  }, [isSuccess, orderCode]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white py-12">

@@ -1,47 +1,107 @@
+// app/api/cart/add/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { ADD_ITEM_TO_ORDER } from '@/lib/graphql/mutations';
 import { fetchGraphQL } from '@/lib/vendure-server';
+import { gql } from 'graphql-request';
 
-// Force dynamic rendering
-export const dynamic = 'force-dynamic';
+const ADD_TO_CART = gql`
+  mutation AddItemToOrder($productVariantId: ID!, $quantity: Int!) {
+    addItemToOrder(productVariantId: $productVariantId, quantity: $quantity) {
+      ... on Order {
+        id
+        code
+        state
+        totalQuantity
+        totalWithTax
+        lines {
+          id
+          quantity
+          linePrice
+          linePriceWithTax
+          productVariant {
+            id
+            name
+            sku
+          }
+        }
+      }
+      ... on ErrorResult {
+        errorCode
+        message
+      }
+    }
+  }
+`;
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const { productVariantId, quantity } = await request.json();
+    const body = await req.json();
+    const { productVariantId, quantity } = body;
+
+    console.log('🛒 Adding to cart:', { productVariantId, quantity });
 
     if (!productVariantId || !quantity) {
       return NextResponse.json(
-        { error: 'productVariantId and quantity are required' },
+        { error: 'Product variant ID and quantity are required' },
         { status: 400 }
       );
     }
 
-    const response = await fetchGraphQL(
-      {
-        query: ADD_ITEM_TO_ORDER,
-        variables: {
-          productVariantId,
-          quantity: Number(quantity),
-        },
+    const cookieHeader = req.headers.get('cookie');
+    console.log('🍪 Add to cart cookies:', cookieHeader?.substring(0, 80) + '...');
+
+    const response = await fetchGraphQL({
+      query: ADD_TO_CART,
+      variables: { 
+        productVariantId, 
+        quantity: parseInt(quantity.toString(), 10),
       },
-      {
-        req: request, // Pass the request to include cookies
-      }
-    );
+    }, { 
+      req,
+      cookie: cookieHeader || undefined,
+    });
 
     if (response.errors) {
-      console.error('GraphQL errors:', response.errors);
+      console.error('❌ GraphQL errors:', response.errors);
       return NextResponse.json(
         { error: 'Failed to add item to cart', details: response.errors },
+        { status: 500 }
+      );
+    }
+
+    const result = response.data?.addItemToOrder;
+
+    // Handle Vendure error results
+    if (result?.errorCode) {
+      console.error('❌ Vendure error:', result);
+      return NextResponse.json(
+        { 
+          error: result.message || 'Failed to add item to cart',
+          errorCode: result.errorCode,
+          details: result,
+        },
         { status: 400 }
       );
     }
 
-    // Create response with data
-    const nextResponse = NextResponse.json(response.data);
+    if (!result || !result.id) {
+      console.error('❌ Invalid response');
+      return NextResponse.json(
+        { error: 'Invalid response from server' },
+        { status: 500 }
+      );
+    }
 
-    // Forward Set-Cookie headers from Vendure if present
+    console.log('✅ Item added to cart:', { 
+      orderCode: result.code,
+      totalItems: result.totalQuantity,
+    });
+
+    // Create response
+    const nextResponse = NextResponse.json({ order: result });
+
+    // 🍪 CRÍTICO: Forward Set-Cookie headers
     if (response.setCookies && response.setCookies.length > 0) {
+      console.log('🍪 Forwarding', response.setCookies.length, 'Set-Cookie header(s)');
       response.setCookies.forEach(cookie => {
         nextResponse.headers.append('Set-Cookie', cookie);
       });
@@ -49,9 +109,9 @@ export async function POST(request: NextRequest) {
 
     return nextResponse;
   } catch (error) {
-    console.error('Add to cart error:', error);
+    console.error('💥 Error adding to cart:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to add item to cart', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
