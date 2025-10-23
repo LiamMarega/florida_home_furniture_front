@@ -1,5 +1,5 @@
 import { gql } from 'graphql-request';
-import { ORDER_FRAGMENT } from './fragments';
+import { ORDER_FRAGMENT, CUSTOMER_FRAGMENT } from './fragments';
 
 export const ADD_ITEM_TO_ORDER = gql`
   ${ORDER_FRAGMENT}
@@ -63,14 +63,18 @@ export const REMOVE_ALL_ORDER_LINES = gql`
 
 export const SET_CUSTOMER_FOR_ORDER = gql`
   ${ORDER_FRAGMENT}
-  mutation SetCustomer($input: CreateCustomerInput!) {
-  setCustomerForOrder(input: $input) {
-    __typename
-    ... on Order { id code state customer { id emailAddress } }
-    ... on ErrorResult { errorCode message }
+  ${CUSTOMER_FRAGMENT}
+  mutation SetCustomerForOrder($input: CreateCustomerInput!) {
+    setCustomerForOrder(input: $input) {
+      ... on Order {
+        ...Order
+      }
+      ... on ErrorResult {
+        errorCode
+        message
+      }
+    }
   }
-}
-
 `;
 
 export const SET_ORDER_SHIPPING_ADDRESS = gql`

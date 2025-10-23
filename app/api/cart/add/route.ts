@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
 import { ADD_ITEM_TO_ORDER } from '@/lib/graphql/mutations';
+import { UpdateOrderItemsResult } from '@/lib/types';
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
     const cookieHeader = req.headers.get('cookie');
     console.log('🍪 Add to cart cookies:', cookieHeader?.substring(0, 80) + '...');
 
-    const response = await fetchGraphQL({
+    const response = await fetchGraphQL<{ addItemToOrder: UpdateOrderItemsResult }>({
       query: ADD_ITEM_TO_ORDER,
       variables: { 
         productVariantId, 
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
     const result = response.data?.addItemToOrder;
 
     // Handle Vendure error results
-    if (result?.errorCode) {
+    if (result && 'errorCode' in result) {
       console.error('❌ Vendure error:', result);
       return NextResponse.json(
         { 
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!result || !result.id) {
+    if (!result || !('id' in result) || !result.id) {
       console.error('❌ Invalid response');
       return NextResponse.json(
         { error: 'Invalid response from server' },

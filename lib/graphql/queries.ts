@@ -1,5 +1,12 @@
 import { gql } from 'graphql-request';
-import { PRODUCT_FRAGMENT, ORDER_FRAGMENT, ASSET_FRAGMENT, SEARCH_RESULT_ASSET_FRAGMENT, PRODUCT_VARIANT_FRAGMENT } from './fragments';
+import { 
+  PRODUCT_FRAGMENT, 
+  ORDER_FRAGMENT, 
+  ASSET_FRAGMENT, 
+  SEARCH_RESULT_ASSET_FRAGMENT, 
+  PRODUCT_VARIANT_FRAGMENT,
+  CUSTOMER_FRAGMENT 
+} from './fragments';
 
 export const GET_PRODUCTS = gql`
   ${PRODUCT_FRAGMENT}
@@ -143,14 +150,10 @@ export const GET_ACTIVE_ORDER = gql`
 `;
 
 export const GET_ACTIVE_CUSTOMER = gql`
+  ${CUSTOMER_FRAGMENT}
   query GetActiveCustomer {
     activeCustomer {
-      id
-      title
-      firstName
-      lastName
-      emailAddress
-      customFields
+      ...Customer
     }
   }
 `;

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
 import { LOGOUT } from '@/lib/graphql/mutations';
 import { GET_ACTIVE_ORDER } from '@/lib/graphql/queries';
+import { Success, ActiveOrderResult } from '@/lib/types';
 
 /**
  * Logout para limpiar sesiones autenticadas previas
@@ -13,19 +14,19 @@ export async function POST(req: NextRequest) {
     const cookieHeader = req.headers.get('cookie');
     
     // Verificar si hay orden activa antes del logout
-    const orderBeforeLogout = await fetchGraphQL({
+    const orderBeforeLogout = await fetchGraphQL<{ activeOrder: ActiveOrderResult }>({
       query: GET_ACTIVE_ORDER,
     }, { req, cookie: cookieHeader || undefined });
     
     const orderBefore = orderBeforeLogout.data?.activeOrder;
     console.log('📦 Order before logout:', {
-      hasOrder: !!orderBefore,
-      orderCode: orderBefore?.code,
-      itemCount: orderBefore?.lines?.length || 0,
+      hasOrder: !!orderBefore && 'id' in orderBefore,
+      orderCode: orderBefore && 'code' in orderBefore ? orderBefore.code : null,
+      itemCount: orderBefore && 'lines' in orderBefore ? orderBefore.lines?.length || 0 : 0,
     });
 
     // Hacer logout
-    const logoutRes = await fetchGraphQL({
+    const logoutRes = await fetchGraphQL<{ logout: Success }>({
       query: LOGOUT,
     }, { req, cookie: cookieHeader || undefined });
 
@@ -34,21 +35,21 @@ export async function POST(req: NextRequest) {
     }
 
     // Verificar orden después del logout
-    const orderAfterLogout = await fetchGraphQL({
+    const orderAfterLogout = await fetchGraphQL<{ activeOrder: ActiveOrderResult }>({
       query: GET_ACTIVE_ORDER,
     }, { req, cookie: cookieHeader || undefined });
     
     const orderAfter = orderAfterLogout.data?.activeOrder;
     console.log('📦 Order after logout:', {
-      hasOrder: !!orderAfter,
-      orderCode: orderAfter?.code,
-      itemCount: orderAfter?.lines?.length || 0,
+      hasOrder: !!orderAfter && 'id' in orderAfter,
+      orderCode: orderAfter && 'code' in orderAfter ? orderAfter.code : null,
+      itemCount: orderAfter && 'lines' in orderAfter ? orderAfter.lines?.length || 0 : 0,
     });
 
     const response = NextResponse.json({ 
       success: true,
-      orderPreserved: !!orderAfter,
-      message: orderAfter ? 'Logged out, order preserved' : 'Logged out, order cleared'
+      orderPreserved: !!orderAfter && 'id' in orderAfter,
+      message: orderAfter && 'id' in orderAfter ? 'Logged out, order preserved' : 'Logged out, order cleared'
     });
 
     // Forward cookies if any

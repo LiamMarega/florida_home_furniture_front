@@ -3,6 +3,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
 import { SET_CUSTOMER_FOR_ORDER, LOGOUT } from '@/lib/graphql/mutations';
 import { GET_ACTIVE_ORDER, GET_ACTIVE_CUSTOMER } from '@/lib/graphql/queries';
+import { 
+  SetCustomerForOrderResult, 
+  ActiveOrderResult, 
+  Customer, 
+  Success,
+  AlreadyLoggedInError,
+  NoActiveOrderError,
+  EmailAddressConflictError,
+  GuestCheckoutError
+} from '@/lib/types';
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,8 +30,8 @@ export async function POST(req: NextRequest) {
 
     // 1) Verificar estado actual
     const [customerRes, orderRes] = await Promise.all([
-      fetchGraphQL({ query: GET_ACTIVE_CUSTOMER }, { req, cookie: cookieHeader || undefined }),
-      fetchGraphQL({ query: GET_ACTIVE_ORDER }, { req, cookie: cookieHeader || undefined }),
+      fetchGraphQL<{ activeCustomer: Customer | null }>({ query: GET_ACTIVE_CUSTOMER }, { req, cookie: cookieHeader || undefined }),
+      fetchGraphQL<{ activeOrder: ActiveOrderResult }>({ query: GET_ACTIVE_ORDER }, { req, cookie: cookieHeader || undefined }),
     ]);
 
     const activeCustomer = customerRes.data?.activeCustomer ?? null;
@@ -29,15 +39,15 @@ export async function POST(req: NextRequest) {
 
     console.log('📊 Current state:', { 
       hasCustomer: !!activeCustomer?.id, 
-      hasOrder: !!activeOrder?.id,
-      orderCode: activeOrder?.code,
-      orderState: activeOrder?.state,
+      hasOrder: !!activeOrder && 'id' in activeOrder,
+      orderCode: activeOrder && 'code' in activeOrder ? activeOrder.code : null,
+      orderState: activeOrder && 'state' in activeOrder ? activeOrder.state : null,
       customerEmail: activeCustomer?.emailAddress,
-      orderCustomerEmail: activeOrder?.customer?.emailAddress,
+      orderCustomerEmail: activeOrder && 'customer' in activeOrder ? activeOrder.customer?.emailAddress : null,
     });
 
     // 2) Verificar que hay orden activa
-    if (!activeOrder?.id) {
+    if (!activeOrder || 'errorCode' in activeOrder || !('id' in activeOrder)) {
       console.error('❌ No active order found');
       return NextResponse.json({ 
         error: 'No active order found', 
@@ -49,18 +59,18 @@ export async function POST(req: NextRequest) {
     // Esto NO debería pasar en Vendure normal, pero puede ocurrir si:
     // - La sesión se quedó autenticada de una compra anterior
     // - El usuario agregó productos (nueva orden) pero Vendure no asoció automáticamente el customer
-    if (activeCustomer?.id && !activeOrder.customer?.id) {
+    if (activeCustomer?.id && !('customer' in activeOrder) || !activeOrder.customer?.id) {
       console.log('⚠️ Authenticated user with order missing customer - Vendure should auto-associate');
       console.log('💡 This order should already have customer associated. Checking again...');
       
       // Refetch la orden por si acaso
-      const recheckOrder = await fetchGraphQL({
+      const recheckOrder = await fetchGraphQL<{ activeOrder: ActiveOrderResult }>({
         query: GET_ACTIVE_ORDER,
       }, { req, cookie: cookieHeader || undefined });
       
       const freshOrder = recheckOrder.data?.activeOrder;
       
-      if (freshOrder?.customer?.id) {
+      if (freshOrder && 'customer' in freshOrder && freshOrder.customer?.id) {
         console.log('✅ Customer now associated with order');
         return NextResponse.json({
           order: freshOrder,
