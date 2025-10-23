@@ -10,6 +10,67 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
+// 🔑 Función para autenticarse como admin en Vendure
+async function getAdminToken(): Promise<string | null> {
+  const ADMIN_LOGIN = gql`
+    mutation AdminLogin($username: String!, $password: String!) {
+      login(username: $username, password: $password) {
+        ... on CurrentUser {
+          id
+          identifier
+          channels {
+            id
+            token
+          }
+        }
+        ... on ErrorResult {
+          errorCode
+          message
+        }
+      }
+    }
+  `;
+
+  try {
+    const response = await fetch(process.env.VENDURE_SHOP_API_URL || 'http://localhost:3000/shop-api', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: ADMIN_LOGIN,
+        variables: {
+          username: process.env.VENDURE_ADMIN_USERNAME || 'superadmin',
+          password: process.env.VENDURE_ADMIN_PASSWORD || 'superadmin',
+        },
+      }),
+    });
+
+    const result = await response.json();
+    
+    if (result.errors) {
+      console.error('❌ Admin login errors:', result.errors);
+      return null;
+    }
+
+    // Extraer el token de autenticación de las cookies
+    const setCookies = response.headers.getSetCookie?.() || [];
+    const sessionCookie = setCookies.find(c => c.startsWith('session='));
+    
+    if (sessionCookie) {
+      const token = sessionCookie.split(';')[0].split('=')[1];
+      console.log('✅ Admin authenticated');
+      return token;
+    }
+
+    console.error('❌ No session cookie in admin login response');
+    return null;
+  } catch (error) {
+    console.error('💥 Admin login error:', error);
+    return null;
+  }
+}
+
 // Mutation para agregar el pago a la orden en Vendure
 const ADD_PAYMENT_TO_ORDER = gql`
   mutation AddPaymentToOrder($input: PaymentInput!) {
@@ -104,24 +165,20 @@ export async function POST(req: NextRequest) {
   console.log('🔍 Processing order:', orderCode);
 
   try {
-    // 🔑 NUEVA ESTRATEGIA: Recuperar el sessionToken de la metadata de Stripe
-    const sessionToken = paymentIntent.metadata.sessionToken;
+    // 🔑 Autenticarse como administrador para poder acceder a cualquier orden
+    console.log('🔐 Authenticating as admin...');
+    const adminToken = await getAdminToken();
 
-    if (!sessionToken) {
-      console.error('❌ No session token found in Stripe metadata for order:', orderCode);
-      console.error('⚠️ Cannot complete order without session token');
-      console.error('Available metadata:', paymentIntent.metadata);
+    if (!adminToken) {
+      console.error('❌ Failed to authenticate as admin');
       return NextResponse.json({ 
-        error: 'Session expired',
+        error: 'Authentication failed',
         received: true,
-        suggestion: 'Session token not found in payment metadata'
       }, { status: 200 });
     }
 
-    console.log('🔑 Found session token in Stripe metadata for order:', orderCode);
-
-    // Buscar la orden por código (no usar activeOrder)
-    console.log('🔍 Fetching order by code...');
+    // Buscar la orden por código usando credenciales de admin
+    console.log('🔍 Fetching order by code with admin credentials...');
     const GET_ORDER_BY_CODE = gql`
       query GetOrderByCode($code: String!) {
         orderByCode(code: $code) {
@@ -141,14 +198,13 @@ export async function POST(req: NextRequest) {
       query: GET_ORDER_BY_CODE,
       variables: { code: orderCode },
     }, {
-      cookie: `session=${sessionToken}`, // 🔑 Formato correcto de Vendure
+      cookie: `session=${adminToken}`, // 🔑 Usar token de administrador
     });
 
     const order = orderRes.data?.orderByCode;
 
     if (!order) {
       console.error('❌ Order not found:', orderCode);
-      console.error('Tried with session token:', sessionToken.substring(0, 20) + '...');
       return NextResponse.json({ 
         error: 'Order not found',
         received: true,
@@ -162,8 +218,20 @@ export async function POST(req: NextRequest) {
       customerId: order.customer?.id,
     });
 
-    // Agregar el pago directamente - esto manejará la transición de estado
-    console.log('💳 Adding payment to Vendure order...');
+    // 🔑 IMPORTANTE: Ahora necesitamos usar el session token del USUARIO para addPaymentToOrder
+    // porque addPaymentToOrder debe ejecutarse en el contexto de la sesión del usuario
+    const userSessionToken = paymentIntent.metadata.sessionToken;
+
+    if (!userSessionToken) {
+      console.error('❌ No user session token found in Stripe metadata');
+      return NextResponse.json({ 
+        error: 'User session expired',
+        received: true,
+      }, { status: 200 });
+    }
+
+    // Agregar el pago usando la sesión del usuario
+    console.log('💳 Adding payment to Vendure order with user session...');
     
     const paymentRes = await fetchGraphQL({
       query: ADD_PAYMENT_TO_ORDER,
@@ -178,7 +246,7 @@ export async function POST(req: NextRequest) {
         },
       },
     }, {
-      cookie: `session=${sessionToken}`, // 🔑 Formato correcto de Vendure
+      cookie: `session=${userSessionToken}`, // 🔑 Usar sesión del usuario
     });
 
     console.log('📊 Payment addition response:', JSON.stringify(paymentRes.data, null, 2));

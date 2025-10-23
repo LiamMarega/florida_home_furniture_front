@@ -93,7 +93,37 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // 3) Si la orden ya tiene customer info, no hacer nada
+    // 3) 🔑 CASO ESPECIAL: Usuario autenticado con orden SIN customer
+    // Esto NO debería pasar en Vendure normal, pero puede ocurrir si:
+    // - La sesión se quedó autenticada de una compra anterior
+    // - El usuario agregó productos (nueva orden) pero Vendure no asoció automáticamente el customer
+    if (activeCustomer?.id && !activeOrder.customer?.id) {
+      console.log('⚠️ Authenticated user with order missing customer - Vendure should auto-associate');
+      console.log('💡 This order should already have customer associated. Checking again...');
+      
+      // Refetch la orden por si acaso
+      const recheckOrder = await fetchGraphQL({
+        query: GET_ACTIVE_ORDER,
+      }, { req, cookie: cookieHeader || undefined });
+      
+      const freshOrder = recheckOrder.data?.activeOrder;
+      
+      if (freshOrder?.customer?.id) {
+        console.log('✅ Customer now associated with order');
+        return NextResponse.json({
+          order: freshOrder,
+          customer: freshOrder.customer,
+          customerEmail: freshOrder.customer.emailAddress,
+          alreadyLoggedIn: true,
+          message: 'Customer already associated with order',
+        });
+      }
+      
+      // Si todavía no tiene customer, algo está mal - intentar setCustomerForOrder de todos modos
+      console.warn('⚠️ Order still has no customer after recheck - will attempt setCustomerForOrder');
+    }
+
+    // 4) Si la orden ya tiene customer info, verificar que es correcto
     if (activeOrder.customer?.emailAddress) {
       console.log('✅ Order already has customer:', activeOrder.customer.emailAddress);
       
@@ -102,6 +132,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           order: activeOrder,
           customer: activeOrder.customer,
+          customerEmail: activeOrder.customer.emailAddress,
           message: 'Customer already set for this order',
         });
       }
@@ -146,8 +177,6 @@ export async function POST(req: NextRequest) {
     });
     
     // 5) 🔑 MANEJAR ALREADY_LOGGED_IN_ERROR: Usuario ya autenticado
-    // NO hacemos logout porque borra la orden activa
-    // En su lugar, continuamos con el checkout - la orden ya está asociada con el usuario
     if (result?.errorCode === 'ALREADY_LOGGED_IN_ERROR') {
       console.log('ℹ️ ALREADY_LOGGED_IN_ERROR: User is logged in, checking order association...');
       
@@ -166,6 +195,7 @@ export async function POST(req: NextRequest) {
         }, { status: 400 });
       }
 
+      // CASO 1: Orden YA tiene customer → continuar con usuario autenticado
       if (currentOrder.customer?.id) {
         console.log('✅ Order already associated with authenticated customer:', {
           customerEmail: currentOrder.customer.emailAddress,
@@ -182,7 +212,52 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      console.warn('⚠️ User logged in but order has no customer - unexpected state');
+      // CASO 2: Usuario autenticado pero orden SIN customer → limpiar sesión autenticada
+      console.warn('⚠️ User logged in but order has no customer - clearing authenticated session...');
+      
+      // Hacer logout para limpiar la sesión autenticada
+      const LOGOUT = gql`
+        mutation Logout {
+          logout {
+            success
+          }
+        }
+      `;
+      
+      const logoutRes = await fetchGraphQL({
+        query: LOGOUT,
+      }, { req, cookie: cookieHeader || undefined });
+
+      console.log('🚪 Logout result:', logoutRes.data?.logout);
+
+      // Verificar que la orden sigue existiendo
+      const orderAfterLogout = await fetchGraphQL({
+        query: GET_ACTIVE_ORDER,
+      }, { req, cookie: cookieHeader || undefined });
+
+      if (!orderAfterLogout.data?.activeOrder?.id) {
+        console.error('❌ Order was cleared after logout - session was tied to authenticated user');
+        return NextResponse.json({ 
+          error: 'Session conflict', 
+          details: 'Please start a new order. Your previous session was tied to an authenticated account.',
+          requiresNewOrder: true,
+        }, { status: 400 });
+      }
+
+      console.log('✅ Order preserved after logout, retrying setCustomerForOrder...');
+
+      // Reintentar setCustomerForOrder
+      response = await fetchGraphQL({
+        query: SET_CUSTOMER_FOR_ORDER,
+        variables: { input },
+      }, { req, cookie: cookieHeader || undefined });
+
+      result = response.data?.setCustomerForOrder;
+      
+      console.log('📊 Retry result:', {
+        typename: result?.__typename,
+        errorCode: result?.errorCode,
+      });
     }
     
     // Manejar otros errores de Vendure
