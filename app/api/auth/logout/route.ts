@@ -1,20 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
-
-const LOGOUT_MUTATION = `
-  mutation Logout {
-    logout {
-      success
-    }
-  }
-`;
+import { LOGOUT } from '@/lib/graphql/mutations';
 
 export async function POST(req: NextRequest) {
   try {
     console.log('🚪 Logging out user...');
     
     const response = await fetchGraphQL({
-      query: LOGOUT_MUTATION,
+      query: LOGOUT,
     }, { req });
 
     console.log('📦 Logout response:', JSON.stringify(response, null, 2));

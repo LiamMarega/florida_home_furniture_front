@@ -1,36 +1,7 @@
 // app/api/cart/add/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
-import { gql } from 'graphql-request';
-
-const ADD_TO_CART = gql`
-  mutation AddItemToOrder($productVariantId: ID!, $quantity: Int!) {
-    addItemToOrder(productVariantId: $productVariantId, quantity: $quantity) {
-      ... on Order {
-        id
-        code
-        state
-        totalQuantity
-        totalWithTax
-        lines {
-          id
-          quantity
-          linePrice
-          linePriceWithTax
-          productVariant {
-            id
-            name
-            sku
-          }
-        }
-      }
-      ... on ErrorResult {
-        errorCode
-        message
-      }
-    }
-  }
-`;
+import { ADD_ITEM_TO_ORDER } from '@/lib/graphql/mutations';
 
 export async function POST(req: NextRequest) {
   try {
@@ -50,7 +21,7 @@ export async function POST(req: NextRequest) {
     console.log('🍪 Add to cart cookies:', cookieHeader?.substring(0, 80) + '...');
 
     const response = await fetchGraphQL({
-      query: ADD_TO_CART,
+      query: ADD_ITEM_TO_ORDER,
       variables: { 
         productVariantId, 
         quantity: parseInt(quantity.toString(), 10),

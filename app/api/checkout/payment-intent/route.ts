@@ -3,32 +3,10 @@ import { fetchGraphQL } from "@/lib/vendure-server";
 import { gql } from "graphql-request";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
+import { TRANSITION_ORDER_TO_STATE } from "@/lib/graphql/mutations";
+import { GET_NEXT_ORDER_STATES, GET_ELIGIBLE_PAYMENT_METHODS, GET_ORDER_FOR_PAYMENT } from "@/lib/graphql/queries";
 
 const SHOP_API = process.env.VENDURE_SHOP_API_URL || "http://localhost:3000/shop-api";
-
-// ---- Queries/Mutations
-const NEXT_STATES = gql`query { nextOrderStates }`;
-
-const TRANSITION = gql`
-  mutation($state: String!) {
-    transitionOrderToState(state: $state) {
-      __typename
-      ... on Order { id state }
-      ... on OrderStateTransitionError {
-        errorCode
-        message
-        transitionError
-        fromState
-        toState
-      }
-      ... on ErrorResult { errorCode message }
-    }
-  }
-`;
-
-const ELIGIBLE_PM = gql`
-  query { eligiblePaymentMethods { code isEligible eligibilityMessage } }
-`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,17 +25,6 @@ export async function POST(req: NextRequest) {
     }
 
     // 1) Lee la orden como SIEMPRE hacías (tu helper ya usa SHOP_API correcto)
-    const GET_ORDER_FOR_PAYMENT = gql`
-      query {
-        activeOrder {
-          id code totalWithTax state currencyCode
-          customer { emailAddress }
-          shippingAddress { streetLine1 city postalCode }
-          shippingLines { id }
-        }
-      }
-    `;
-
     const orderRes = await fetchGraphQL({ query: GET_ORDER_FOR_PAYMENT }, { req, cookie: cookieHeader });
     const order = orderRes.data?.activeOrder;
 
@@ -93,10 +60,10 @@ export async function POST(req: NextRequest) {
     };
 
     // 3) Verifica next states y transiciona, pero si falla, devuelve el motivo real
-    const next = await vendureShopFetch<{ nextOrderStates: string[] }>(NEXT_STATES);
+    const next = await vendureShopFetch<{ nextOrderStates: string[] }>(GET_NEXT_ORDER_STATES);
 
     if (order.state === "AddingItems" && next.nextOrderStates.includes("ArrangingPayment")) {
-      const res = await vendureShopFetch<any>(TRANSITION, { state: "ArrangingPayment" });
+      const res = await vendureShopFetch<any>(TRANSITION_ORDER_TO_STATE, { state: "ArrangingPayment" });
 
       if (res.transitionOrderToState.__typename !== "Order") {
         // <-- verás transitionError, fromState, toState en la respuesta
@@ -113,7 +80,7 @@ export async function POST(req: NextRequest) {
     }
 
     // (Opcional) Asegura que el PaymentMethod 'stripe-payment' es elegible
-    const pm = await vendureShopFetch<{ eligiblePaymentMethods: { code: string; isEligible: boolean; eligibilityMessage?: string }[] }>(ELIGIBLE_PM);
+    const pm = await vendureShopFetch<{ eligiblePaymentMethods: { code: string; isEligible: boolean; eligibilityMessage?: string }[] }>(GET_ELIGIBLE_PAYMENT_METHODS);
     const stripeEligible = pm.eligiblePaymentMethods.find(m => m.code === "stripe-payment");
     if (!stripeEligible?.isEligible) {
       return NextResponse.json({

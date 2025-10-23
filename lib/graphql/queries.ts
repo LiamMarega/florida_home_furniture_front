@@ -200,3 +200,36 @@ export const GET_NEXT_ORDER_STATES = gql`
     nextOrderStates
   }
 `;
+
+export const GET_ELIGIBLE_PAYMENT_METHODS = gql`
+  query GetEligiblePaymentMethods {
+    eligiblePaymentMethods {
+      code
+      isEligible
+      eligibilityMessage
+    }
+  }
+`;
+
+export const GET_ORDER_FOR_PAYMENT = gql`
+  query GetOrderForPayment {
+    activeOrder {
+      id
+      code
+      totalWithTax
+      state
+      currencyCode
+      customer {
+        emailAddress
+      }
+      shippingAddress {
+        streetLine1
+        city
+        postalCode
+      }
+      shippingLines {
+        id
+      }
+    }
+  }
+`;

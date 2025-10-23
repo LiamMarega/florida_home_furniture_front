@@ -1,45 +1,8 @@
 // app/api/checkout/set-customer/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
-import { gql } from 'graphql-request';
-
-const SET_CUSTOMER_FOR_ORDER = gql`
- mutation SetCustomer($input: CreateCustomerInput!) {
-  setCustomerForOrder(input: $input) {
-    __typename
-    ... on Order { id code state customer { id emailAddress } }
-    ... on ErrorResult { errorCode message }
-  }
-}
-
-`;
-
-const GET_ACTIVE_ORDER = gql`
-  query GetActiveOrder {
-    activeOrder {
-      id
-      code
-      state
-      customer {
-        id
-        emailAddress
-        firstName
-        lastName
-      }
-    }
-  }
-`;
-
-const GET_ACTIVE_CUSTOMER = gql`
-  query GetActiveCustomer {
-    activeCustomer {
-      id
-      emailAddress
-      firstName
-      lastName
-    }
-  }
-`;
+import { SET_CUSTOMER_FOR_ORDER, LOGOUT } from '@/lib/graphql/mutations';
+import { GET_ACTIVE_ORDER, GET_ACTIVE_CUSTOMER } from '@/lib/graphql/queries';
 
 export async function POST(req: NextRequest) {
   try {
@@ -205,14 +168,6 @@ export async function POST(req: NextRequest) {
       console.warn('⚠️ User logged in but order has no customer - clearing authenticated session...');
       
       // Hacer logout para limpiar la sesión autenticada
-      const LOGOUT = gql`
-        mutation Logout {
-          logout {
-            success
-          }
-        }
-      `;
-      
       const logoutRes = await fetchGraphQL({
         query: LOGOUT,
       }, { req, cookie: cookieHeader || undefined });

@@ -1,27 +1,8 @@
 // app/api/auth/logout-guest/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
-import { gql } from 'graphql-request';
-
-const LOGOUT = gql`
-  mutation Logout {
-    logout {
-      success
-    }
-  }
-`;
-
-const GET_ACTIVE_ORDER = gql`
-  query GetActiveOrder {
-    activeOrder {
-      id
-      code
-      lines {
-        id
-      }
-    }
-  }
-`;
+import { LOGOUT } from '@/lib/graphql/mutations';
+import { GET_ACTIVE_ORDER } from '@/lib/graphql/queries';
 
 /**
  * Logout para limpiar sesiones autenticadas previas

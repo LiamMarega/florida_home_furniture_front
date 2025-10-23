@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { gql } from 'graphql-request';
+import { GET_ORDER_BY_CODE, GET_NEXT_ORDER_STATES } from '@/lib/graphql/queries';
+import { TRANSITION_ORDER_TO_STATE, ADD_PAYMENT_TO_ORDER } from '@/lib/graphql/mutations';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY! /* , { apiVersion: '2024-06-20' } */);
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
@@ -25,36 +27,6 @@ async function vendureShopFetch<T>(
   return json.data;
 }
 
-const ORDER_BY_CODE = gql`
-  query OrderByCode($code: String!) {
-    orderByCode(code: $code) { id code state totalWithTax }
-  }
-`;
-
-const NEXT_STATES = gql`query { nextOrderStates }`;
-
-const TRANSITION_ORDER = gql`
-  mutation TransitionOrder($state: String!) {
-    transitionOrderToState(state: $state) {
-      __typename
-      ... on Order { id state }
-      ... on ErrorResult { errorCode message }
-    }
-  }
-`;
-
-const ADD_PAYMENT = gql`
-  mutation AddPaymentToOrder($input: PaymentInput!) {
-    addPaymentToOrder(input: $input) {
-      __typename
-      ... on Order { id code state payments { id state method amount transactionId } }
-      ... on PaymentFailedError { errorCode message paymentErrorMessage }
-      ... on PaymentDeclinedError { errorCode message paymentErrorMessage }
-      ... on IneligiblePaymentMethodError { errorCode message eligibilityCheckerMessage }
-      ... on ErrorResult { errorCode message }
-    }
-  }
-`;
 
 export async function POST(req: NextRequest) {
   // 1) raw body + firma
@@ -81,7 +53,7 @@ export async function POST(req: NextRequest) {
   try {
     // 2) Traer orden como el cliente
     const data1 = await vendureShopFetch<{ orderByCode: { code: string; state: string; totalWithTax: number } }>(
-      ORDER_BY_CODE, { code: orderCode }, userSession
+      GET_ORDER_BY_CODE, { code: orderCode }, userSession
     );
     const order = data1.orderByCode;
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 200 });
@@ -93,7 +65,7 @@ export async function POST(req: NextRequest) {
 
     // 4) Asegurar ArrangingPayment
     if (order.state === 'AddingItems') {
-      const trans = await vendureShopFetch<any>(TRANSITION_ORDER, { state: 'ArrangingPayment' }, userSession);
+      const trans = await vendureShopFetch<any>(TRANSITION_ORDER_TO_STATE, { state: 'ArrangingPayment' }, userSession);
       if (trans.transitionOrderToState.__typename !== 'Order') {
         return NextResponse.json({ error: 'Cannot transition to ArrangingPayment', reason: trans.transitionOrderToState?.message }, { status: 200 });
       }
@@ -103,7 +75,7 @@ export async function POST(req: NextRequest) {
     // Podríamos consultar eligiblePaymentMethods aquí si quieres mostrar mensajes más claros. :contentReference[oaicite:5]{index=5}
 
     // 5) Añadir pago -> tu handler devuelve 'Settled' => Order -> PaymentSettled
-    const added = await vendureShopFetch<any>(ADD_PAYMENT, {
+    const added = await vendureShopFetch<any>(ADD_PAYMENT_TO_ORDER, {
       input: {
         method: 'stripe-payment',
         metadata: {

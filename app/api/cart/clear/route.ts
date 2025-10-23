@@ -1,26 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
 import { GET_ACTIVE_ORDER } from '@/lib/graphql/queries';
-
-// Mutation para remover un item
-const REMOVE_ORDER_LINE = `
-  mutation RemoveOrderLine($orderLineId: ID!) {
-    removeOrderLine(orderLineId: $orderLineId) {
-      __typename
-      ... on Order {
-        id
-        code
-        lines {
-          id
-        }
-      }
-      ... on OrderModificationError {
-        errorCode
-        message
-      }
-    }
-  }
-`;
+import { REMOVE_ORDER_LINE } from '@/lib/graphql/mutations';
 
 export async function POST(req: NextRequest) {
   try {
