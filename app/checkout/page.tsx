@@ -12,7 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { ArrowRight, Package, Truck, User } from 'lucide-react';
 
 const customerSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  emailAddress: z.string().email('Invalid email address'),
   firstName: z.string().min(2, 'First name is required'),
   lastName: z.string().min(2, 'Last name is required'),
   shippingFullName: z.string().min(2, 'Full name is required'),
@@ -32,34 +32,110 @@ const customerSchema = z.object({
   billingPostalCode: z.string().optional(),
   billingCountry: z.string().optional(),
   billingPhoneNumber: z.string().optional(),
-  shippingMethodId: z.string().min(1, 'Please select a shipping method'),
+  shippingMethodId: z.string().optional(),
 });
 
 type CustomerFormData = z.infer<typeof customerSchema>;
 
 export default function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [shippingMethods, setShippingMethods] = useState<any[]>([]);
+  const [selectedShippingMethod, setSelectedShippingMethod] = useState<string>('');
+  const [isLoadingShippingMethods, setIsLoadingShippingMethods] = useState(false);
 
   const {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
     defaultValues: {
       billingSameAsShipping: true,
       shippingCountry: 'US',
+      shippingMethodId: '',
     },
   });
 
   const billingSameAsShipping = watch('billingSameAsShipping');
 
+  // Function to fetch eligible shipping methods
+  const fetchShippingMethods = async () => {
+    setIsLoadingShippingMethods(true);
+    try {
+      const response = await fetch('/api/checkout/shipping-methods', { 
+        cache: 'no-store',
+        credentials: 'include'
+      });
+      const data = await response.json();
+      
+      if (data.eligibleShippingMethods && data.eligibleShippingMethods.length > 0) {
+        setShippingMethods(data.eligibleShippingMethods);
+        // Automatically select the first shipping method
+        const firstMethod = data.eligibleShippingMethods[0];
+        setSelectedShippingMethod(firstMethod.id);
+        setValue('shippingMethodId', firstMethod.id);
+      }
+    } catch (error) {
+      console.error('Error fetching shipping methods:', error);
+    } finally {
+      setIsLoadingShippingMethods(false);
+    }
+  };
+
+  // Function to set shipping method
+  const setShippingMethod = async (shippingMethodId: string) => {
+    try {
+      const response = await fetch('/api/checkout/shipping-methods', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shippingMethodIds: [shippingMethodId] }),
+        credentials: 'include'
+      });
+      const result = await response.json();
+      console.log('Shipping method set:', result);
+    } catch (error) {
+      console.error('Error setting shipping method:', error);
+    }
+  };
+
   const onSubmit = async (data: CustomerFormData) => {
+    console.log('holaaaaaaaaa');
     setIsSubmitting(true);
     try {
       // TODO: Implement checkout logic
-      console.log('Form data:', data);
+        const response = await fetch('/api/checkout/set-customer', {
+          method: 'POST',
+          body: JSON.stringify(data),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+        });
+        const result = await response.json();
+        console.log('Result:', result);
+
+        const shippingResponse = await fetch('/api/checkout/set-shipping-address', {
+          method: 'POST',
+          body: JSON.stringify(data),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+        });
+        const shippingResult = await shippingResponse.json();
+        console.log('Shipping Result:', shippingResult);
+
+        // Fetch and set shipping methods after setting shipping address
+        await fetchShippingMethods();
+
+        // Set the selected shipping method if we have one
+        if (selectedShippingMethod) {
+          await setShippingMethod(selectedShippingMethod);
+        }
+
+       
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -112,14 +188,14 @@ export default function CheckoutPage() {
                   <div>
                     <Label htmlFor="email">Email Address *</Label>
                     <Input
-                      id="email"
+                      id="emailAddress"
                       type="email"
-                      {...register('email')}
+                      {...register('emailAddress')}
                       placeholder="you@example.com"
-                      className={errors.email ? 'border-red-500' : ''}
+                      className={errors.emailAddress ? 'border-red-500' : ''}
                     />
-                    {errors.email && (
-                      <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>
+                    {errors.emailAddress && (
+                      <p className="text-red-500 text-sm mt-1">{errors.emailAddress.message}</p>
                     )}
                   </div>
                 </div>
@@ -291,9 +367,71 @@ export default function CheckoutPage() {
                     Shipping Method
                   </h2>
 
-                  <div className="text-center py-4">
-                    <p className="text-brand-dark-blue/70 mb-4">Shipping methods will be loaded here</p>
-                  </div>
+                  {isLoadingShippingMethods ? (
+                    <div className="text-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-primary mx-auto mb-2"></div>
+                      <p className="text-brand-dark-blue/70">Loading shipping methods...</p>
+                    </div>
+                  ) : shippingMethods.length > 0 ? (
+                    <div className="space-y-3">
+                      {shippingMethods.map((method) => (
+                        <div
+                          key={method.id}
+                          className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                            selectedShippingMethod === method.id
+                              ? 'border-brand-primary bg-brand-primary/5'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                          onClick={() => {
+                            setSelectedShippingMethod(method.id);
+                            setValue('shippingMethodId', method.id);
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="radio"
+                                name="shippingMethod"
+                                value={method.id}
+                                checked={selectedShippingMethod === method.id}
+                                onChange={() => {
+                                  setSelectedShippingMethod(method.id);
+                                  setValue('shippingMethodId', method.id);
+                                }}
+                                className="w-4 h-4 text-brand-primary focus:ring-brand-primary border-gray-300"
+                              />
+                              <div>
+                                <p className="font-medium text-brand-dark-blue">
+                                  {method.description || 'Standard Shipping'}
+                                </p>
+                                {method.metadata && (
+                                  <p className="text-sm text-brand-dark-blue/70">
+                                    {method.metadata.deliveryTime || 'Estimated delivery time'}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold text-brand-dark-blue">
+                                ${(method.priceWithTax / 100).toFixed(2)}
+                              </p>
+                              {method.price !== method.priceWithTax && (
+                                <p className="text-sm text-brand-dark-blue/70">
+                                  (incl. tax)
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-brand-dark-blue/70 mb-4">
+                        Shipping methods will be available after entering your address
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <Button

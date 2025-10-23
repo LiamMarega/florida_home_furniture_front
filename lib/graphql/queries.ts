@@ -175,20 +175,13 @@ export const GET_ALL_PRODUCTS = gql`
     }
 `;
 
-export const GET_ELIGIBLE_SHIPPING_METHODS = gql`
-  query GetEligibleShippingMethods {
+export const ELIGIBLE_SHIPPING_METHODS = /* GraphQL */ `
+  query EligibleShippingMethods {
     eligibleShippingMethods {
-      id
-      code
-      name
-      description
-      price
-      priceWithTax
-      metadata
+      ...ShippingMethodQuoteFields
     }
   }
 `;
-
 export const GET_ORDER_BY_CODE = gql`
   ${ORDER_FRAGMENT}
   query GetOrderByCode($code: String!) {
@@ -236,3 +229,23 @@ export const GET_ORDER_FOR_PAYMENT = gql`
     }
   }
 `;
+
+
+export const GET_AUTH_STATE = gql`
+  query AuthState {
+  me { id identifier }            # null si NO hay login
+  activeCustomer {                # null si NO hay login
+    id
+    firstName
+    lastName
+    emailAddress
+  }
+  activeOrder {
+    id
+    code
+    state
+    customer { id emailAddress }
+  }
+}
+`;
+

@@ -86,20 +86,19 @@ export const SET_CUSTOMER_FOR_ORDER = gql`
 `;
 
 export const SET_ORDER_SHIPPING_ADDRESS = gql`
-  ${ORDER_FRAGMENT}
   mutation SetOrderShippingAddress($input: CreateAddressInput!) {
     setOrderShippingAddress(input: $input) {
+      __typename
       ... on Order {
-        ...Order
+        ...OrderWithAddresses
       }
-      ... on ErrorResult {
+      ... on NoActiveOrderError {
         errorCode
         message
       }
     }
   }
 `;
-
 export const TRANSITION_ORDER_TO_STATE = gql`
   ${ORDER_FRAGMENT}
   mutation TransitionOrderToState($state: String!) {
@@ -116,14 +115,18 @@ export const TRANSITION_ORDER_TO_STATE = gql`
   }
 `;
 
-export const SET_ORDER_SHIPPING_METHOD = gql`
-  ${ORDER_FRAGMENT}
-  mutation SetOrderShippingMethod($shippingMethodId: [ID!]!) {
-    setOrderShippingMethod(shippingMethodId: $shippingMethodId) {
+export const SET_ORDER_SHIPPING_METHOD = /* GraphQL */ `
+  mutation SetOrderShippingMethod($ids: [ID!]!) {
+    setOrderShippingMethod(shippingMethodId: $ids) {
+      __typename
       ... on Order {
-        ...Order
+        ...OrderPricingSummary
       }
-      ... on ErrorResult {
+      ... on NoActiveOrderError {
+        errorCode
+        message
+      }
+      ... on IneligibleShippingMethodError {
         errorCode
         message
       }
@@ -132,13 +135,13 @@ export const SET_ORDER_SHIPPING_METHOD = gql`
 `;
 
 export const SET_ORDER_BILLING_ADDRESS = gql`
-  ${ORDER_FRAGMENT}
   mutation SetOrderBillingAddress($input: CreateAddressInput!) {
     setOrderBillingAddress(input: $input) {
+      __typename
       ... on Order {
-        ...Order
+        ...OrderWithAddresses
       }
-      ... on ErrorResult {
+      ... on NoActiveOrderError {
         errorCode
         message
       }
@@ -192,3 +195,4 @@ export const LOGOUT = gql`
     }
   }
 `;
+
