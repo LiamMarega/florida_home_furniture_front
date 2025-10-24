@@ -3,50 +3,11 @@ import {
   PRODUCT_FRAGMENT, 
   ORDER_FRAGMENT, 
   ASSET_FRAGMENT, 
-  SEARCH_RESULT_ASSET_FRAGMENT, 
   PRODUCT_VARIANT_FRAGMENT,
   CUSTOMER_FRAGMENT 
 } from './fragments';
 
-export const GET_PRODUCTS = gql`
-  ${PRODUCT_FRAGMENT}
-  query GetProducts($options: ProductListOptions) {
-    products(options: $options) {
-      items {
-        ...Product
-      }
-      totalItems
-    }
-  }
-`;
 
-export const SEARCH_PRODUCTS = gql`
-  ${SEARCH_RESULT_ASSET_FRAGMENT}
-  query SearchProducts($input: SearchInput!) {
-    search(input: $input) {
-      items {
-        productId
-        productName
-        slug
-        description
-        priceWithTax {
-          ... on PriceRange {
-            min
-            max
-          }
-          ... on SinglePrice {
-            value
-          }
-        }
-        currencyCode
-        productAsset {
-          ...SearchResultAsset
-        }
-      }
-      totalItems
-    }
-  }
-`;
 
 export const GET_PRODUCT_BY_SLUG = gql`
   ${PRODUCT_FRAGMENT}
@@ -57,88 +18,8 @@ export const GET_PRODUCT_BY_SLUG = gql`
   }
 `;
 
-export const GET_PRODUCT_DETAILS = gql`
-  ${ASSET_FRAGMENT}
-  ${PRODUCT_VARIANT_FRAGMENT}
-  query GetProductDetails($slug: String!) {
-    product(slug: $slug) {
-      id
-      name
-      slug
-      description
-      featuredAsset {
-        ...Asset
-      }
-      assets {
-        ...Asset
-      }
-      variants {
-        ...ProductVariant
-        product {
-          id
-          name
-          slug
-        }
-      }
-      customFields {
-        materials
-        dimensions
-        weight
-        color
-        assembly
-        warranty
-      }
-    }
-  }
-`;
 
-export const GET_COLLECTIONS = gql`
-  ${ASSET_FRAGMENT}
-  query GetCollections($options: CollectionListOptions) {
-    collections(options: $options) {
-      items {
-        id
-        name
-        slug
-        description
-        featuredAsset {
-          ...Asset
-        }
-      }
-      totalItems
-    }
-  }
-`;
 
-export const GET_COLLECTION_BY_SLUG = gql`
-  ${ASSET_FRAGMENT}
-  ${PRODUCT_FRAGMENT}
-  query GetCollectionBySlug($slug: String!, $options: ProductListOptions) {
-    collection(slug: $slug) {
-      id
-      name
-      slug
-      description
-      featuredAsset {
-        ...Asset
-      }
-      productVariants(options: $options) {
-        items {
-          id
-          name
-          sku
-          price
-          priceWithTax
-          currencyCode
-          product {
-            ...Product
-          }
-        }
-        totalItems
-      }
-    }
-  }
-`;
 
 export const GET_ACTIVE_ORDER = gql`
   ${ORDER_FRAGMENT}
@@ -149,14 +30,6 @@ export const GET_ACTIVE_ORDER = gql`
   }
 `;
 
-export const GET_ACTIVE_CUSTOMER = gql`
-  ${CUSTOMER_FRAGMENT}
-  query GetActiveCustomer {
-    activeCustomer {
-      ...Customer
-    }
-  }
-`;
 
 export const GET_ALL_PRODUCTS = gql`
     query GetAllProducts {
@@ -191,63 +64,10 @@ export const GET_ORDER_BY_CODE = gql`
   }
 `;
 
-export const GET_NEXT_ORDER_STATES = gql`
-  query GetNextOrderStates {
-    nextOrderStates
-  }
-`;
-
-export const GET_ELIGIBLE_PAYMENT_METHODS = gql`
-  query GetEligiblePaymentMethods {
-    eligiblePaymentMethods {
-      code
-      isEligible
-      eligibilityMessage
-    }
-  }
-`;
-
-export const GET_ORDER_FOR_PAYMENT = gql`
-  query GetOrderForPayment {
-    activeOrder {
-      id
-      code
-      totalWithTax
-      state
-      currencyCode
-      customer {
-        emailAddress
-      }
-      shippingAddress {
-        streetLine1
-        city
-        postalCode
-      }
-      shippingLines {
-        id
-      }
-    }
-  }
-`;
 
 
-export const GET_AUTH_STATE = gql`
-  query AuthState {
-  me { id identifier }            # null si NO hay login
-  activeCustomer {                # null si NO hay login
-    id
-    firstName
-    lastName
-    emailAddress
-  }
-  activeOrder {
-    id
-    code
-    state
-    customer { id emailAddress }
-  }
-}
-`;
+
+
 
 export const GET_ACTIVE_ORDER_FOR_PAYMENT = gql`
   query GetActiveOrderForPayment {
@@ -263,15 +83,6 @@ export const GET_ACTIVE_ORDER_FOR_PAYMENT = gql`
 `;
 
 
-export const TRANSITION_TO_ARRANGING = gql`
-  mutation ToArrangingPayment {
-    transitionOrderToState(state: "ArrangingPayment") {
-      __typename
-      ... on Order { id code state }
-      ... on OrderStateTransitionError { errorCode message transitionError fromState toState }
-    }
-  }
-`;
 
 export const ADD_PAYMENT_TO_ORDER = gql`
   mutation AddPaymentToOrder($input: PaymentInput!) {

@@ -1,5 +1,5 @@
 import { gql } from 'graphql-request';
-import { ORDER_FRAGMENT, CUSTOMER_FRAGMENT } from './fragments';
+import { ORDER_FRAGMENT, CUSTOMER_FRAGMENT, ORDER_BASIC_FRAGMENT } from './fragments';
 
 export const ADD_ITEM_TO_ORDER = gql`
   mutation AddItemToOrder($productVariantId: ID!, $qty: Int!) {
@@ -20,11 +20,11 @@ export const ADD_ITEM_TO_ORDER = gql`
 `;
 
 export const ADJUST_ORDER_LINE = gql`
-  ${ORDER_FRAGMENT}
+  ${ORDER_BASIC_FRAGMENT}
   mutation AdjustOrderLine($orderLineId: ID!, $quantity: Int!) {
     adjustOrderLine(orderLineId: $orderLineId, quantity: $quantity) {
       ... on Order {
-        ...Order
+        ...OrderBasic
       }
       ... on ErrorResult {
         errorCode
@@ -35,11 +35,11 @@ export const ADJUST_ORDER_LINE = gql`
 `;
 
 export const REMOVE_ORDER_LINE = gql`
-  ${ORDER_FRAGMENT}
+  ${ORDER_BASIC_FRAGMENT}
   mutation RemoveOrderLine($orderLineId: ID!) {
     removeOrderLine(orderLineId: $orderLineId) {
       ... on Order {
-        ...Order
+        ...OrderBasic
       }
       ... on ErrorResult {
         errorCode
@@ -49,20 +49,6 @@ export const REMOVE_ORDER_LINE = gql`
   }
 `;
 
-export const REMOVE_ALL_ORDER_LINES = gql`
-  ${ORDER_FRAGMENT}
-  mutation RemoveAllOrderLines {
-    removeAllOrderLines {
-      ... on Order {
-        ...Order
-      }
-      ... on ErrorResult {
-        errorCode
-        message
-      }
-    }
-  }
-`;
 
 export const SET_CUSTOMER_FOR_ORDER = gql`
   mutation SetCustomerForOrder($input: CreateCustomerInput!) {
@@ -164,29 +150,7 @@ export const ADD_PAYMENT_TO_ORDER = gql`
   }
 `;
 
-export const CREATE_PAYMENT_INTENT = gql`
-  mutation CreateStripePaymentIntent {
-    createStripePaymentIntent
-  }
-`;
 
-export const UPDATE_CUSTOMER = gql`
-  mutation UpdateCustomer($input: UpdateCustomerInput!) {
-    updateCustomer(input: $input) {
-      ... on Customer {
-        id
-        firstName
-        lastName
-        emailAddress
-        customFields
-      }
-      ... on ErrorResult {
-        errorCode
-        message
-      }
-    }
-  }
-`;
 
 export const LOGOUT = gql`
   mutation Logout {

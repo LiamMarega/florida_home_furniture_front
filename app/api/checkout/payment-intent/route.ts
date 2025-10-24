@@ -4,9 +4,9 @@ import Stripe from 'stripe';
 import { fetchGraphQL } from '@/lib/vendure-server';
 import {
   GET_ACTIVE_ORDER_FOR_PAYMENT,
-  TRANSITION_TO_ARRANGING,
   ADD_PAYMENT_TO_ORDER,
 } from '@/lib/graphql/queries';
+import { TRANSITION_ORDER_TO_STATE } from '@/lib/graphql/mutations';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   // apiVersion: '2024-06-20',
@@ -34,7 +34,10 @@ export async function POST(req: NextRequest) {
 
   // 2) Transicionar a ArrangingPayment (si corresponde)
   if (order.state === 'AddingItems') {
-    const t = await fetchGraphQL({ query: TRANSITION_TO_ARRANGING }, { req });
+    const t = await fetchGraphQL({ 
+      query: TRANSITION_ORDER_TO_STATE, 
+      variables: { state: 'ArrangingPayment' } 
+    }, { req });
     const tr = t.data?.transitionOrderToState;
     if (tr?.__typename !== 'Order') {
       return NextResponse.json({ result: tr, info: 'No se pudo transicionar a ArrangingPayment' }, { status: 409 });

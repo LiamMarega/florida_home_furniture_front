@@ -128,7 +128,6 @@ export const ORDER_LINE_FRAGMENT = gql`
     id
     quantity
     linePriceWithTax
-    discountedLinePriceWithTax
     productVariant {
       id
       name
@@ -142,7 +141,6 @@ export const ORDER_LINE_FRAGMENT = gql`
         }
       }
     }
-    
   }
 `;
 
@@ -169,16 +167,6 @@ export const ORDER_SUMMARY_FRAGMENT = gql`
   ${ORDER_LINE_FRAGMENT}
 `;
 
-export const SEARCH_RESULT_ASSET_FRAGMENT = gql`
-  fragment SearchResultAsset on SearchResultAsset {
-    id
-    preview
-    focalPoint {
-      x
-      y
-    }
-  }
-`;
 
 export const CUSTOMER_FRAGMENT = gql`
   fragment Customer on Customer {
@@ -373,5 +361,33 @@ export const ORDER_PRICING_SUMMARY = gql`
     subTotalWithTax
     totalWithTax
     currencyCode
+  }
+`;
+
+export const ORDER_BASIC_FRAGMENT = gql`
+  fragment OrderBasic on Order {
+    id
+    code
+    state
+    totalWithTax
+    currencyCode
+    lines {
+      id
+      quantity
+      linePriceWithTax
+      productVariant {
+        id
+        name
+        sku
+        product {
+          id
+          name
+          featuredAsset {
+            id
+            preview
+          }
+        }
+      }
+    }
   }
 `;
