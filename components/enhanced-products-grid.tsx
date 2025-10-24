@@ -1,12 +1,9 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
 import { staggerContainer, staggerItem } from '@/lib/animations';
 import { useScrollAnimation } from '@/hooks/use-scroll-animation';
-import { useQuery } from '@tanstack/react-query';
-import { productKeys } from '@/hooks/use-products';
-import { GET_ALL_PRODUCTS } from '@/lib/graphql/queries';
-import { fetchGraphQL } from '@/lib/vendure-server';
 import { useProductsGrid } from '@/hooks/use-products-grid';
 import { ProductCard } from './products/product-card';
 import { ProductsGridFilters } from './products/products-grid-filters';
@@ -26,8 +23,7 @@ interface EnhancedProductsGridProps {
   showPagination?: boolean;
   showQuickAdd?: boolean;
   imageAspectRatio?: 'square' | 'portrait' | 'landscape';
-  initialSort?: 'featured' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc';
-  maxProducts?: number;
+  initialSort?: 'featured' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc' | 'newest';
   className?: string;
 }
 
@@ -44,24 +40,11 @@ export function EnhancedProductsGrid({
   showQuickAdd = true,
   imageAspectRatio = 'square',
   initialSort = 'featured',
-  maxProducts,
   className = '',
 }: EnhancedProductsGridProps) {
   const { ref, isVisible } = useScrollAnimation();
   
-  // Fetch products using React Query
-  const { data: productsResponse, isLoading, error } = useQuery({
-    queryKey: productKeys.lists(),
-    queryFn: () => fetchGraphQL({ query: GET_ALL_PRODUCTS }),
-  });
-
-  // Get products from response
-  const allProducts: Product[] = productsResponse?.data?.products?.items || [];
-  
-  // Limit products if maxProducts is set
-  const products = maxProducts ? allProducts.slice(0, maxProducts) : allProducts;
-
-  // Use products grid hook for filtering, sorting, and pagination
+  // Use products grid hook with server-side pagination
   const {
     searchQuery,
     sortBy,
@@ -69,13 +52,16 @@ export function EnhancedProductsGrid({
     products: displayedProducts,
     totalProducts,
     totalPages,
+    isLoading,
+    isFetching,
+    error,
     setSearchQuery,
     setSortBy,
     setCurrentPage,
   } = useProductsGrid({
-    products,
     itemsPerPage,
     initialSort,
+    useServerPagination: true,
   });
 
   // Grid column classes based on props
@@ -120,7 +106,7 @@ export function EnhancedProductsGrid({
           />
         )}
 
-        {/* Loading State */}
+        {/* Loading State (initial load) */}
         {isLoading ? (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
@@ -130,7 +116,7 @@ export function EnhancedProductsGrid({
           /* Error State */
           <div className="text-center py-12">
             <p className="text-red-600 text-lg mb-4">Failed to load products</p>
-            <p className="text-brand-dark-blue/60">{error.message}</p>
+            <p className="text-brand-dark-blue/60">{error instanceof Error ? error.message : 'Unknown error'}</p>
           </div>
         ) : displayedProducts.length === 0 ? (
           /* Empty State */
@@ -143,7 +129,17 @@ export function EnhancedProductsGrid({
           </div>
         ) : (
           /* Products Grid */
-          <>
+          <div className="relative">
+            {/* Fetching Overlay - shown when paginating/filtering but not initial load */}
+            {isFetching && !isLoading && (
+              <div className="absolute inset-0 bg-white/50 backdrop-blur-[2px] z-10 flex items-center justify-center">
+                <div className="flex items-center gap-3 bg-white px-6 py-3 rounded-full shadow-lg">
+                  <Loader2 className="w-5 h-5 animate-spin text-brand-primary" />
+                  <span className="text-brand-dark-blue font-medium">Updating...</span>
+                </div>
+              </div>
+            )}
+
             <motion.div
               initial="hidden"
               animate={isVisible ? "visible" : "hidden"}
@@ -176,7 +172,7 @@ export function EnhancedProductsGrid({
                 />
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </section>

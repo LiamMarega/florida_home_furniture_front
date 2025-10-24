@@ -1,89 +1,110 @@
-import { useState, useMemo } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useProductsApi } from './use-products-api';
 import { Product } from '@/lib/types';
 
-export type SortOption = 'featured' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc';
+export type SortOption = 'featured' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc' | 'newest';
 
 interface UseProductsGridOptions {
-  products: Product[];
   itemsPerPage?: number;
   initialSort?: SortOption;
+  useServerPagination?: boolean;
 }
 
+/**
+ * Hook for managing products grid with server-side pagination and filtering
+ * 
+ * @param options - Configuration options
+ * @param options.itemsPerPage - Number of items per page (default: 20)
+ * @param options.initialSort - Initial sort option (default: 'featured')
+ * @param options.useServerPagination - Whether to use server-side pagination (default: true)
+ * 
+ * @example
+ * ```tsx
+ * const {
+ *   products,
+ *   isLoading,
+ *   searchQuery,
+ *   sortBy,
+ *   currentPage,
+ *   totalPages,
+ *   setSearchQuery,
+ *   setSortBy,
+ *   setCurrentPage,
+ * } = useProductsGrid({ itemsPerPage: 12 });
+ * ```
+ */
 export function useProductsGrid({
-  products,
   itemsPerPage = 20,
   initialSort = 'featured',
-}: UseProductsGridOptions) {
+  useServerPagination = true,
+}: UseProductsGridOptions = {}) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>(initialSort);
   const [currentPage, setCurrentPage] = useState(1);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  // Filter products based on search query
-  const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return products;
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1); // Reset to first page on search
+    }, 300);
 
-    const query = searchQuery.toLowerCase();
-    return products.filter((product) => {
-      const nameMatch = product.name.toLowerCase().includes(query);
-      const descriptionMatch = product.description?.toLowerCase().includes(query);
-      return nameMatch || descriptionMatch;
-    });
-  }, [products, searchQuery]);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-  // Sort products
-  const sortedProducts = useMemo(() => {
-    const sorted = [...filteredProducts];
+  // Fetch products from API with pagination
+  const { 
+    data, 
+    isLoading, 
+    error,
+    isFetching 
+  } = useProductsApi({
+    page: currentPage,
+    limit: itemsPerPage,
+    search: debouncedSearch || undefined,
+    sort: sortBy,
+    enabled: useServerPagination,
+  });
 
-    switch (sortBy) {
-      case 'price-low':
-        return sorted.sort((a, b) => {
-          const priceA = a.variants[0]?.priceWithTax || 0;
-          const priceB = b.variants[0]?.priceWithTax || 0;
-          return priceA - priceB;
-        });
-      case 'price-high':
-        return sorted.sort((a, b) => {
-          const priceA = a.variants[0]?.priceWithTax || 0;
-          const priceB = b.variants[0]?.priceWithTax || 0;
-          return priceB - priceA;
-        });
-      case 'name-asc':
-        return sorted.sort((a, b) => a.name.localeCompare(b.name));
-      case 'name-desc':
-        return sorted.sort((a, b) => b.name.localeCompare(a.name));
-      case 'featured':
-      default:
-        return sorted;
-    }
-  }, [filteredProducts, sortBy]);
+  const products = data?.products || [];
+  const pagination = data?.pagination || {
+    page: currentPage,
+    limit: itemsPerPage,
+    totalItems: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPreviousPage: false,
+  };
 
-  // Calculate pagination
-  const totalPages = Math.ceil(sortedProducts.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedProducts = sortedProducts.slice(startIndex, endIndex);
-
-  // Handle page change
-  const handlePageChange = (page: number) => {
+  // Handle page change with smooth scroll
+  const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);
+    
     // Scroll to top of products section
     const element = document.getElementById('products-section');
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const offset = 80; // Account for header
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - offset;
+      
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
     }
-  };
+  }, []);
 
   // Handle search change
-  const handleSearchChange = (query: string) => {
+  const handleSearchChange = useCallback((query: string) => {
     setSearchQuery(query);
-    setCurrentPage(1); // Reset to first page on search
-  };
+  }, []);
 
   // Handle sort change
-  const handleSortChange = (sort: SortOption) => {
+  const handleSortChange = useCallback((sort: SortOption) => {
     setSortBy(sort);
     setCurrentPage(1); // Reset to first page on sort change
-  };
+  }, []);
 
   return {
     // State
@@ -92,9 +113,16 @@ export function useProductsGrid({
     currentPage,
     
     // Data
-    products: paginatedProducts,
-    totalProducts: sortedProducts.length,
-    totalPages,
+    products,
+    totalProducts: pagination.totalItems,
+    totalPages: pagination.totalPages,
+    hasNextPage: pagination.hasNextPage,
+    hasPreviousPage: pagination.hasPreviousPage,
+    
+    // Loading states
+    isLoading,
+    isFetching,
+    error,
     
     // Handlers
     setSearchQuery: handleSearchChange,
@@ -102,4 +130,5 @@ export function useProductsGrid({
     setCurrentPage: handlePageChange,
   };
 }
+
 

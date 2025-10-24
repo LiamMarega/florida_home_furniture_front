@@ -4,7 +4,7 @@ import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
-export type SortOption = 'featured' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc';
+export type SortOption = 'featured' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc' | 'newest';
 
 interface ProductsGridFiltersProps {
   searchQuery: string;
@@ -68,6 +68,7 @@ export function ProductsGridFilters({
             className="px-4 py-3 border border-brand-cream rounded-lg bg-white text-brand-dark-blue font-medium focus:outline-none focus:ring-2 focus:ring-brand-primary min-w-[200px]"
           >
             <option value="featured">Featured</option>
+            <option value="newest">Newest First</option>
             <option value="price-low">Price: Low to High</option>
             <option value="price-high">Price: High to Low</option>
             <option value="name-asc">Name: A-Z</option>

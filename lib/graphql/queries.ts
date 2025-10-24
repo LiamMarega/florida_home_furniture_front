@@ -32,20 +32,46 @@ export const GET_ACTIVE_ORDER = gql`
 
 
 export const GET_ALL_PRODUCTS = gql`
-    query GetAllProducts {
-      products {
-        items {
+  ${PRODUCT_FRAGMENT}
+  query GetAllProducts($options: ProductListOptions) {
+    products(options: $options) {
+      items {
+        ...Product
+      }
+      totalItems
+    }
+  }
+`;
+
+export const GET_PRODUCTS_PAGINATED = gql`
+  ${ASSET_FRAGMENT}
+  ${PRODUCT_VARIANT_FRAGMENT}
+  query GetProductsPaginated($options: ProductListOptions) {
+    products(options: $options) {
+      items {
+        id
+        createdAt
+        updatedAt
+        languageCode
+        name
+        slug
+        description
+        enabled
+        featuredAsset {
+          ...Asset
+        }
+        variants {
+          ...ProductVariant
+        }
+        collections {
           id
           name
           slug
-          featuredAsset {
-            id
-            preview
-          }
         }
-        totalItems
       }
+      totalItems
     }
+  }
 `;
 
 export const ELIGIBLE_SHIPPING_METHODS = /* GraphQL */ `
