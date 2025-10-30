@@ -39,10 +39,34 @@ export async function POST(req: NextRequest) {
       variables: { state: 'ArrangingPayment' } 
     }, { req });
     const tr = t.data?.transitionOrderToState;
-    if (tr?.__typename !== 'Order') {
-      return NextResponse.json({ result: tr, info: 'No se pudo transicionar a ArrangingPayment' }, { status: 409 });
-    }
+  
+   // 2) Transicionar a ArrangingPayment (si corresponde)
+if (order.state === 'AddingItems') {
+  const t = await fetchGraphQL({
+    query: TRANSITION_ORDER_TO_STATE,
+    variables: { state: 'ArrangingPayment' }
+  }, { req });
+
+  const tr = t.data?.transitionOrderToState;
+
+  // 🔍 Verificamos si Vendure devolvió un error benigno
+  if (tr?.__typename === 'Order') {
+    order.state = tr.state;
+  } else if (
+    tr?.__typename === 'OrderStateTransitionError' &&
+    tr.transitionError?.includes('from "ArrangingPayment" to "ArrangingPayment"')
+  ) {
+    // ⚠️ Ya está en el estado correcto, seguimos igual
+    console.log('Orden ya estaba en ArrangingPayment, continuando...');
+  } else {
+    // 🚫 Cualquier otro error, sí lo devolvemos
+    return NextResponse.json({ result: tr, info: 'No se pudo transicionar a ArrangingPayment' }, { status: 409 });
   }
+}
+    // Si llegó bien, actualizamos la orden para seguir el flujo
+    order.state = tr.state;
+  }
+  
 
   // 3) Crear o reutilizar PaymentIntent en Stripe
   const currency = (order.currencyCode || 'USD').toLowerCase(); // Stripe usa lowercase
