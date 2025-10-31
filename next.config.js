@@ -31,10 +31,11 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'images.pexels.com',
       },
+    
+   
       {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '3000',
+        protocol: 'https',
+        hostname: 'vendure-server-production-60d5.up.railway.app',
       },
       // Agregar tu dominio de Vendure cuando esté en producción
       // {
