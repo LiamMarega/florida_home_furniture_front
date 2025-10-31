@@ -14,7 +14,7 @@ export function OrderFilterTabs({
   onFilterChange,
 }: OrderFilterTabsProps) {
   return (
-    <Tabs value={activeFilter} onValueChange={onFilterChange}>
+    <Tabs value={activeFilter} onValueChange={(value) => onFilterChange(value as OrderFilter)}>
       <TabsList className="w-full md:w-auto grid grid-cols-3 md:inline-flex mb-6">
         <TabsTrigger
           value="current"

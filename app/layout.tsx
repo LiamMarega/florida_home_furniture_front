@@ -6,6 +6,10 @@ import { QueryProvider } from '@/lib/query-client';
 import { Toaster } from '@/components/ui/sonner';
 import localFont from 'next/font/local';
 import { ConditionalHeader } from '@/components/conditional-header';
+import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from "@vercel/speed-insights/next"
+
+
 
 const tangoSans = localFont({
   src: [
@@ -112,6 +116,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${creatoDisplay.variable} ${tangoSans.variable} font-creato-display`}>
+      <Analytics />
+      <SpeedInsights />
         <QueryProvider>
           <CartProvider>
             <ConditionalHeader />
