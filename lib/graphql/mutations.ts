@@ -152,6 +152,56 @@ export const ADD_PAYMENT_TO_ORDER = gql`
 
 
 
+export const CREATE_CUSTOMER_ADDRESS = gql`
+  mutation CreateCustomerAddress($input: CreateAddressInput!) {
+    createCustomerAddress(input: $input) {
+      id
+      fullName
+      streetLine1
+      streetLine2
+      city
+      province
+      postalCode
+      country {
+        code
+        name
+      }
+      phoneNumber
+      defaultShippingAddress
+      defaultBillingAddress
+    }
+  }
+`;
+
+export const UPDATE_CUSTOMER_ADDRESS = gql`
+  mutation UpdateCustomerAddress($input: UpdateAddressInput!) {
+    updateCustomerAddress(input: $input) {
+      id
+      fullName
+      streetLine1
+      streetLine2
+      city
+      province
+      postalCode
+      country {
+        code
+        name
+      }
+      phoneNumber
+      defaultShippingAddress
+      defaultBillingAddress
+    }
+  }
+`;
+
+export const DELETE_CUSTOMER_ADDRESS = gql`
+  mutation DeleteCustomerAddress($id: ID!) {
+    deleteCustomerAddress(id: $id) {
+      success
+    }
+  }
+`;
+
 export const LOGOUT = gql`
   mutation Logout {
     logout {

@@ -95,6 +95,58 @@ export const GET_ORDER_BY_CODE = gql`
 
 
 
+export const GET_ACTIVE_CUSTOMER = gql`
+  ${CUSTOMER_FRAGMENT}
+  query GetActiveCustomer {
+    activeCustomer {
+      ...Customer
+    }
+  }
+`;
+
+export const GET_CUSTOMER_ORDERS = gql`
+  query GetCustomerOrders($options: OrderListOptions) {
+    activeCustomer {
+      id
+      orders(options: $options) {
+        items {
+          id
+          code
+          createdAt
+          state
+          active
+          orderPlacedAt
+          currencyCode
+          totalWithTax
+          shippingAddress {
+            fullName
+            streetLine1
+            streetLine2
+            city
+            province
+            postalCode
+            countryCode
+          }
+          lines {
+            id
+            quantity
+            productVariant {
+              id
+              name
+              featuredAsset {
+                preview
+              }
+            }
+            unitPriceWithTax
+            linePriceWithTax
+          }
+        }
+        totalItems
+      }
+    }
+  }
+`;
+
 export const GET_ACTIVE_ORDER_FOR_PAYMENT = gql`
   query GetActiveOrderForPayment {
     activeOrder {

@@ -15,25 +15,14 @@ export default function ConfirmationPage() {
   const paymentIntent = searchParams.get('payment_intent');
   const redirectStatus = searchParams.get('redirect_status');
 
-  const isSuccess = redirectStatus === 'succeeded';
 
-  // ✅ NO limpiamos el carrito aquí
-  // El webhook se encargará de procesar el pago y cambiar el estado de la orden
-  // La orden quedará en estado "PaymentSettled" con todos sus productos
 
-  useEffect(() => {
-    if (isSuccess) {
-      console.log('✅ Payment successful! Order:', orderCode);
-      console.log('🎯 Webhook will process the payment and update order state');
-      console.log('📦 Order items are preserved in Vendure');
-    }
-  }, [isSuccess, orderCode]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white py-12">
-      <div className="max-w-2xl mx-auto px-4">
+    <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white pt-28 pb-12 flex items-center justify-center">
+      <div className="max-w-2xl mx-auto px-4 w-full">
         <Card className="p-8 text-center">
-          {isSuccess ? (
+        
             <>
               <div className="flex justify-center mb-6">
                 <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
@@ -75,27 +64,7 @@ export default function ConfirmationPage() {
                 </div>
               </div>
             </>
-          ) : (
-            <>
-              <div className="flex justify-center mb-6">
-                <div className="w-20 h-20 rounded-full bg-yellow-100 flex items-center justify-center">
-                  <Package className="w-12 h-12 text-yellow-600" />
-                </div>
-              </div>
-
-              <h1 className="text-3xl font-bold text-brand-dark-blue mb-4">
-                Payment Processing
-              </h1>
-
-              <p className="text-lg text-brand-dark-blue/70 mb-8">
-                Your payment is being processed. Please check your email for confirmation.
-              </p>
-
-              <Button asChild size="lg">
-                <Link href="/products">Return to Shop</Link>
-              </Button>
-            </>
-          )}
+          
         </Card>
       </div>
     </div>
