@@ -78,7 +78,7 @@ export function PaymentStep({ clientSecret, onPaid, onBack }: PaymentStepProps) 
 
   return (
     <div className="space-y-4">
-      <PaymentElement />
+      <PaymentElement  />
       {error && <p className="text-red-600 text-sm">{error}</p>}
       <div className="flex gap-3">
         <Button type="button" variant="outline" onClick={onBack}>
