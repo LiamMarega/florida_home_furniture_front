@@ -61,11 +61,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // 🆕 Wrapper mejorado con auto-recovery
   const addItem = async (productVariantId: string, quantity = 1) => {
     try {
-      console.log('🛒 Adding item to cart:', { productVariantId, quantity });
       await addToCartMutation.mutateAsync({ productVariantId, quantity });
-      console.log('✅ Item added successfully');
     } catch (error: any) {
-      console.error('❌ Error adding item to cart:', error);
       
       // 🔄 Si el error es por estado inválido de la orden, intentar recuperar
       if (
@@ -73,16 +70,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         error?.message?.includes('AddingItems') ||
         error?.message?.includes('requiresClearCart')
       ) {
-        console.log('🔄 Order in invalid state, attempting auto-recovery...');
         
         try {
           // Limpiar el carrito
           await clearCartMutation.mutateAsync();
-          console.log('✅ Cart cleared, retrying...');
           
           // Reintentar agregar el producto
           await addToCartMutation.mutateAsync({ productVariantId, quantity });
-          console.log('✅ Item added after recovery');
           
           return; // Éxito después de recovery
         } catch (retryError) {

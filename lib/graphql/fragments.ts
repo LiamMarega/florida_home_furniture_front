@@ -124,74 +124,49 @@ export const PRODUCT_FRAGMENT = gql`
 `;
 
 export const ORDER_LINE_FRAGMENT = gql`
-  ${ASSET_FRAGMENT}
   fragment OrderLine on OrderLine {
     id
-    createdAt
-    updatedAt
+    quantity
+    linePriceWithTax
     productVariant {
       id
       name
       sku
-      price
-      priceWithTax
-      currencyCode
-      stockLevel
       product {
         id
         name
-        slug
         featuredAsset {
-          ...Asset
+          id
+          preview
         }
       }
     }
-    featuredAsset {
-      ...Asset
-    }
-    unitPrice
-    unitPriceWithTax
-    unitPriceChangeSinceAdded
-    unitPriceWithTaxChangeSinceAdded
-    discountedUnitPrice
-    discountedUnitPriceWithTax
-    proratedUnitPrice
-    proratedUnitPriceWithTax
-    quantity
-    orderPlacedQuantity
-    taxRate
-    linePrice
-    linePriceWithTax
-    discountedLinePrice
-    discountedLinePriceWithTax
-    proratedLinePrice
-    proratedLinePriceWithTax
-    lineTax
-    discounts {
-      adjustmentSource
-      type
-      description
-      amount
-      amountWithTax
-    }
-    taxLines {
-      description
-      taxRate
-    }
-    customFields
   }
 `;
 
-export const SEARCH_RESULT_ASSET_FRAGMENT = gql`
-  fragment SearchResultAsset on SearchResultAsset {
+export const ORDER_SUMMARY_FRAGMENT = gql`
+  fragment OrderSummary on Order {
     id
-    preview
-    focalPoint {
-      x
-      y
+    code
+    state
+    active
+    total
+    totalWithTax
+    currencyCode
+    lines {
+      ...OrderLine
+    }
+    shippingWithTax
+    subTotalWithTax
+    discounts {
+      description
+      amountWithTax
+      adjustmentSource
     }
   }
+  ${ORDER_LINE_FRAGMENT}
 `;
+
 
 export const CUSTOMER_FRAGMENT = gql`
   fragment Customer on Customer {
@@ -225,8 +200,8 @@ export const CUSTOMER_FRAGMENT = gql`
   }
 `;
 
-export const ORDER_ADDRESS_FRAGMENT = gql`
-  fragment OrderAddress on OrderAddress {
+export const ADDRESS_FIELDS = gql`
+  fragment AddressFields on OrderAddress {
     fullName
     company
     streetLine1
@@ -234,11 +209,22 @@ export const ORDER_ADDRESS_FRAGMENT = gql`
     city
     province
     postalCode
-    country
     countryCode
     phoneNumber
-    customFields
   }
+`;
+
+export const ORDER_WITH_ADDRESSES = gql`
+  fragment OrderWithAddresses on Order {
+    id
+    code
+    state
+    shippingAddress { ...AddressFields }
+    billingAddress { ...AddressFields }
+    totalWithTax
+    currencyCode
+  }
+  ${ADDRESS_FIELDS}
 `;
 
 export const SHIPPING_LINE_FRAGMENT = gql`
@@ -294,9 +280,10 @@ export const PAYMENT_FRAGMENT = gql`
 export const ORDER_FRAGMENT = gql`
   ${ORDER_LINE_FRAGMENT}
   ${CUSTOMER_FRAGMENT}
-  ${ORDER_ADDRESS_FRAGMENT}
+  ${ADDRESS_FIELDS}
   ${SHIPPING_LINE_FRAGMENT}
   ${PAYMENT_FRAGMENT}
+
   fragment Order on Order {
     id
     createdAt
@@ -306,26 +293,19 @@ export const ORDER_FRAGMENT = gql`
     code
     state
     active
-    customer {
-      ...Customer
-    }
-    shippingAddress {
-      ...OrderAddress
-    }
-    billingAddress {
-      ...OrderAddress
-    }
-    lines {
-      ...OrderLine
-    }
+    customer { ...Customer }
+
+    # ⬇️ Antes: ...OrderAddress (WRONG)
+    shippingAddress { ...AddressFields }
+    billingAddress  { ...AddressFields }
+
+    lines { ...OrderLine }
+
     surcharges {
       id
       description
       sku
-      taxLines {
-        description
-        taxRate
-      }
+      taxLines { description taxRate }
       price
       priceWithTax
       taxRate
@@ -338,44 +318,76 @@ export const ORDER_FRAGMENT = gql`
       amountWithTax
     }
     couponCodes
-    promotions {
-      id
-      name
-      description
-      couponCode
-    }
-    payments {
-      ...Payment
-    }
+    promotions { id name description couponCode }
+    payments { ...Payment }
     fulfillments {
       id
       state
       method
       trackingCode
-      lines {
-        orderLine {
-          id
-        }
-        quantity
-      }
+      lines { orderLine { id } quantity }
     }
     totalQuantity
     subTotal
     subTotalWithTax
     currencyCode
-    shippingLines {
-      ...ShippingLine
-    }
+    shippingLines { ...ShippingLine }
     shipping
     shippingWithTax
     total
     totalWithTax
-    taxSummary {
-      description
-      taxRate
-      taxBase
-      taxTotal
-    }
+    taxSummary { description taxRate taxBase taxTotal }
     customFields
+  }
+`;
+
+
+export const SHIPPING_METHOD_QUOTE = gql`
+  fragment ShippingMethodQuoteFields on ShippingMethodQuote {
+    id
+    price
+    priceWithTax
+    description
+    metadata
+  }
+`;
+
+export const ORDER_PRICING_SUMMARY = gql`
+  fragment OrderPricingSummary on Order {
+    id
+    code
+    state
+    shippingWithTax
+    subTotalWithTax
+    totalWithTax
+    currencyCode
+  }
+`;
+
+export const ORDER_BASIC_FRAGMENT = gql`
+  fragment OrderBasic on Order {
+    id
+    code
+    state
+    totalWithTax
+    currencyCode
+    lines {
+      id
+      quantity
+      linePriceWithTax
+      productVariant {
+        id
+        name
+        sku
+        product {
+          id
+          name
+          featuredAsset {
+            id
+            preview
+          }
+        }
+      }
+    }
   }
 `;

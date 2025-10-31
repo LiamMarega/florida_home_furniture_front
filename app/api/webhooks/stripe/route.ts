@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { gql } from 'graphql-request';
-import { GET_ORDER_BY_CODE, GET_NEXT_ORDER_STATES } from '@/lib/graphql/queries';
+import { GET_ORDER_BY_CODE } from '@/lib/graphql/queries';
 import { TRANSITION_ORDER_TO_STATE, ADD_PAYMENT_TO_ORDER } from '@/lib/graphql/mutations';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY! /* , { apiVersion: '2024-06-20' } */);

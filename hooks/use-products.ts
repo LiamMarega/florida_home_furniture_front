@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { vendureClient } from '@/lib/vendure-client';
 import { GET_ALL_PRODUCTS } from '@/lib/graphql/queries';
+import { fetchGraphQL } from '@/lib/vendure-server';
 
 // Query keys for product operations
 export const productKeys = {
@@ -23,24 +23,9 @@ interface DisplayProduct {
   };
 }
 
-interface ProductsResponse {
-  products: {
-    items: DisplayProduct[];
-  };
-}
 
 // Fetch all products
 async function fetchAllProducts(): Promise<DisplayProduct[]> {
-  const data = await vendureClient.request<ProductsResponse>(GET_ALL_PRODUCTS);
-  return data.products.items || [];
-}
-
-// Hook to get all products
-export function useAllProducts() {
-  return useQuery({
-    queryKey: productKeys.lists(),
-    queryFn: fetchAllProducts,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 2,
-  });
+  const data = await fetchGraphQL({ query: GET_ALL_PRODUCTS });
+  return data.data?.products?.items || [];
 }

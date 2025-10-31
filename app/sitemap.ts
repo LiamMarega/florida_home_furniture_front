@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next';
-import { getAllProducts } from '@/lib/vendure-server';
+import { fetchGraphQL } from '@/lib/vendure-server';
+import { GET_ALL_PRODUCTS } from '@/lib/graphql/queries';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
@@ -28,7 +29,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     // Obtener todos los productos dinámicamente
-    const result = await getAllProducts();
+    const result = await fetchGraphQL({
+      query: GET_ALL_PRODUCTS,
+    });
     const products = result.data?.products?.items || [];
 
     const productPages: MetadataRoute.Sitemap = products.map((product: any) => ({

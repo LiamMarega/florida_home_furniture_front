@@ -1,90 +1,84 @@
-// app/api/cart/add/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
 import { ADD_ITEM_TO_ORDER } from '@/lib/graphql/mutations';
-import { UpdateOrderItemsResult } from '@/lib/types';
+import { ORDER_SUMMARY_FRAGMENT } from '@/lib/graphql/fragments';
+
+const ACTIVE_ORDER_STATE = /* GraphQL */ `
+  query ActiveOrderState {
+    activeOrder {
+      id
+      code
+      state
+    }
+  }
+`;
+
+const TRANSITION_TO_ADDING = /* GraphQL */ `
+  mutation BackToAdding {
+    transitionOrderToState(state: "AddingItems") {
+      __typename
+      ... on Order { id code state }
+      ... on OrderStateTransitionError { errorCode message transitionError fromState toState }
+    }
+  }
+`;
 
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { productVariantId, quantity } = body;
+  const body = await req.json().catch(() => ({}));
+  const { productVariantId, quantity = 1 } = body as {
+    productVariantId: string;
+    quantity?: number;
+  };
 
-    console.log('🛒 Adding to cart:', { productVariantId, quantity });
+  if (!productVariantId || quantity <= 0) {
+    return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
+  }
 
-    if (!productVariantId || !quantity) {
+  // 1) Ver el estado actual
+  const auth = await fetchGraphQL({ query: ACTIVE_ORDER_STATE }, { req });
+  if (auth.errors) {
+    return NextResponse.json({ errors: auth.errors }, { status: 400 });
+  }
+  const state = auth.data?.activeOrder?.state as string | undefined;
+
+  // 2) Si está en ArrangingPayment, intentar volver a AddingItems
+  if (state === 'ArrangingPayment') {
+    const back = await fetchGraphQL({ query: TRANSITION_TO_ADDING }, { req });
+    const t = back.data?.transitionOrderToState;
+    if (t?.__typename !== 'Order') {
+      // No se pudo volver → devolvés info para que el front reintente/cancele pago
       return NextResponse.json(
-        { error: 'Product variant ID and quantity are required' },
-        { status: 400 }
+        { error: 'ORDER_LOCKED_DURING_PAYMENT', detail: t },
+        { status: 409 },
       );
     }
+  }
 
-    const cookieHeader = req.headers.get('cookie');
-    console.log('🍪 Add to cart cookies:', cookieHeader?.substring(0, 80) + '...');
-
-    const response = await fetchGraphQL<{ addItemToOrder: UpdateOrderItemsResult }>({
-      query: ADD_ITEM_TO_ORDER,
-      variables: { 
-        productVariantId, 
-        quantity: parseInt(quantity.toString(), 10),
-      },
-    }, { 
-      req,
-      cookie: cookieHeader || undefined,
-    });
-
-    if (response.errors) {
-      console.error('❌ GraphQL errors:', response.errors);
-      return NextResponse.json(
-        { error: 'Failed to add item to cart', details: response.errors },
-        { status: 500 }
-      );
-    }
-
-    const result = response.data?.addItemToOrder;
-
-    // Handle Vendure error results
-    if (result && 'errorCode' in result) {
-      console.error('❌ Vendure error:', result);
-      return NextResponse.json(
-        { 
-          error: result.message || 'Failed to add item to cart',
-          errorCode: result.errorCode,
-          details: result,
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!result || !('id' in result) || !result.id) {
-      console.error('❌ Invalid response');
-      return NextResponse.json(
-        { error: 'Invalid response from server' },
-        { status: 500 }
-      );
-    }
-
-    console.log('✅ Item added to cart:', { 
-      orderCode: result.code,
-      totalItems: result.totalQuantity,
-    });
-
-    // Create response
-    const nextResponse = NextResponse.json({ order: result });
-
-    // 🍪 CRÍTICO: Forward Set-Cookie headers
-    if (response.setCookies && response.setCookies.length > 0) {
-      console.log('🍪 Forwarding', response.setCookies.length, 'Set-Cookie header(s)');
-      response.setCookies.forEach(cookie => {
-        nextResponse.headers.append('Set-Cookie', cookie);
-      });
-    }
-
-    return nextResponse;
-  } catch (error) {
-    console.error('💥 Error adding to cart:', error);
+  // 3) Si ya está placed (p.ej. PaymentAuthorized / PaymentSettled), bloquear
+  if (state && state !== 'AddingItems' && state !== 'ArrangingPayment') {
     return NextResponse.json(
-      { error: 'Failed to add item to cart', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
+      {
+        error: 'ORDER_ALREADY_PLACED',
+        message:
+          'La orden ya fue confirmada. Creá una nueva orden para agregar items o usa Order Modification en Admin.',
+        state,
+      },
+      { status: 409 },
     );
   }
+
+  // 4) Agregar item
+  const query = `${ORDER_SUMMARY_FRAGMENT}\n${ADD_ITEM_TO_ORDER}`;
+  const result = await fetchGraphQL(
+    { query, variables: { productVariantId, qty: quantity } },
+    { req },
+  );
+
+  if (result.errors) {
+    return NextResponse.json({ errors: result.errors }, { status: 400 });
+  }
+
+  const res = NextResponse.json(result.data);
+  for (const c of result.setCookies ?? []) res.headers.append('Set-Cookie', c);
+  return res;
 }
