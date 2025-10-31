@@ -15,7 +15,7 @@ export function ProfileTabsNavigation({
   onTabChange,
 }: ProfileTabsNavigationProps) {
   return (
-    <Tabs value={activeTab} onValueChange={onTabChange}>
+    <Tabs value={activeTab} onValueChange={(value) => onTabChange(value as ProfileTab)}>
       <TabsList className="w-full md:w-auto grid grid-cols-2 md:inline-flex mb-6">
         <TabsTrigger
           value="addresses"
