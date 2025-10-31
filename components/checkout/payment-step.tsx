@@ -5,10 +5,12 @@ import { PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
 import { Button } from '@/components/ui/button';
 import { CreditCard } from 'lucide-react';
 import { PaymentStepProps } from '@/lib/checkout/types';
+import { useCart } from '@/contexts/cart-context';
 
 export function PaymentStep({ clientSecret, onPaid, onBack }: PaymentStepProps) {
   const stripe = useStripe();
   const elements = useElements();
+  const { clearCart } = useCart();
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,6 +53,15 @@ export function PaymentStep({ clientSecret, onPaid, onBack }: PaymentStepProps) 
         const complete = await completeRes.json();
 
         if (complete.result?.__typename === 'Order') {
+          // Limpiar el carrito usando el contexto después del pago exitoso
+          try {
+            await clearCart();
+            console.log('✅ Cart cleared via context after successful payment');
+          } catch (cartError) {
+            console.warn('⚠️ Failed to clear cart via context, but payment was successful:', cartError);
+            // No bloquear el flujo si falla el clear del carrito
+          }
+          
           onPaid(complete.result.code);
           return;
         }

@@ -1,4 +1,4 @@
-// app/api/checkout/payment-intent/route.ts
+// // app/api/checkout/payment-intent/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { fetchGraphQL } from '@/lib/vendure-server';
@@ -127,13 +127,45 @@ export async function PUT(req: NextRequest) {
   if (addRes.errors) return NextResponse.json({ errors: addRes.errors }, { status: 400 });
 
   const payload = addRes.data?.addPaymentToOrder;
+  
+  // Si el pago se completó exitosamente, limpiar el carrito
+  if (payload?.__typename === 'Order') {
+    try {
+      // Llamar al endpoint de limpiar carrito internamente
+      const clearCartUrl = new URL('/api/cart/clear', req.nextUrl.origin);
+      const clearCartRes = await fetch(clearCartUrl.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Forward cookies del request original para mantener la sesión
+          'Cookie': req.headers.get('cookie') || '',
+        },
+      });
+      
+      if (clearCartRes.ok) {
+        console.log('✅ Cart cleared after successful payment');
+        // Forward cookies del clear cart response
+        const clearCartCookies = clearCartRes.headers.getSetCookie();
+        const res = NextResponse.json({ result: payload, stripeStatus: pi.status });
+        for (const c of addRes.setCookies ?? []) res.headers.append('Set-Cookie', c);
+        for (const c of clearCartCookies) res.headers.append('Set-Cookie', c);
+        return res;
+      } else {
+        console.warn('⚠️ Failed to clear cart after payment, but payment was successful');
+      }
+    } catch (error) {
+      console.error('❌ Error clearing cart after payment:', error);
+      // No fallar el request si el clear falla, el pago ya se completó
+    }
+  }
+  
   const res = NextResponse.json({ result: payload, stripeStatus: pi.status });
   for (const c of addRes.setCookies ?? []) res.headers.append('Set-Cookie', c);
   return res;
 }
 
 
-// // app/api/checkout/payment-intent/route.ts
+// // // app/api/checkout/payment-intent/route.ts
 // import { NextRequest, NextResponse } from 'next/server';
 // import Stripe from 'stripe';
 // import { fetchGraphQL } from '@/lib/vendure-server';
@@ -177,7 +209,7 @@ export async function PUT(req: NextRequest) {
 //     const tr = t.data?.transitionOrderToState;
 
 //     // Verificamos si la transición fue exitosa
-//     if (tr?.__typename === 'Order') {
+//     if (tr?.__typename === 'Order' && order.state === 'AddingItems' ) {
 //       order.state = tr.state;
 //     } else if (
 //       tr?.__typename === 'OrderStateTransitionError' &&
