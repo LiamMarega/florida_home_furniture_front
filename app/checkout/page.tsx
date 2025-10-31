@@ -160,13 +160,11 @@ export default function CheckoutPage() {
                 </form>
               ) : (
                 /* Payment Step */
-                <Elements stripe={stripePromise} >
-                  <PaymentStep
-                    clientSecret={clientSecret!}
-                    onPaid={handlePaid}
-                    onBack={handleBack}
-                  />
-                </Elements>
+                clientSecret && (
+                  <Elements stripe={stripePromise} options={{ clientSecret: clientSecret ?? undefined }}>
+                    <PaymentStep clientSecret={clientSecret} onPaid={handlePaid} onBack={handleBack} />
+                  </Elements>
+                )
               )}
             </Card>
           </div>
