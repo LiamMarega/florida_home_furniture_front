@@ -113,33 +113,105 @@ export const GET_CUSTOMER_ORDERS = gql`
           id
           code
           createdAt
+          updatedAt
           state
           active
           orderPlacedAt
           currencyCode
+          totalQuantity
+          subTotal
+          subTotalWithTax
+          shipping
+          shippingWithTax
+          total
           totalWithTax
           shippingAddress {
             fullName
+            company
             streetLine1
             streetLine2
             city
             province
             postalCode
             countryCode
+            phoneNumber
+          }
+          billingAddress {
+            fullName
+            company
+            streetLine1
+            streetLine2
+            city
+            province
+            postalCode
+            countryCode
+            phoneNumber
           }
           lines {
             id
             quantity
+            linePrice
+            linePriceWithTax
+            unitPrice
+            unitPriceWithTax
+            discountedUnitPrice
+            discountedUnitPriceWithTax
             productVariant {
               id
               name
+              sku
+              product {
+                id
+                name
+                slug
+                featuredAsset {
+                  id
+                  preview
+                  source
+                }
+              }
               featuredAsset {
+                id
                 preview
+                source
               }
             }
-            unitPriceWithTax
-            linePriceWithTax
+            featuredAsset {
+              id
+              preview
+              source
+            }
+            customFields
           }
+          payments {
+            id
+            createdAt
+            method
+            amount
+            state
+            errorMessage
+            metadata
+          }
+          fulfillments {
+            id
+            createdAt
+            updatedAt
+            method
+            trackingCode
+            state
+            lines {
+              orderLine {
+                id
+              }
+              quantity
+            }
+          }
+          discounts {
+            description
+            amount
+            amountWithTax
+          }
+          couponCodes
         }
         totalItems
       }

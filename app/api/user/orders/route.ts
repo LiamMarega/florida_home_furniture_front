@@ -3,6 +3,9 @@ import { fetchGraphQL } from '@/lib/vendure-server';
 import { GET_CUSTOMER_ORDERS } from '@/lib/graphql/queries';
 import { UserOrder, OrderProduct } from '@/app/profile/types';
 
+// Force dynamic rendering for session-based auth
+export const dynamic = 'force-dynamic';
+
 // Map Vendure order state to our status
 function mapOrderState(state: string): UserOrder['status'] {
   const stateMap: Record<string, UserOrder['status']> = {
@@ -19,22 +22,51 @@ function mapOrderState(state: string): UserOrder['status'] {
   return stateMap[state] || 'pending';
 }
 
-// GET - Fetch user orders
+// Transform order products
+function transformOrderProducts(lines: any[]): OrderProduct[] {
+  return (lines || []).map((line) => {
+    const productVariant = line.productVariant || {};
+    const product = productVariant.product || {};
+    const asset = line.featuredAsset || productVariant.featuredAsset || product.featuredAsset;
+    const customFields = line.customFields || {};
+    
+    return {
+      id: line.id,
+      name: product.name || productVariant.name || 'Unknown Product',
+      featuredAsset: asset ? { preview: asset.preview || asset.source } : undefined,
+      quantity: line.quantity,
+      unitPrice: line.discountedUnitPriceWithTax || line.unitPriceWithTax || 0,
+      totalPrice: line.linePriceWithTax || 0,
+      color: customFields.color || 'Silver',
+      size: customFields.size || 'Large',
+    };
+  });
+}
+
+// GET - Fetch user orders (legacy endpoint, redirects logic to /api/orders)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');
+    const limit = searchParams.get('limit') || '50';
+    const page = searchParams.get('page') || '1';
 
     // Build options based on status filter
+    const take = Math.min(parseInt(limit, 10), 100);
+    const currentPage = Math.max(parseInt(page, 10), 1);
+    const skip = (currentPage - 1) * take;
+
     const options: any = {
-      take: 50,
-      skip: 0,
+      take,
+      skip,
+      sort: { createdAt: 'DESC' },
     };
 
     if (status === 'current') {
       // Get active orders (not delivered or cancelled)
       options.filter = {
         active: { eq: true },
+        state: { notIn: ['Delivered', 'Cancelled'] },
       };
     } else if (status === 'unpaid') {
       // Get orders in payment states
@@ -77,30 +109,27 @@ export async function GET(req: NextRequest) {
     }
 
     // Transform Vendure orders to UserOrder format
-    const orders: UserOrder[] = customer.orders.items.map((order: any) => {
-      const products: OrderProduct[] = (order.lines || []).map((line: any) => ({
-        id: line.id,
-        name: line.productVariant?.name || 'Unknown Product',
-        featuredAsset: line.productVariant?.featuredAsset || undefined,
-        quantity: line.quantity,
-        unitPrice: line.unitPriceWithTax / line.quantity,
-        totalPrice: line.linePriceWithTax,
-        color: undefined, // These would come from custom fields if available
-        size: undefined,
-      }));
+    const ordersData = customer.orders;
+    const totalItems = ordersData.totalItems || 0;
+    
+    const orders: UserOrder[] = (ordersData.items || []).map((order: any) => {
+      const products = transformOrderProducts(order.lines || []);
+      const productCount = products.reduce((sum, p) => sum + p.quantity, 0);
 
       const deliveryAddress = order.shippingAddress
         ? [
             order.shippingAddress.streetLine1,
             order.shippingAddress.streetLine2,
-            `${order.shippingAddress.city}, ${order.shippingAddress.province} ${order.shippingAddress.postalCode}`,
+            order.shippingAddress.city,
+            order.shippingAddress.province,
+            order.shippingAddress.postalCode,
             order.shippingAddress.countryCode,
           ]
             .filter(Boolean)
             .join(', ')
         : 'Address not available';
 
-      // Calculate delivery date (typically 5-7 business days after order placed)
+      // Calculate delivery date
       const orderDate = order.orderPlacedAt || order.createdAt;
       const deliveryDate = orderDate
         ? new Date(new Date(orderDate).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
@@ -114,13 +143,21 @@ export async function GET(req: NextRequest) {
         deliveryDate,
         deliveryAddress,
         currency: order.currencyCode || 'USD',
-        totalAmount: order.totalWithTax,
-        productCount: products.reduce((sum, p) => sum + p.quantity, 0),
+        totalAmount: order.totalWithTax || 0,
+        productCount,
         products,
       };
     });
 
-    const response = NextResponse.json({ orders });
+    const response = NextResponse.json({ 
+      orders,
+      pagination: {
+        totalItems,
+        currentPage,
+        totalPages: Math.ceil(totalItems / take),
+        hasNextPage: currentPage < Math.ceil(totalItems / take),
+      },
+    });
     
     if (result.setCookies) {
       result.setCookies.forEach((cookie) => {

@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export function OrdersPanel() {
   const [filter, setFilter] = useState<OrderFilter>('current');
-  const { orders, loading, error } = useOrders(filter);
+  const { orders, loading, error, refetch } = useOrders(filter);
 
   const handleViewDetails = (orderId: string) => {
     // Navigate to order details page
@@ -51,7 +51,7 @@ export function OrdersPanel() {
       <div className="text-center py-12">
         <p className="text-destructive mb-4">{error}</p>
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => refetch()}
           className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90"
         >
           Retry

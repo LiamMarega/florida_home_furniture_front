@@ -28,12 +28,18 @@ export default function ProfilePage() {
 
   const userName = `${profile.firstName} ${profile.lastName}`;
 
+  const handleTabChange = (value: string) => {
+    if (value === 'addresses' || value === 'orders') {
+      setActiveTab(value);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-brand-cream/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
         <UserProfileHeader userName={userName} userEmail={profile.emailAddress} />
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
           <ProfileTabsNavigation activeTab={activeTab} onTabChange={setActiveTab} />
 
           <TabsContent value="addresses" className="mt-0">

@@ -15,6 +15,7 @@ export function AddressesPanel() {
     addresses,
     loading,
     error,
+    fetchAddresses,
     createAddress,
     updateAddress,
     deleteAddress,
@@ -83,7 +84,7 @@ export function AddressesPanel() {
     return (
       <div className="text-center py-12">
         <p className="text-destructive mb-4">{error}</p>
-        <Button onClick={() => window.location.reload()}>Retry</Button>
+        <Button onClick={() => fetchAddresses()}>Retry</Button>
       </div>
     );
   }
