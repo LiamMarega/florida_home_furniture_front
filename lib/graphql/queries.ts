@@ -97,9 +97,116 @@ export const GET_ORDER_BY_CODE = gql`
 
 export const GET_ACTIVE_CUSTOMER = gql`
   ${CUSTOMER_FRAGMENT}
-  query GetActiveCustomer {
+  query GetActiveCustomer($orderOptions: OrderListOptions) {
     activeCustomer {
       ...Customer
+      orders(options: $orderOptions) {
+        items {
+          id
+          code
+          createdAt
+          updatedAt
+          state
+          active
+          orderPlacedAt
+          currencyCode
+          totalQuantity
+          subTotal
+          subTotalWithTax
+          shipping
+          shippingWithTax
+          total
+          totalWithTax
+          shippingAddress {
+            fullName
+            company
+            streetLine1
+            streetLine2
+            city
+            province
+            postalCode
+            countryCode
+            phoneNumber
+          }
+          billingAddress {
+            fullName
+            company
+            streetLine1
+            streetLine2
+            city
+            province
+            postalCode
+            countryCode
+            phoneNumber
+          }
+          lines {
+            id
+            quantity
+            linePrice
+            linePriceWithTax
+            unitPrice
+            unitPriceWithTax
+            discountedUnitPrice
+            discountedUnitPriceWithTax
+            productVariant {
+              id
+              name
+              sku
+              product {
+                id
+                name
+                slug
+                featuredAsset {
+                  id
+                  preview
+                  source
+                }
+              }
+              featuredAsset {
+                id
+                preview
+                source
+              }
+            }
+            featuredAsset {
+              id
+              preview
+              source
+            }
+            customFields
+          }
+          payments {
+            id
+            createdAt
+            method
+            amount
+            state
+            errorMessage
+            metadata
+          }
+          fulfillments {
+            id
+            createdAt
+            updatedAt
+            method
+            trackingCode
+            state
+            lines {
+              orderLine {
+                id
+              }
+              quantity
+            }
+          }
+          discounts {
+            description
+            amount
+            amountWithTax
+          }
+          couponCodes
+        }
+        totalItems
+      }
     }
   }
 `;

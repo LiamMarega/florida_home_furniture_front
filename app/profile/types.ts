@@ -4,6 +4,9 @@ export interface UserProfile {
   firstName: string;
   lastName: string;
   emailAddress: string;
+  addresses?: UserAddress[];
+  orders?: UserOrder[];
+  ordersTotalItems?: number;
 }
 
 export interface UserAddress {
