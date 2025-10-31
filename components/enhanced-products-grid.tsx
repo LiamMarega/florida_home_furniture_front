@@ -1,219 +1,178 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, SlidersHorizontal, Star, ShoppingCart } from 'lucide-react';
-import { vendureClient } from '@/lib/vendure-client';
-import { GET_ALL_PRODUCTS } from '@/lib/graphql/queries';
+import { Loader2 } from 'lucide-react';
 import { staggerContainer, staggerItem } from '@/lib/animations';
 import { useScrollAnimation } from '@/hooks/use-scroll-animation';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { toast } from 'sonner';
-import Image from 'next/image';
-import Link from 'next/link';
+import { useProductsGrid } from '@/hooks/use-products-grid';
+import { ProductCard } from './products/product-card';
+import { ProductsGridFilters } from './products/products-grid-filters';
+import { Pagination } from './products/pagination';
+import { Product } from '@/lib/types';
 
-interface DisplayProduct {
-  id: string;
-  name: string;
-  slug: string;
-  featuredAsset: {
-    id: string;
-    preview: string;
-  };
+interface EnhancedProductsGridProps {
+  // Customization options
+  title?: string;
+  subtitle?: string;
+  itemsPerPage?: number;
+  columnsDesktop?: 2 | 3 | 4 | 5;
+  columnsMobile?: 1 | 2;
+  showSearch?: boolean;
+  showSort?: boolean;
+  showFilters?: boolean;
+  showPagination?: boolean;
+  showQuickAdd?: boolean;
+  imageAspectRatio?: 'square' | 'portrait' | 'landscape';
+  initialSort?: 'featured' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc' | 'newest';
+  className?: string;
 }
 
-export function EnhancedProductsGrid() {
-  const [products, setProducts] = useState<DisplayProduct[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<DisplayProduct[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'featured' | 'price-low' | 'price-high'>('featured');
-  const [isLoaded, setIsLoaded] = useState(false);
+export function EnhancedProductsGrid({
+  title = 'Explore latest collection',
+  subtitle = 'Quality furniture that fits your budget and style',
+  itemsPerPage = 20,
+  columnsDesktop = 4,
+  columnsMobile = 1,
+  showSearch = true,
+  showSort = true,
+  showFilters = true,
+  showPagination = true,
+  showQuickAdd = true,
+  imageAspectRatio = 'square',
+  initialSort = 'featured',
+  className = '',
+}: EnhancedProductsGridProps) {
   const { ref, isVisible } = useScrollAnimation();
+  
+  // Use products grid hook with server-side pagination
+  const {
+    searchQuery,
+    sortBy,
+    currentPage,
+    products: displayedProducts,
+    totalProducts,
+    totalPages,
+    isLoading,
+    isFetching,
+    error,
+    setSearchQuery,
+    setSortBy,
+    setCurrentPage,
+  } = useProductsGrid({
+    itemsPerPage,
+    initialSort,
+    useServerPagination: true,
+  });
 
-  useEffect(() => {
-    async function loadProducts() {
-      try {
-        const data = await vendureClient.request<{ products: { items: DisplayProduct[] } }>(
-          GET_ALL_PRODUCTS
-        );
+  // Grid column classes based on props
+  const gridColsClass = {
+    1: 'grid-cols-1',
+    2: 'grid-cols-2',
+    3: 'grid-cols-3',
+    4: 'grid-cols-4',
+    5: 'grid-cols-5',
+  };
 
-        if (data.products.items) {
-          setProducts(data.products.items);
-          setFilteredProducts(data.products.items);
-          setIsLoaded(true);
-        }
-      } catch (error) {
-        console.error('Error loading products:', error);
-        toast.error('Failed to load products');
-        setIsLoaded(true); // Still set loaded to show error state
-      }
-    }
-
-    loadProducts();
-  }, []);
-
-  // Fallback: ensure products are visible after a delay if intersection observer fails
-  useEffect(() => {
-    if (isLoaded && !isVisible) {
-      const fallbackTimer = setTimeout(() => {
-        // Force visibility after 2 seconds if intersection observer hasn't triggered
-        const element = ref.current;
-        if (element && !isVisible) {
-          // Trigger a re-render by updating a dummy state
-          setSearchQuery(prev => prev);
-        }
-      }, 2000);
-
-      return () => clearTimeout(fallbackTimer);
-    }
-  }, [isLoaded, isVisible, ref]);
-
-  useEffect(() => {
-    let filtered = [...products];
-
-    if (searchQuery) {
-      filtered = filtered.filter((product) =>
-        product.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    // Since we don't have price data, we'll just sort by name for now
-    switch (sortBy) {
-      case 'price-low':
-      case 'price-high':
-        filtered.sort((a, b) => a.name.localeCompare(b.name));
-        break;
-      default:
-        // Keep original order for 'featured'
-        break;
-    }
-
-    setFilteredProducts(filtered);
-  }, [searchQuery, sortBy, products]);
-
+  const gridClassName = `grid ${gridColsClass[columnsMobile]} lg:${gridColsClass[columnsDesktop]} gap-6`;
 
   return (
-    <section id="products-section" ref={ref} className="py-20">
+    <section id="products-section" ref={ref} className={`py-20 ${className}`}>
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
-        <div className="mb-12">
-          <h2 className="text-4xl sm:text-5xl font-bold text-brand-dark-blue mb-6 font-tango-sans">
-            Explore latest collection
-          </h2>
-          <p className="text-lg text-brand-dark-blue/80 mb-8">
-            Quality furniture that fits your budget and style
-          </p>
-
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-dark-blue/60" />
-              <Input
-                type="text"
-                placeholder="Search furniture..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 h-12 text-base border-brand-cream focus:border-brand-primary focus:ring-brand-primary"
-              />
-            </div>
-
-            <div className="flex gap-4">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="px-4 py-3 border border-brand-cream rounded-lg bg-white text-brand-dark-blue font-medium focus:outline-none focus:ring-2 focus:ring-brand-primary"
-              >
-                <option value="featured">Featured</option>
-                <option value="price-low">Price: Low to High</option>
-                <option value="price-high">Price: High to Low</option>
-              </select>
-
-              <Button variant="outline" className="gap-2">
-                <SlidersHorizontal className="w-5 h-5" />
-                Filters
-              </Button>
-            </div>
+        {/* Header */}
+        {(title || subtitle) && (
+          <div className="mb-12">
+            {title && (
+              <h2 className="text-4xl sm:text-5xl font-bold text-brand-dark-blue mb-6 font-tango-sans">
+                {title}
+              </h2>
+            )}
+            {subtitle && (
+              <p className="text-lg text-brand-dark-blue/80 mb-8">
+                {subtitle}
+              </p>
+            )}
           </div>
-        </div>
+        )}
 
-        {!isLoaded ? (
+        {/* Filters */}
+        {(showSearch || showSort || showFilters) && (
+          <ProductsGridFilters
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+            showFiltersButton={showFilters}
+            totalResults={totalProducts}
+          />
+        )}
+
+        {/* Loading State (initial load) */}
+        {isLoading ? (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
             <p className="text-brand-dark-blue/60 text-lg">Loading products...</p>
           </div>
-        ) : filteredProducts.length === 0 ? (
+        ) : error ? (
+          /* Error State */
           <div className="text-center py-12">
-            <p className="text-brand-dark-blue/60 text-lg">No products found matching your criteria.</p>
+            <p className="text-red-600 text-lg mb-4">Failed to load products</p>
+            <p className="text-brand-dark-blue/60">{error instanceof Error ? error.message : 'Unknown error'}</p>
+          </div>
+        ) : displayedProducts.length === 0 ? (
+          /* Empty State */
+          <div className="text-center py-12">
+            <p className="text-brand-dark-blue/60 text-lg">
+              {searchQuery
+                ? 'No products found matching your search.'
+                : 'No products available at this time.'}
+            </p>
           </div>
         ) : (
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            variants={staggerContainer}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-          >
-            {filteredProducts.map((product) => (
-              <motion.div
-                key={product.id}
-                variants={staggerItem}
-                whileHover={{ y: -8, transition: { duration: 0.3 } }}
-                className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-brand transition-all duration-300"
-              >
-                <Link 
-                  href={`/products/${product.slug}`}
-                  className="block"
-                  prefetch={true}
-                >
-                <div className="relative aspect-square overflow-hidden bg-brand-cream">
-                  {product.featuredAsset?.preview ? (
-                  <Image
-                    src={product.featuredAsset?.preview}
-                    alt={product.name}
-                    fill
-                    className="object-cover" 
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-brand-cream rounded-md flex items-center justify-center">
-                       <Image
-                    src={'/images/logos/ISO.png'}
-                    alt={product.name}
-                    width={60}
-                    height={60}
-                    className="object-cover opacity-50" 
-                    />
-                    </div>
-                  )}
+          /* Products Grid */
+          <div className="relative">
+            {/* Fetching Overlay - shown when paginating/filtering but not initial load */}
+            {isFetching && !isLoading && (
+              <div className="absolute inset-0 bg-white/50 backdrop-blur-[2px] z-10 flex items-center justify-center">
+                <div className="flex items-center gap-3 bg-white px-6 py-3 rounded-full shadow-lg">
+                  <Loader2 className="w-5 h-5 animate-spin text-brand-primary" />
+                  <span className="text-brand-dark-blue font-medium">Updating...</span>
                 </div>
+              </div>
+            )}
 
-                  <div className="p-6">
-                    <h3 className="font-bold text-brand-dark-blue text-lg mb-2 line-clamp-1 font-tango-sans">
-                      {product.name}
-                    </h3>
+            <motion.div
+              initial="hidden"
+              animate={isVisible ? "visible" : "hidden"}
+              variants={staggerContainer}
+              className={gridClassName}
+            >
+              {displayedProducts.map((product: Product) => (
+                <motion.div key={product.id} variants={staggerItem}>
+                  <ProductCard
+                    id={product.id}
+                    name={product.name}
+                    slug={product.slug}
+                    featuredAsset={product.featuredAsset}
+                    variants={product.variants}
+                    description={product.description}
+                    showQuickAdd={showQuickAdd}
+                    imageAspectRatio={imageAspectRatio}
+                  />
+                </motion.div>
+              ))}
+            </motion.div>
 
-                    <p className="text-sm text-brand-dark-blue/70 mb-4 line-clamp-2">
-                      Available now - Click to view more details
-                    </p>
-
-                    <div className="flex items-end justify-between">
-                      <div>
-                        <div className="text-lg font-semibold text-brand-dark-blue">
-                          View details
-                        </div>
-                      </div>
-
-                      <Button
-                        size="sm"
-                        className="gap-2"
-                        onClick={(e) => e.preventDefault()}
-                      >
-                        <ShoppingCart className="w-4 h-4" />
-                        View
-                      </Button>
-                    </div>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
-          </motion.div>
+            {/* Pagination */}
+            {showPagination && totalPages > 1 && (
+              <div className="mt-12">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                />
+              </div>
+            )}
+          </div>
         )}
       </div>
     </section>

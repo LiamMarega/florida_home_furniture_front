@@ -1,117 +1,100 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
-import { SET_ORDER_SHIPPING_ADDRESS } from '@/lib/graphql/mutations';
+import {
+  SET_ORDER_SHIPPING_ADDRESS,
+  SET_ORDER_BILLING_ADDRESS,
+} from '@/lib/graphql/mutations';
+import { ORDER_WITH_ADDRESSES } from '@/lib/graphql/fragments';
 
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const {
-      fullName,
-      streetLine1,
-      streetLine2,
-      city,
-      province,
-      postalCode,
-      country,
-      phoneNumber,
-    } = body;
-
-    console.log('📍 Setting shipping address:', { fullName, streetLine1, city, province, postalCode });
-
-    if (!fullName || !streetLine1 || !city || !province || !postalCode) {
-      console.error('❌ Missing required address fields');
-      return NextResponse.json(
-        { error: 'Missing required address fields' },
-        { status: 400 }
-      );
-    }
-
-    console.log('🍪 Request cookies:', req.headers.get('cookie')?.substring(0, 50) + '...');
-
-    const response = await fetchGraphQL({
-      query: SET_ORDER_SHIPPING_ADDRESS,
-      variables: {
-        input: {
-          fullName,
-          streetLine1,
-          streetLine2: streetLine2 || '',
-          city,
-          province,
-          postalCode,
-          countryCode: country || 'US',
-          phoneNumber: phoneNumber || '',
-        },
-      },
-    }, {
-      req // Pass the request to include cookies
-    });
-
-    console.log('📦 Vendure response:', JSON.stringify(response, null, 2));
-
-    // Handle GraphQL-level errors
-    if (response.errors) {
-      console.error('❌ GraphQL errors:', response.errors);
-      return NextResponse.json(
-        { error: 'Failed to set shipping address', details: response.errors },
-        { status: 500 }
-      );
-    }
-
-    const result = response.data?.setOrderShippingAddress;
-
-    // Handle Vendure error results (check both __typename and errorCode)
-    if (result?.__typename && result.__typename !== 'Order') {
-      console.error('❌ ErrorResult by __typename:', result);
-      return NextResponse.json(
-        { 
-          error: result.message || 'Failed to set shipping address',
-          errorCode: result.errorCode,
-          details: result
-        },
-        { status: 400 }
-      );
-    }
-
-    if (result?.errorCode) {
-      console.error('❌ ErrorResult by errorCode:', result);
-      return NextResponse.json(
-        { 
-          error: result.message || 'Failed to set shipping address',
-          errorCode: result.errorCode,
-          details: result
-        },
-        { status: 400 }
-      );
-    }
-
-    // Verify we have a valid order
-    if (!result || !result.id) {
-      console.error('❌ Invalid response: No order returned');
-      return NextResponse.json(
-        { error: 'Invalid response from server' },
-        { status: 500 }
-      );
-    }
-
-    console.log('✅ Shipping address set successfully');
-    
-    // Create response with data
-    const nextResponse = NextResponse.json({ order: result });
-
-    // Forward Set-Cookie headers from Vendure if present
-    if (response.setCookies && response.setCookies.length > 0) {
-      response.setCookies.forEach(cookie => {
-        nextResponse.headers.append('Set-Cookie', cookie);
-      });
-    }
-
-    return nextResponse;
-  } catch (error) {
-    console.error('💥 Error setting shipping address:', error);
-    return NextResponse.json(
-      { error: 'Failed to set shipping address', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
+function normalizeAddressBody(raw: any) {
+  if (raw?.shipping?.streetLine1) return raw;
+  const shipping = {
+    fullName: raw.shippingFullName ?? raw.fullName,
+    streetLine1: raw.shippingStreetLine1,
+    streetLine2: raw.shippingStreetLine2,
+    city: raw.shippingCity,
+    province: raw.shippingProvince,
+    postalCode: raw.shippingPostalCode,
+    countryCode: raw.shippingCountry,
+    phoneNumber: raw.shippingPhoneNumber,
+  };
+  const billingSameAsShipping =
+    typeof raw.billingSameAsShipping === 'boolean' ? raw.billingSameAsShipping : true;
+  const billing = raw.billingStreetLine1
+    ? {
+        fullName: raw.billingFullName ?? raw.fullName,
+        streetLine1: raw.billingStreetLine1,
+        streetLine2: raw.billingStreetLine2,
+        city: raw.billingCity,
+        province: raw.billingProvince,
+        postalCode: raw.billingPostalCode,
+        countryCode: raw.billingCountry,
+        phoneNumber: raw.billingPhoneNumber,
+      }
+    : undefined;
+  return { shipping, billingSameAsShipping, billing };
 }
 
+export async function POST(req: NextRequest) {
+  const raw = await req.json().catch(() => ({} as any));
+  const body = normalizeAddressBody(raw);
+
+  // Validación mínima
+  if (!body?.shipping?.streetLine1) {
+    return NextResponse.json({ error: 'Missing shipping.streetLine1' }, { status: 400 });
+  }
+
+  const shippingQuery = `${ORDER_WITH_ADDRESSES}\n${SET_ORDER_SHIPPING_ADDRESS}`;
+  const billingQuery  = `${ORDER_WITH_ADDRESSES}\n${SET_ORDER_BILLING_ADDRESS}`;
+
+  // 1) Shipping
+  const shipResult = await fetchGraphQL(
+    { query: shippingQuery, variables: { input: body.shipping } },
+    { req }
+  );
+  if (shipResult.errors) {
+    return NextResponse.json({ errors: shipResult.errors }, { status: 400 });
+  }
+  const shippingPayload = shipResult.data?.setOrderShippingAddress;
+  if (shippingPayload?.__typename !== 'Order') {
+    const res = NextResponse.json({ result: shippingPayload });
+    for (const c of shipResult.setCookies ?? []) res.headers.append('Set-Cookie', c);
+    return res; // p.ej. NoActiveOrderError
+  }
+
+  // 2) Billing
+  const billingSame = body.billingSameAsShipping ?? true;
+  let finalPayload = shippingPayload;
+
+  if (billingSame) {
+    const billResult = await fetchGraphQL(
+      { query: billingQuery, variables: { input: body.shipping } },
+      { req }
+    );
+    if (billResult.errors) {
+      return NextResponse.json({ errors: billResult.errors }, { status: 400 });
+    }
+    finalPayload = billResult.data?.setOrderBillingAddress ?? finalPayload;
+    const res = NextResponse.json({ result: finalPayload });
+    for (const c of shipResult.setCookies ?? []) res.headers.append('Set-Cookie', c);
+    for (const c of billResult.setCookies ?? []) res.headers.append('Set-Cookie', c);
+    return res;
+  } else if (body.billing?.streetLine1) {
+    const billResult = await fetchGraphQL(
+      { query: billingQuery, variables: { input: body.billing } },
+      { req }
+    );
+    if (billResult.errors) {
+      return NextResponse.json({ errors: billResult.errors }, { status: 400 });
+    }
+    finalPayload = billResult.data?.setOrderBillingAddress ?? finalPayload;
+    const res = NextResponse.json({ result: finalPayload });
+    for (const c of shipResult.setCookies ?? []) res.headers.append('Set-Cookie', c);
+    for (const c of billResult.setCookies ?? []) res.headers.append('Set-Cookie', c);
+    return res;
+  }
+
+  const res = NextResponse.json({ result: finalPayload });
+  for (const c of shipResult.setCookies ?? []) res.headers.append('Set-Cookie', c);
+  return res;
+}

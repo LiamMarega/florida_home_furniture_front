@@ -1,168 +1,302 @@
-// app/api/checkout/payment-intent/route.ts
+// // app/api/checkout/payment-intent/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
 import { fetchGraphQL } from '@/lib/vendure-server';
-import { CREATE_PAYMENT_INTENT } from '@/lib/graphql/mutations';
-import { GET_ACTIVE_ORDER } from '@/lib/graphql/queries';
+import {
+  GET_ACTIVE_ORDER_FOR_PAYMENT,
+  ADD_PAYMENT_TO_ORDER,
+} from '@/lib/graphql/queries';
+import { TRANSITION_ORDER_TO_STATE } from '@/lib/graphql/mutations';
 
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  // apiVersion: '2024-06-20',
+});
+
+type CreateBody = { reusePaymentIntentId?: string };
+type CompleteBody = { paymentIntentId: string };
+
+function bad(msg: string, status = 400) {
+  return NextResponse.json({ error: msg }, { status });
+}
+
+/**
+ * POST -> Crea (o reutiliza) un PaymentIntent de Stripe para la Active Order y
+ *         transiciona la orden a ArrangingPayment.
+ * Body (opcional):
+ *   { reusePaymentIntentId?: string }  // para reintentos
+ */
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const orderCode = body.orderCode || body.code;
-    const forceNew = body.forceNew;
-    const timestamp = body.timestamp;
+  // 1) Obtener Active Order
+  const orderRes = await fetchGraphQL({ query: GET_ACTIVE_ORDER_FOR_PAYMENT }, { req });
+  if (orderRes.errors) return NextResponse.json({ errors: orderRes.errors }, { status: 400 });
+  const order = orderRes.data?.activeOrder;
+  if (!order) return bad('NoActiveOrder: agrega items al carrito antes de pagar.', 409);
 
-    console.log('📝 Creating payment intent for order:', orderCode);
-    console.log('🔄 Request details:', { forceNew, timestamp, orderCode });
-
-    if (!orderCode) {
-      return NextResponse.json({ 
-        error: 'Order code is required',
-        details: 'Please provide an order code'
-      }, { status: 400 });
-    }
-
-    // First, verify the order is ready for payment
-    const orderCheck = await fetchGraphQL({
-      query: GET_ACTIVE_ORDER,
+  // 2) Transicionar a ArrangingPayment (si NO está ya en ese estado)
+  if (order.state !== 'ArrangingPayment') {
+    const t = await fetchGraphQL({
+      query: TRANSITION_ORDER_TO_STATE,
+      variables: { state: 'ArrangingPayment' }
     }, { req });
 
-    console.log('🔍 Order check:', JSON.stringify(orderCheck, null, 2));
+    const tr = t.data?.transitionOrderToState;
 
-    const order = orderCheck.data?.activeOrder;
-
-    if (!order) {
-      return NextResponse.json({ 
-        error: 'No active order found',
-        details: 'Please add items to cart first'
-      }, { status: 400 });
-    }
-
-    // Validate order code matches
-    if (order.code !== orderCode) {
-      console.warn('⚠️ Order code mismatch:', { provided: orderCode, actual: order.code });
-    }
-
-    // Validate order has required data
-    const missingFields = [];
-    if (!order.customer?.emailAddress) missingFields.push('customer email');
-    if (!order.shippingAddress?.streetLine1) missingFields.push('shipping address');
-    if (!order.shippingLines || order.shippingLines.length === 0) missingFields.push('shipping method');
-
-    if (missingFields.length > 0) {
-      console.error('❌ Order incomplete:', missingFields);
-      return NextResponse.json({ 
-        error: 'Order incomplete',
-        details: `Missing required fields: ${missingFields.join(', ')}`,
-        order: {
-          hasCustomer: !!order.customer,
-          hasShippingAddress: !!order.shippingAddress,
-          hasShippingMethod: order.shippingLines?.length > 0,
-        }
-      }, { status: 400 });
-    }
-
-    // Check if order already has payments
-    if (order.payments && order.payments.length > 0) {
-      const lastPayment = order.payments[order.payments.length - 1];
-      const paymentState = lastPayment.state?.toLowerCase();
-      
-      console.log('🔍 Existing payment found:', {
-        state: paymentState,
-        amount: lastPayment.amount,
-        method: lastPayment.method
-      });
-
-      // If payment is already successful, don't create a new intent
-      if (paymentState === 'settled' || paymentState === 'succeeded') {
+    // Verificamos si la transición fue exitosa
+    if (tr?.__typename === 'Order') {
+      order.state = tr.state;
+    } else if (tr?.__typename === 'OrderStateTransitionError') {
+      // Solo rechazamos si es un error real (no el caso benigno de ya estar en el estado)
+      if (!tr.transitionError?.includes('from "ArrangingPayment" to "ArrangingPayment"')) {
         return NextResponse.json({ 
-          error: 'Payment already completed',
-          details: 'This order has already been paid for',
-          paymentState: paymentState
-        }, { status: 400 });
+          result: tr, 
+          info: 'No se pudo transicionar a ArrangingPayment' 
+        }, { status: 409 });
       }
-
-      // If payment failed or was cancelled, we can create a new intent
-      if (paymentState === 'failed' || paymentState === 'declined' || paymentState === 'cancelled') {
-        console.log('🔄 Previous payment failed, creating new payment intent...');
-      }
+      // Si es el error benigno, continuamos
+      console.log('Orden ya estaba en ArrangingPayment, continuando...');
+      order.state = 'ArrangingPayment';
     }
-
-    console.log('✅ Order validation passed, creating payment intent...');
-    console.log('📋 Order details:', {
-      code: order.code,
-      customer: order.customer?.emailAddress,
-      total: order.totalWithTax,
-      currency: order.currencyCode,
-      existingPayments: order.payments?.length || 0
-    });
-
-    // The mutation uses the active order from the session, no orderCode needed
-    const response = await fetchGraphQL({
-      query: CREATE_PAYMENT_INTENT,
-    }, {
-      req // Pass the request to include cookies
-    });
-
-    console.log('📦 Vendure response:', JSON.stringify(response, null, 2));
-
-    // Handle GraphQL-level errors
-    if (response.errors && response.errors.length > 0) {
-      console.error('❌ GraphQL errors:', response.errors);
-      return NextResponse.json({ 
-        error: 'GraphQL error', 
-        details: response.errors 
-      }, { status: 500 });
-    }
-
-    const result = response.data?.createStripePaymentIntent;
-
-    // Handle Vendure error results
-    if (result && typeof result === 'object' && 'errorCode' in result) {
-      console.error('❌ ErrorResult by errorCode:', result);
-      return NextResponse.json(
-        { 
-          error: result.message || 'Failed to create payment intent',
-          errorCode: result.errorCode,
-          details: result
-        },
-        { status: 400 }
-      );
-    }
-
-    // Check if we have a valid client secret (should be a string)
-    if (!result || typeof result !== 'string') {
-      console.error('❌ No valid client secret returned. Full response:', response);
-      return NextResponse.json({ 
-        error: 'Failed to create payment intent',
-        details: 'No client secret returned from Vendure. Check if StripePlugin is configured and order is in correct state.',
-        response: response
-      }, { status: 500 });
-    }
-
-    console.log('✅ Payment intent created successfully');
-    console.log('🔑 Client secret length:', result.length);
-    console.log('🔑 Client secret preview:', result.substring(0, 20) + '...');
-    
-    // Extract PaymentIntent ID from client secret for debugging
-    const paymentIntentId = result.split('_secret_')[0];
-    console.log('🆔 PaymentIntent ID:', paymentIntentId);
-    
-    // Create response with data
-    const nextResponse = NextResponse.json({ clientSecret: result });
-
-    // Forward Set-Cookie headers from Vendure if present
-    if (response.setCookies && response.setCookies.length > 0) {
-      response.setCookies.forEach(cookie => {
-        nextResponse.headers.append('Set-Cookie', cookie);
-      });
-    }
-
-    return nextResponse;
-  } catch (error) {
-    console.error('💥 Error creating payment intent:', error);
-    return NextResponse.json({ 
-      error: 'Server error', 
-      details: error instanceof Error ? error.message : 'Unknown error' 
-    }, { status: 500 });
   }
+
+  // 3) Crear o reutilizar PaymentIntent en Stripe
+  const currency = (order.currencyCode || 'USD').toLowerCase();
+  const amount = order.totalWithTax as number;
+
+  const body = (await req.json().catch(() => ({}))) as CreateBody;
+  let pi: Stripe.PaymentIntent;
+
+  if (body?.reusePaymentIntentId) {
+    // Reutilizar PI (p.ej. requiere 3DS o reintento)
+    pi = await stripe.paymentIntents.retrieve(body.reusePaymentIntentId);
+    // Si el monto cambió, actualizar
+    if (pi.amount !== amount || pi.currency !== currency) {
+      pi = await stripe.paymentIntents.update(pi.id, { amount, currency });
+    }
+  } else {
+    // Crear PI nuevo
+    pi = await stripe.paymentIntents.create({
+      amount,
+      currency,
+      automatic_payment_methods: { enabled: true },
+      receipt_email: order.customer?.emailAddress ?? undefined,
+      metadata: {
+        vendureOrderId: order.id,
+        vendureOrderCode: order.code,
+      },
+    });
+  }
+
+  // 4) Responder con clientSecret
+  const res = NextResponse.json({
+    paymentIntentId: pi.id,
+    clientSecret: pi.client_secret,
+    amount: pi.amount,
+    currency: pi.currency,
+    orderCode: order.code,
+  });
+  for (const c of orderRes.setCookies ?? []) res.headers.append('Set-Cookie', c);
+  return res;
 }
+
+/**
+ * PUT -> Completa el checkout en Vendure registrando el pago
+ *        (después de confirmar el PaymentIntent en el front con Stripe.js).
+ * Body: { paymentIntentId: string }
+ */
+export async function PUT(req: NextRequest) {
+  const body = (await req.json().catch(() => ({}))) as CompleteBody;
+  if (!body.paymentIntentId) return bad('Missing paymentIntentId');
+
+  // Validar que el PI está en estado correcto
+  const pi = await stripe.paymentIntents.retrieve(body.paymentIntentId);
+
+  // 1) Registrar el pago en Vendure: addPaymentToOrder
+  const addRes = await fetchGraphQL(
+    {
+      query: ADD_PAYMENT_TO_ORDER,
+      variables: {
+        input: {
+          method: 'stripe-payment',
+          metadata: { paymentIntentId: body.paymentIntentId },
+        },
+      },
+    },
+    { req }
+  );
+
+  if (addRes.errors) return NextResponse.json({ errors: addRes.errors }, { status: 400 });
+
+  const payload = addRes.data?.addPaymentToOrder;
+  
+  // Si el pago se completó exitosamente, limpiar el carrito
+  if (payload?.__typename === 'Order') {
+    try {
+      // Llamar al endpoint de limpiar carrito internamente
+      const clearCartUrl = new URL('/api/cart/clear', req.nextUrl.origin);
+      const clearCartRes = await fetch(clearCartUrl.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Forward cookies del request original para mantener la sesión
+          'Cookie': req.headers.get('cookie') || '',
+        },
+      });
+      
+      if (clearCartRes.ok) {
+        console.log('✅ Cart cleared after successful payment');
+        // Forward cookies del clear cart response
+        const clearCartCookies = clearCartRes.headers.getSetCookie();
+        const res = NextResponse.json({ result: payload, stripeStatus: pi.status });
+        for (const c of addRes.setCookies ?? []) res.headers.append('Set-Cookie', c);
+        for (const c of clearCartCookies) res.headers.append('Set-Cookie', c);
+        return res;
+      } else {
+        console.warn('⚠️ Failed to clear cart after payment, but payment was successful');
+      }
+    } catch (error) {
+      console.error('❌ Error clearing cart after payment:', error);
+      // No fallar el request si el clear falla, el pago ya se completó
+    }
+  }
+  
+  const res = NextResponse.json({ result: payload, stripeStatus: pi.status });
+  for (const c of addRes.setCookies ?? []) res.headers.append('Set-Cookie', c);
+  return res;
+}
+
+
+// // // app/api/checkout/payment-intent/route.ts
+// import { NextRequest, NextResponse } from 'next/server';
+// import Stripe from 'stripe';
+// import { fetchGraphQL } from '@/lib/vendure-server';
+// import {
+//   GET_ACTIVE_ORDER_FOR_PAYMENT,
+//   ADD_PAYMENT_TO_ORDER,
+// } from '@/lib/graphql/queries';
+// import { TRANSITION_ORDER_TO_STATE } from '@/lib/graphql/mutations';
+
+// const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+//   // apiVersion: '2024-06-20',
+// });
+
+// type CreateBody = { reusePaymentIntentId?: string };
+// type CompleteBody = { paymentIntentId: string };
+
+// function bad(msg: string, status = 400) {
+//   return NextResponse.json({ error: msg }, { status });
+// }
+
+// /**
+//  * POST -> Crea (o reutiliza) un PaymentIntent de Stripe para la Active Order y
+//  *         transiciona la orden a ArrangingPayment.
+//  * Body (opcional):
+//  *   { reusePaymentIntentId?: string }  // para reintentos
+//  */
+// export async function POST(req: NextRequest) {
+//   // 1) Obtener Active Order
+//   const orderRes = await fetchGraphQL({ query: GET_ACTIVE_ORDER_FOR_PAYMENT }, { req });
+//   if (orderRes.errors) return NextResponse.json({ errors: orderRes.errors }, { status: 400 });
+//   const order = orderRes.data?.activeOrder;
+//   if (!order) return bad('NoActiveOrder: agrega items al carrito antes de pagar.', 409);
+
+//   // 2) Transicionar a ArrangingPayment (si NO está ya en ese estado)
+//   if (order.state !== 'ArrangingPayment') {
+//     const t = await fetchGraphQL({
+//       query: TRANSITION_ORDER_TO_STATE,
+//       variables: { state: 'ArrangingPayment' }
+//     }, { req });
+
+//     const tr = t.data?.transitionOrderToState;
+
+//     // Verificamos si la transición fue exitosa
+//     if (tr?.__typename === 'Order' && order.state === 'AddingItems' ) {
+//       order.state = tr.state;
+//     } else if (
+//       tr?.__typename === 'OrderStateTransitionError' &&
+//       tr.transitionError?.includes('from "ArrangingPayment" to "ArrangingPayment"')
+//     ) {
+//       // Ya está en el estado correcto (race condition), continuamos
+//       console.log('Orden ya estaba en ArrangingPayment, continuando...');
+//       order.state = 'ArrangingPayment';
+//     } else {
+//       // Cualquier otro error de transición
+//       return NextResponse.json({ 
+//         result: tr, 
+//         info: 'No se pudo transicionar a ArrangingPayment' 
+//       }, { status: 409 });
+//     }
+//   }
+
+//   // 3) Crear o reutilizar PaymentIntent en Stripe
+//   const currency = (order.currencyCode || 'USD').toLowerCase();
+//   const amount = order.totalWithTax as number;
+
+//   const body = (await req.json().catch(() => ({}))) as CreateBody;
+//   let pi: Stripe.PaymentIntent;
+
+//   if (body?.reusePaymentIntentId) {
+//     // Reutilizar PI (p.ej. requiere 3DS o reintento)
+//     pi = await stripe.paymentIntents.retrieve(body.reusePaymentIntentId);
+//     // Si el monto cambió, actualizar
+//     if (pi.amount !== amount || pi.currency !== currency) {
+//       pi = await stripe.paymentIntents.update(pi.id, { amount, currency });
+//     }
+//   } else {
+//     // Crear PI nuevo
+//     pi = await stripe.paymentIntents.create({
+//       amount,
+//       currency,
+//       automatic_payment_methods: { enabled: true },
+//       receipt_email: order.customer?.emailAddress ?? undefined,
+//       metadata: {
+//         vendureOrderId: order.id,
+//         vendureOrderCode: order.code,
+//       },
+//     });
+//   }
+
+//   // 4) Responder con clientSecret
+//   const res = NextResponse.json({
+//     paymentIntentId: pi.id,
+//     clientSecret: pi.client_secret,
+//     amount: pi.amount,
+//     currency: pi.currency,
+//     orderCode: order.code,
+//   });
+//   for (const c of orderRes.setCookies ?? []) res.headers.append('Set-Cookie', c);
+//   return res;
+// }
+
+// /**
+//  * PUT -> Completa el checkout en Vendure registrando el pago
+//  *        (después de confirmar el PaymentIntent en el front con Stripe.js).
+//  * Body: { paymentIntentId: string }
+//  */
+// export async function PUT(req: NextRequest) {
+//   const body = (await req.json().catch(() => ({}))) as CompleteBody;
+//   if (!body.paymentIntentId) return bad('Missing paymentIntentId');
+
+//   // Validar que el PI está en estado correcto
+//   const pi = await stripe.paymentIntents.retrieve(body.paymentIntentId);
+
+//   // 1) Registrar el pago en Vendure: addPaymentToOrder
+//   const addRes = await fetchGraphQL(
+//     {
+//       query: ADD_PAYMENT_TO_ORDER,
+//       variables: {
+//         input: {
+//           method: 'stripe-payment',
+//           metadata: { paymentIntentId: body.paymentIntentId },
+//         },
+//       },
+//     },
+//     { req }
+//   );
+
+//   if (addRes.errors) return NextResponse.json({ errors: addRes.errors }, { status: 400 });
+
+//   const payload = addRes.data?.addPaymentToOrder;
+//   const res = NextResponse.json({ result: payload, stripeStatus: pi.status });
+//   for (const c of addRes.setCookies ?? []) res.headers.append('Set-Cookie', c);
+//   return res;
+// }

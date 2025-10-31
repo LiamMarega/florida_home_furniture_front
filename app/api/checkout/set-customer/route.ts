@@ -1,185 +1,69 @@
+// app/api/checkout/set-customer/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
 import { SET_CUSTOMER_FOR_ORDER } from '@/lib/graphql/mutations';
-import { GET_ACTIVE_ORDER, GET_ACTIVE_CUSTOMER } from '@/lib/graphql/queries';
+
+const AUTH_STATE = /* GraphQL */ `
+  query AuthState {
+    me { id identifier }
+    activeCustomer { id firstName lastName emailAddress }
+    activeOrder { id code state customer { id emailAddress } }
+  }
+`;
 
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { firstName, lastName, emailAddress } = body;
+  console.log('[set-customer] POST request received');
+  const raw = await req.json().catch(() => ({}));
+  console.log('[set-customer] Raw body parsed:', raw);
 
-    console.log('👤 Setting customer:', { firstName, lastName, emailAddress });
+  const input = {
+    firstName: raw.firstName?.trim(),
+    lastName: raw.lastName?.trim(),
+    emailAddress: raw.emailAddress?.trim(),
+    phoneNumber: raw.phoneNumber?.trim() || undefined,
+  };
+  console.log('[set-customer] Constructed input:', input);
 
-    if (!emailAddress) {
-      console.error('❌ Email address is required');
-      return NextResponse.json(
-        { error: 'Email address is required' },
-        { status: 400 }
-      );
-    }
+  // 1) Chequear si hay sesión autenticada (y tolerar FORBIDDEN en `me`)
+  console.log('[set-customer] Checking authentication state');
+  const auth = await fetchGraphQL({ query: AUTH_STATE }, { req });
+  console.log('[set-customer] Auth response:', JSON.stringify(auth, null, 2));
 
-    console.log('🍪 Request cookies:', req.headers.get('cookie')?.substring(0, 50) + '...');
+  const meForbiddenOnly =
+    auth.errors?.length &&
+    auth.errors.every(e => e.extensions?.code === 'FORBIDDEN' && e.path?.[0] === 'me');
 
-    // First, check if there's an active customer (user logged in)
-    console.log('🔍 Checking if user is already authenticated...');
-    const activeCustomerCheck = await fetchGraphQL({
-      query: GET_ACTIVE_CUSTOMER,
-    }, { req });
-
-    console.log('🔍 Active customer check response:', JSON.stringify(activeCustomerCheck, null, 2));
-
-    const activeCustomer = activeCustomerCheck.data?.activeCustomer;
-    
-    // Check the active order
-    const activeOrderCheck = await fetchGraphQL({
-      query: GET_ACTIVE_ORDER,
-    }, { req });
-
-    const activeOrder = activeOrderCheck.data?.activeOrder;
-    console.log('🔍 Active order:', activeOrder?.id);
-    console.log('🔍 Active order customer:', activeOrder?.customer);
-    
-    // If user is already logged in, skip setCustomerForOrder (it's only for guest checkout)
-    if (activeCustomer?.id) {
-      console.log('✅ User already logged in - skipping setCustomerForOrder');
-      console.log('👤 Current customer:', { 
-        id: activeCustomer.id, 
-        email: activeCustomer.emailAddress 
-      });
-      
-      // Return the active order with the logged-in customer
-      return NextResponse.json({ 
-        order: activeOrder,
-        message: 'User already authenticated',
-        customer: activeCustomer,
-        alreadyLoggedIn: true
-      });
-    }
-    
-    // If order already has a customer (guest checkout was completed), return it
-    if (activeOrder?.customer?.id) {
-      console.log('✅ Order already has customer assigned');
-      console.log('👤 Current customer:', { 
-        id: activeOrder.customer.id, 
-        email: activeOrder.customer.emailAddress 
-      });
-      return NextResponse.json({ 
-        order: activeOrder,
-        message: 'Customer already assigned to order',
-        customer: activeOrder.customer,
-        alreadyLoggedIn: false
-      });
-    }
-
-    console.log('👤 No existing customer found, proceeding with customer setup...');
-
-    const response = await fetchGraphQL({
-      query: SET_CUSTOMER_FOR_ORDER,
-      variables: {
-        input: {
-          firstName: firstName || '',
-          lastName: lastName || '',
-          emailAddress,
-        },
-      },
-    }, {
-      req // Pass the request to include cookies
-    });
-
-    console.log('📦 Vendure response:', JSON.stringify(response, null, 2));
-
-    // Handle GraphQL-level errors
-    if (response.errors) {
-      console.error('❌ GraphQL errors:', response.errors);
-      return NextResponse.json(
-        { error: 'Failed to set customer', details: response.errors },
-        { status: 500 }
-      );
-    }
-
-    const result = response.data?.setCustomerForOrder;
-
-    // Handle ALREADY_LOGGED_IN_ERROR (shouldn't happen now since we check earlier, but just in case)
-    if (result?.errorCode === 'ALREADY_LOGGED_IN_ERROR') {
-      console.log('⚠️ ALREADY_LOGGED_IN_ERROR received (this should have been caught earlier)');
-      
-      // Get the current active order and customer
-      const currentOrderCheck = await fetchGraphQL({
-        query: GET_ACTIVE_ORDER,
-      }, { req });
-      
-      const currentCustomerCheck = await fetchGraphQL({
-        query: GET_ACTIVE_CUSTOMER,
-      }, { req });
-      
-      const currentOrder = currentOrderCheck.data?.activeOrder;
-      const currentCustomer = currentCustomerCheck.data?.activeCustomer;
-      
-      console.log('📦 Current order:', currentOrder?.id);
-      console.log('👤 Current customer:', currentCustomer?.emailAddress);
-      
-      // Return success with the current state
-      return NextResponse.json({ 
-        order: currentOrder,
-        message: 'User already authenticated',
-        customer: currentCustomer || currentOrder?.customer,
-        alreadyLoggedIn: true
-      });
-    }
-
-    // Handle Vendure error results (check both __typename and errorCode)
-    if (result?.__typename && result.__typename !== 'Order') {
-      console.error('❌ ErrorResult by __typename:', result);
-      return NextResponse.json(
-        { 
-          error: result.message || 'Failed to set customer',
-          errorCode: result.errorCode,
-          details: result
-        },
-        { status: 400 }
-      );
-    }
-
-    if (result?.errorCode) {
-      console.error('❌ ErrorResult by errorCode:', result);
-      return NextResponse.json(
-        { 
-          error: result.message || 'Failed to set customer',
-          errorCode: result.errorCode,
-          details: result
-        },
-        { status: 400 }
-      );
-    }
-
-    // Verify we have a valid order
-    if (!result || !result.id) {
-      console.error('❌ Invalid response: No order returned');
-      return NextResponse.json(
-        { error: 'Invalid response from server' },
-        { status: 500 }
-      );
-    }
-
-    console.log('✅ Customer set successfully');
-    
-    // Create response with data
-    const nextResponse = NextResponse.json({ order: result });
-
-    // Forward Set-Cookie headers from Vendure if present
-    if (response.setCookies && response.setCookies.length > 0) {
-      response.setCookies.forEach(cookie => {
-        nextResponse.headers.append('Set-Cookie', cookie);
-      });
-    }
-
-    return nextResponse;
-  } catch (error) {
-    console.error('💥 Error setting customer:', error);
-    return NextResponse.json(
-      { error: 'Failed to set customer', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+  const isLoggedIn = !!auth.data?.me || !!auth.data?.activeCustomer;
+  console.log('[set-customer] isLoggedIn:', isLoggedIn);
+  if (isLoggedIn) {
+    console.log('[set-customer] User already logged in, returning current auth info');
+    const res = NextResponse.json({ auth: auth.data });
+    for (const c of auth.setCookies ?? []) res.headers.append('Set-Cookie', c);
+    return res; // ya logueado → NO setCustomerForOrder
   }
-}
 
+  // 2) Guest: si faltan campos mínimos, error
+  if (!input.firstName || !input.lastName || !input.emailAddress) {
+    console.warn('[set-customer] Missing required customer fields:', input);
+    return NextResponse.json({ error: 'Missing customer fields' }, { status: 400 });
+  }
+
+  // 3) Ejecutar setCustomerForOrder (guest)
+  console.log('[set-customer] Executing setCustomerForOrder mutation with:', input);
+  const result = await fetchGraphQL(
+    { query: SET_CUSTOMER_FOR_ORDER, variables: { input } },
+    { req }
+  );
+  console.log('[set-customer] setCustomerForOrder response:', JSON.stringify(result, null, 2));
+
+  // Si hubo errores reales (no relacionados con `me`), devolvelos
+  if (result.errors && !meForbiddenOnly) {
+    console.error('[set-customer] GraphQL errors:', result.errors);
+    return NextResponse.json({ errors: result.errors }, { status: 400 });
+  }
+
+  const res = NextResponse.json(result.data);
+  for (const c of result.setCookies ?? []) res.headers.append('Set-Cookie', c);
+  console.log('[set-customer] Success response sent:', JSON.stringify(result.data, null, 2));
+  return res;
+}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Search, Heart, User, Menu } from 'lucide-react';
@@ -11,7 +11,7 @@ import { MiniCart } from '@/components/cart/mini-cart';
 export function Header() {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
-
+  const router = useRouter();
   // Detectar si estamos en páginas de productos o páginas internas
   const isProductPage = pathname?.startsWith('/products/') && pathname !== '/products';
   const isInternalPage = pathname !== '/' || scrolled;
@@ -78,6 +78,9 @@ export function Header() {
             <button
               aria-label="Open account"
               className="hover:text-brand-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2 rounded p-2"
+              onClick={() => {
+                router.push('/profile');
+              }}
             >
               <User className="w-5 h-5 text-white" />
             </button>

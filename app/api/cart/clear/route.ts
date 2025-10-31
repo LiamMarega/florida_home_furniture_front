@@ -1,45 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { REMOVE_ALL_ORDER_LINES } from '@/lib/graphql/mutations';
 import { fetchGraphQL } from '@/lib/vendure-server';
+import { GET_ACTIVE_ORDER } from '@/lib/graphql/queries';
+import { REMOVE_ORDER_LINE } from '@/lib/graphql/mutations';
 
-// Force dynamic rendering
-export const dynamic = 'force-dynamic';
-
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const response = await fetchGraphQL(
-      {
-        query: REMOVE_ALL_ORDER_LINES,
-        variables: {},
-      },
-      {
-        req: request, // Pass the request to include cookies
-      }
-    );
+    console.log('🧹 Clearing cart...');
 
-    if (response.errors) {
-      console.error('GraphQL errors:', response.errors);
-      return NextResponse.json(
-        { error: 'Failed to clear cart', details: response.errors },
-        { status: 400 }
-      );
+    // 1. Obtener la orden activa
+    const orderResponse = await fetchGraphQL({
+      query: GET_ACTIVE_ORDER,
+    }, { req });
+
+    const activeOrder = orderResponse.data?.activeOrder;
+
+    if (!activeOrder || !activeOrder.lines || activeOrder.lines.length === 0) {
+      console.log('ℹ️ No active order or cart already empty');
+      return NextResponse.json({
+        success: true,
+        message: 'Cart is already empty',
+      });
     }
 
-    // Create response with data
-    const nextResponse = NextResponse.json(response.data);
+    console.log(`🗑️ Removing ${activeOrder.lines.length} items from cart...`);
 
-    // Forward Set-Cookie headers from Vendure if present
-    if (response.setCookies && response.setCookies.length > 0) {
-      response.setCookies.forEach(cookie => {
+    // 2. Remover todos los items uno por uno
+    for (const line of activeOrder.lines) {
+      console.log(`Removing line ${line.id}...`);
+      
+      const removeResponse = await fetchGraphQL({
+        query: REMOVE_ORDER_LINE,
+        variables: { orderLineId: line.id },
+      }, { req });
+
+      if (removeResponse.errors) {
+        console.error('❌ Error removing line:', removeResponse.errors);
+        // Continuar con los demás items
+      }
+    }
+
+    console.log('✅ Cart cleared successfully');
+
+    const nextResponse = NextResponse.json({
+      success: true,
+      message: 'Cart cleared successfully',
+    });
+
+    // Forward cookies de la última operación
+    if (orderResponse.setCookies?.length) {
+      orderResponse.setCookies.forEach(cookie => {
         nextResponse.headers.append('Set-Cookie', cookie);
       });
     }
 
     return nextResponse;
   } catch (error) {
-    console.error('Clear cart error:', error);
+    console.error('💥 Error clearing cart:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Failed to clear cart',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

@@ -1,7 +1,15 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Order, OrderLine } from '@/lib/types';
+import { 
+  useActiveCart, 
+  useAddToCart, 
+  useRemoveFromCart, 
+  useUpdateCartQuantity, 
+  useClearCart 
+} from '@/hooks/use-cart';
 
 interface CartContextType {
   items: OrderLine[];
@@ -11,120 +19,83 @@ interface CartContextType {
   removeItem: (orderLineId: string) => Promise<void>;
   updateQuantity: (orderLineId: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
+  resetSession: () => Promise<void>; // 🆕 Para limpiar sesión completa
   isLoading: boolean;
   isUpdating: boolean;
   error: string | null;
   order: Order | null;
-  refreshCart: () => Promise<void>;
+  refreshCart: () => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [order, setOrder] = useState<Order | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  
+  // React Query hooks
+  const { data: cartData, isLoading, error: cartError, refetch } = useActiveCart();
+  const addToCartMutation = useAddToCart();
+  const removeFromCartMutation = useRemoveFromCart();
+  const updateQuantityMutation = useUpdateCartQuantity();
+  const clearCartMutation = useClearCart();
 
-  const loadCart = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const response = await fetch('/api/cart/active', {
-        credentials: 'include', // Include cookies in request
-      });
-      const data = await response.json();
+  // Derived state
+  const order = cartData?.activeOrder || null;
+  const items = order?.lines || [];
+  const itemCount = items.reduce((total: number, item: OrderLine) => total + item.quantity, 0);
+  const total = order?.totalWithTax || 0;
+  
+  // Combined loading and error states
+  const isUpdating = addToCartMutation.isPending || 
+                    removeFromCartMutation.isPending || 
+                    updateQuantityMutation.isPending || 
+                    clearCartMutation.isPending;
+  
+  const error = cartError?.message || 
+               addToCartMutation.error?.message || 
+               removeFromCartMutation.error?.message || 
+               updateQuantityMutation.error?.message || 
+               clearCartMutation.error?.message || 
+               null;
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch cart');
-      }
-
-      setOrder(data.activeOrder);
-    } catch (error) {
-      console.error('Error loading cart:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load cart');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadCart();
-  }, [loadCart]);
-
+  // 🆕 Wrapper mejorado con auto-recovery
   const addItem = async (productVariantId: string, quantity = 1) => {
     try {
-      setIsUpdating(true);
-      setError(null);
-
-      const response = await fetch('/api/cart/add', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Include cookies in request
-        body: JSON.stringify({
-          productVariantId,
-          quantity,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to add item to cart');
+      await addToCartMutation.mutateAsync({ productVariantId, quantity });
+    } catch (error: any) {
+      
+      // 🔄 Si el error es por estado inválido de la orden, intentar recuperar
+      if (
+        error?.message?.includes('state') || 
+        error?.message?.includes('AddingItems') ||
+        error?.message?.includes('requiresClearCart')
+      ) {
+        
+        try {
+          // Limpiar el carrito
+          await clearCartMutation.mutateAsync();
+          
+          // Reintentar agregar el producto
+          await addToCartMutation.mutateAsync({ productVariantId, quantity });
+          
+          return; // Éxito después de recovery
+        } catch (retryError) {
+          console.error('❌ Auto-recovery failed:', retryError);
+          throw new Error('Cart was in an invalid state. Please refresh the page and try again.');
+        }
       }
-
-      // Check if the result is an error
-      if (data.addItemToOrder?.__typename === 'ErrorResult') {
-        throw new Error(data.addItemToOrder.message || 'Failed to add item to cart');
-      }
-
-      setOrder(data.addItemToOrder);
-    } catch (error) {
-      console.error('Error adding item to cart:', error);
-      setError(error instanceof Error ? error.message : 'Failed to add item to cart');
+      
+      // Si no es un error de estado, propagar el error original
       throw error;
-    } finally {
-      setIsUpdating(false);
     }
   };
 
   const removeItem = async (orderLineId: string) => {
     try {
-      setIsUpdating(true);
-      setError(null);
-
-      const response = await fetch('/api/cart/remove', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Include cookies in request
-        body: JSON.stringify({
-          orderLineId,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to remove item from cart');
-      }
-
-      // Check if the result is an error
-      if (data.removeOrderLine?.__typename === 'ErrorResult') {
-        throw new Error(data.removeOrderLine.message || 'Failed to remove item from cart');
-      }
-
-      setOrder(data.removeOrderLine);
+      await removeFromCartMutation.mutateAsync({ orderLineId });
     } catch (error) {
       console.error('Error removing item from cart:', error);
-      setError(error instanceof Error ? error.message : 'Failed to remove item from cart');
       throw error;
-    } finally {
-      setIsUpdating(false);
     }
   };
 
@@ -135,79 +106,61 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      setIsUpdating(true);
-      setError(null);
-
-      const response = await fetch('/api/cart/update', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Include cookies in request
-        body: JSON.stringify({
-          orderLineId,
-          quantity,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update cart item');
-      }
-
-      // Check if the result is an error
-      if (data.adjustOrderLine?.__typename === 'ErrorResult') {
-        throw new Error(data.adjustOrderLine.message || 'Failed to update cart item');
-      }
-
-      setOrder(data.adjustOrderLine);
+      await updateQuantityMutation.mutateAsync({ orderLineId, quantity });
     } catch (error) {
       console.error('Error updating quantity:', error);
-      setError(error instanceof Error ? error.message : 'Failed to update cart item');
       throw error;
-    } finally {
-      setIsUpdating(false);
     }
   };
 
   const clearCart = async () => {
     try {
-      setIsUpdating(true);
-      setError(null);
-
-      const response = await fetch('/api/cart/clear', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Include cookies in request
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to clear cart');
-      }
-
-      // Check if the result is an error
-      if (data.removeAllOrderLines?.__typename === 'ErrorResult') {
-        throw new Error(data.removeAllOrderLines.message || 'Failed to clear cart');
-      }
-
-      setOrder(data.removeAllOrderLines);
+      console.log('🧹 Clearing cart...');
+      await clearCartMutation.mutateAsync();
+      console.log('✅ Cart cleared');
     } catch (error) {
       console.error('Error clearing cart:', error);
-      setError(error instanceof Error ? error.message : 'Failed to clear cart');
       throw error;
-    } finally {
-      setIsUpdating(false);
     }
   };
 
-  const items = order?.lines || [];
-  const itemCount = items.reduce((total, item) => total + item.quantity, 0);
-  const total = order?.totalWithTax || 0;
+  // 🆕 Reset completo de la sesión (para casos extremos)
+  const resetSession = async () => {
+    try {
+      console.log('🔄 Resetting session...');
+      
+      // 1. Limpiar carrito en el servidor
+      try {
+        await clearCartMutation.mutateAsync();
+      } catch (e) {
+        console.log('Cart already empty or error clearing:', e);
+      }
+      
+      // 2. Limpiar cache de React Query
+      queryClient.clear();
+      
+      // 3. Limpiar cookies del cliente (solo las que podemos acceder)
+      if (typeof document !== 'undefined') {
+        document.cookie.split(";").forEach((c) => {
+          document.cookie = c
+            .replace(/^ +/, "")
+            .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+        });
+      }
+      
+      // 4. Refetch para crear nueva sesión
+      await refetch();
+      
+      console.log('✅ Session reset complete');
+    } catch (error) {
+      console.error('Error resetting session:', error);
+      throw error;
+    }
+  };
+
+  const refreshCart = () => {
+    refetch();
+  };
 
   return (
     <CartContext.Provider
@@ -219,11 +172,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         removeItem,
         updateQuantity,
         clearCart,
+        resetSession, // 🆕
         isLoading,
         isUpdating,
         error,
         order,
-        refreshCart: loadCart
+        refreshCart
       }}
     >
       {children}

@@ -1,45 +1,13 @@
 import { gql } from 'graphql-request';
-import { PRODUCT_FRAGMENT, ORDER_FRAGMENT, ASSET_FRAGMENT, SEARCH_RESULT_ASSET_FRAGMENT, PRODUCT_VARIANT_FRAGMENT } from './fragments';
+import { 
+  PRODUCT_FRAGMENT, 
+  ORDER_FRAGMENT, 
+  ASSET_FRAGMENT, 
+  PRODUCT_VARIANT_FRAGMENT,
+  CUSTOMER_FRAGMENT 
+} from './fragments';
 
-export const GET_PRODUCTS = gql`
-  ${PRODUCT_FRAGMENT}
-  query GetProducts($options: ProductListOptions) {
-    products(options: $options) {
-      items {
-        ...Product
-      }
-      totalItems
-    }
-  }
-`;
 
-export const SEARCH_PRODUCTS = gql`
-  ${SEARCH_RESULT_ASSET_FRAGMENT}
-  query SearchProducts($input: SearchInput!) {
-    search(input: $input) {
-      items {
-        productId
-        productName
-        slug
-        description
-        priceWithTax {
-          ... on PriceRange {
-            min
-            max
-          }
-          ... on SinglePrice {
-            value
-          }
-        }
-        currencyCode
-        productAsset {
-          ...SearchResultAsset
-        }
-      }
-      totalItems
-    }
-  }
-`;
 
 export const GET_PRODUCT_BY_SLUG = gql`
   ${PRODUCT_FRAGMENT}
@@ -50,88 +18,8 @@ export const GET_PRODUCT_BY_SLUG = gql`
   }
 `;
 
-export const GET_PRODUCT_DETAILS = gql`
-  ${ASSET_FRAGMENT}
-  ${PRODUCT_VARIANT_FRAGMENT}
-  query GetProductDetails($slug: String!) {
-    product(slug: $slug) {
-      id
-      name
-      slug
-      description
-      featuredAsset {
-        ...Asset
-      }
-      assets {
-        ...Asset
-      }
-      variants {
-        ...ProductVariant
-        product {
-          id
-          name
-          slug
-        }
-      }
-      customFields {
-        materials
-        dimensions
-        weight
-        color
-        assembly
-        warranty
-      }
-    }
-  }
-`;
 
-export const GET_COLLECTIONS = gql`
-  ${ASSET_FRAGMENT}
-  query GetCollections($options: CollectionListOptions) {
-    collections(options: $options) {
-      items {
-        id
-        name
-        slug
-        description
-        featuredAsset {
-          ...Asset
-        }
-      }
-      totalItems
-    }
-  }
-`;
 
-export const GET_COLLECTION_BY_SLUG = gql`
-  ${ASSET_FRAGMENT}
-  ${PRODUCT_FRAGMENT}
-  query GetCollectionBySlug($slug: String!, $options: ProductListOptions) {
-    collection(slug: $slug) {
-      id
-      name
-      slug
-      description
-      featuredAsset {
-        ...Asset
-      }
-      productVariants(options: $options) {
-        items {
-          id
-          name
-          sku
-          price
-          priceWithTax
-          currencyCode
-          product {
-            ...Product
-          }
-        }
-        totalItems
-      }
-    }
-  }
-`;
 
 export const GET_ACTIVE_ORDER = gql`
   ${ORDER_FRAGMENT}
@@ -142,49 +30,57 @@ export const GET_ACTIVE_ORDER = gql`
   }
 `;
 
-export const GET_ACTIVE_CUSTOMER = gql`
-  query GetActiveCustomer {
-    activeCustomer {
-      id
-      title
-      firstName
-      lastName
-      emailAddress
+
+export const GET_ALL_PRODUCTS = gql`
+  ${PRODUCT_FRAGMENT}
+  query GetAllProducts($options: ProductListOptions) {
+    products(options: $options) {
+      items {
+        ...Product
+      }
+      totalItems
     }
   }
 `;
 
-export const GET_ALL_PRODUCTS = gql`
-    query GetAllProducts {
-      products {
-        items {
+export const GET_PRODUCTS_PAGINATED = gql`
+  ${ASSET_FRAGMENT}
+  ${PRODUCT_VARIANT_FRAGMENT}
+  query GetProductsPaginated($options: ProductListOptions) {
+    products(options: $options) {
+      items {
+        id
+        createdAt
+        updatedAt
+        languageCode
+        name
+        slug
+        description
+        enabled
+        featuredAsset {
+          ...Asset
+        }
+        variants {
+          ...ProductVariant
+        }
+        collections {
           id
           name
           slug
-          featuredAsset {
-            id
-            preview
-          }
         }
-        totalItems
       }
-    }
-`;
-
-export const GET_ELIGIBLE_SHIPPING_METHODS = gql`
-  query GetEligibleShippingMethods {
-    eligibleShippingMethods {
-      id
-      code
-      name
-      description
-      price
-      priceWithTax
-      metadata
+      totalItems
     }
   }
 `;
 
+export const ELIGIBLE_SHIPPING_METHODS = /* GraphQL */ `
+  query EligibleShippingMethods {
+    eligibleShippingMethods {
+      ...ShippingMethodQuoteFields
+    }
+  }
+`;
 export const GET_ORDER_BY_CODE = gql`
   ${ORDER_FRAGMENT}
   query GetOrderByCode($code: String!) {
@@ -194,8 +90,265 @@ export const GET_ORDER_BY_CODE = gql`
   }
 `;
 
-export const GET_NEXT_ORDER_STATES = gql`
-  query GetNextOrderStates {
-    nextOrderStates
+
+
+
+
+
+export const GET_ACTIVE_CUSTOMER = gql`
+  ${CUSTOMER_FRAGMENT}
+  query GetActiveCustomer($orderOptions: OrderListOptions) {
+    activeCustomer {
+      ...Customer
+      orders(options: $orderOptions) {
+        items {
+          id
+          code
+          createdAt
+          updatedAt
+          state
+          active
+          orderPlacedAt
+          currencyCode
+          totalQuantity
+          subTotal
+          subTotalWithTax
+          shipping
+          shippingWithTax
+          total
+          totalWithTax
+          shippingAddress {
+            fullName
+            company
+            streetLine1
+            streetLine2
+            city
+            province
+            postalCode
+            countryCode
+            phoneNumber
+          }
+          billingAddress {
+            fullName
+            company
+            streetLine1
+            streetLine2
+            city
+            province
+            postalCode
+            countryCode
+            phoneNumber
+          }
+          lines {
+            id
+            quantity
+            linePrice
+            linePriceWithTax
+            unitPrice
+            unitPriceWithTax
+            discountedUnitPrice
+            discountedUnitPriceWithTax
+            productVariant {
+              id
+              name
+              sku
+              product {
+                id
+                name
+                slug
+                featuredAsset {
+                  id
+                  preview
+                  source
+                }
+              }
+              featuredAsset {
+                id
+                preview
+                source
+              }
+            }
+            featuredAsset {
+              id
+              preview
+              source
+            }
+            customFields
+          }
+          payments {
+            id
+            createdAt
+            method
+            amount
+            state
+            errorMessage
+            metadata
+          }
+          fulfillments {
+            id
+            createdAt
+            updatedAt
+            method
+            trackingCode
+            state
+            lines {
+              orderLine {
+                id
+              }
+              quantity
+            }
+          }
+          discounts {
+            description
+            amount
+            amountWithTax
+          }
+          couponCodes
+        }
+        totalItems
+      }
+    }
+  }
+`;
+
+export const GET_CUSTOMER_ORDERS = gql`
+  query GetCustomerOrders($options: OrderListOptions) {
+    activeCustomer {
+      id
+      orders(options: $options) {
+        items {
+          id
+          code
+          createdAt
+          updatedAt
+          state
+          active
+          orderPlacedAt
+          currencyCode
+          totalQuantity
+          subTotal
+          subTotalWithTax
+          shipping
+          shippingWithTax
+          total
+          totalWithTax
+          shippingAddress {
+            fullName
+            company
+            streetLine1
+            streetLine2
+            city
+            province
+            postalCode
+            countryCode
+            phoneNumber
+          }
+          billingAddress {
+            fullName
+            company
+            streetLine1
+            streetLine2
+            city
+            province
+            postalCode
+            countryCode
+            phoneNumber
+          }
+          lines {
+            id
+            quantity
+            linePrice
+            linePriceWithTax
+            unitPrice
+            unitPriceWithTax
+            discountedUnitPrice
+            discountedUnitPriceWithTax
+            productVariant {
+              id
+              name
+              sku
+              product {
+                id
+                name
+                slug
+                featuredAsset {
+                  id
+                  preview
+                  source
+                }
+              }
+              featuredAsset {
+                id
+                preview
+                source
+              }
+            }
+            featuredAsset {
+              id
+              preview
+              source
+            }
+            customFields
+          }
+          payments {
+            id
+            createdAt
+            method
+            amount
+            state
+            errorMessage
+            metadata
+          }
+          fulfillments {
+            id
+            createdAt
+            updatedAt
+            method
+            trackingCode
+            state
+            lines {
+              orderLine {
+                id
+              }
+              quantity
+            }
+          }
+          discounts {
+            description
+            amount
+            amountWithTax
+          }
+          couponCodes
+        }
+        totalItems
+      }
+    }
+  }
+`;
+
+export const GET_ACTIVE_ORDER_FOR_PAYMENT = gql`
+  query GetActiveOrderForPayment {
+    activeOrder {
+      id
+      code
+      state
+      totalWithTax
+      currencyCode
+      customer { id emailAddress }
+    }
+  }
+`;
+
+
+
+export const ADD_PAYMENT_TO_ORDER = gql`
+  mutation AddPaymentToOrder($input: PaymentInput!) {
+    addPaymentToOrder(input: $input) {
+      __typename
+      ... on Order {
+        id code state totalWithTax currencyCode
+      }
+      ... on ErrorResult { errorCode message }
+    }
   }
 `;

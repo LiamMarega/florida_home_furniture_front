@@ -26,16 +26,16 @@ export function Footer() {
         <div>
           <h3 className="text-[14px] font-semibold text-brand-dark-blue mb-3">Location:</h3>
           <p className="text-[12px] text-brand-dark-blue/70 leading-6">
-            Florida Homes Furniture<br />
-            Design District, Suite 201<br />
-            Miami, Florida 33127
+            Florida Home Furniture<br />
+            4055 NW 17th Ave<br />
+            Miami, FL 33142
           </p>
         </div>
 
         <div>
           <h3 className="text-[14px] font-semibold text-brand-dark-blue mb-3">Contact Us:</h3>
           <p className="text-[12px] text-brand-dark-blue/70 leading-6">
-            Phone: +1 (305) 555-0123<br />
+            Phone: +1 (305) 924-0685<br />
             Customer Service Hours:<br />
             Mon - Fri 9 AM - 6 PM
           </p>
@@ -45,9 +45,7 @@ export function Footer() {
           <h3 className="text-[14px] font-semibold text-brand-dark-blue mb-3">Email:</h3>
           <p className="text-[12px] text-brand-dark-blue/70 leading-6">
             For inquiries:<br />
-            info@floridahomesfurniture.com<br />
-            For support:<br />
-            support@floridahomesfurniture.com
+            alexlsabramovich11@gmail.com
           </p>
         </div>
 

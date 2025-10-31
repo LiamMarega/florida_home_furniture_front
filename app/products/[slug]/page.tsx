@@ -1,8 +1,9 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getProductBySlug, getAllProducts } from '@/lib/vendure-server';
+import {  fetchGraphQL } from '@/lib/vendure-server';
 import { ProductPage } from '@/components/product/product-page';
 import { Product } from '@/lib/types';
+import { GET_ALL_PRODUCTS, GET_PRODUCT_BY_SLUG } from '@/lib/graphql/queries';
 
 interface ProductPageProps {
   params: {
@@ -12,7 +13,12 @@ interface ProductPageProps {
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
   try {
-    const result = await getProductBySlug(params.slug);
+    const result = await fetchGraphQL({
+      query: GET_PRODUCT_BY_SLUG,
+      variables: {
+        slug: params.slug,
+      },
+    });
 
     if (!result.data?.product) {
       return {
@@ -91,7 +97,9 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 
 export async function generateStaticParams() {
   try {
-    const result = await getAllProducts();
+    const result = await fetchGraphQL({
+      query: GET_ALL_PRODUCTS,
+    });
 
     return result.data?.products?.items?.map((product: Product) => ({
       slug: product.slug,
@@ -104,25 +112,29 @@ export async function generateStaticParams() {
 
 export default async function ProductPageRoute({ params }: ProductPageProps) {
   try {
-    const result = await getProductBySlug(params.slug);
+    const result = await fetchGraphQL({
+      query: GET_PRODUCT_BY_SLUG,
+      variables: {
+        slug: params.slug,
+      },
+    });
 
     if (!result.data?.product) {
       notFound();
     }
 
     // Get related products (same category or random products)
-    const relatedProductsResult = await getAllProducts();
+    const relatedProductsResult = await fetchGraphQL({
+      query: GET_ALL_PRODUCTS,
+      variables: {
+        options: {
+          take: 4,
+          skip: 0,
+        },
+      },
+    });
 
-    const relatedProducts = relatedProductsResult.data?.products?.items
-      ?.filter((p: Product) => p.id !== result.data.product.id)
-      .slice(0, 4) || [];
-
-    return (
-      <ProductPage 
-        product={result.data.product} 
-        relatedProducts={relatedProducts}
-      />
-    );
+    return <ProductPage product={result.data.product} relatedProducts={[]} />;
   } catch (error) {
     console.error('Error fetching product:', error);
     notFound();
