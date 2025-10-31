@@ -160,7 +160,7 @@ export default function CheckoutPage() {
                 </form>
               ) : (
                 /* Payment Step */
-                <Elements stripe={stripePromise} options={{ clientSecret }}>
+                <Elements stripe={stripePromise} >
                   <PaymentStep
                     clientSecret={clientSecret!}
                     onPaid={handlePaid}
