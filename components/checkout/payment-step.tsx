@@ -14,6 +14,9 @@ export function PaymentStep({ clientSecret, onPaid, onBack }: PaymentStepProps) 
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Validate clientSecret before rendering PaymentElement
+  const isValidClientSecret = clientSecret && typeof clientSecret === 'string' && clientSecret.trim() !== '';
+
   const handlePay = async () => {
     if (!stripe || !elements) return;
     
@@ -76,9 +79,22 @@ export function PaymentStep({ clientSecret, onPaid, onBack }: PaymentStepProps) 
     }
   };
 
+  if (!isValidClientSecret) {
+    return (
+      <div className="space-y-4">
+        <div className="text-center py-8">
+          <p className="text-red-600 text-sm">Invalid payment configuration. Please try again.</p>
+          <Button type="button" variant="outline" onClick={onBack} className="mt-4">
+            Back
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <PaymentElement  />
+      {isValidClientSecret && <PaymentElement />}
       {error && <p className="text-red-600 text-sm">{error}</p>}
       <div className="flex gap-3">
         <Button type="button" variant="outline" onClick={onBack}>
@@ -87,7 +103,7 @@ export function PaymentStep({ clientSecret, onPaid, onBack }: PaymentStepProps) 
         <Button 
           type="button" 
           onClick={handlePay} 
-          disabled={!stripe || !elements || paying}
+          disabled={!stripe || !elements || paying || !isValidClientSecret}
         >
           {paying ? 'Processing...' : 'Pay now'}
           <CreditCard className="w-5 h-5 ml-2" />
