@@ -352,3 +352,43 @@ export const ADD_PAYMENT_TO_ORDER = gql`
     }
   }
 `;
+
+export const AUTH_STATE_QUERY = gql`
+  query AuthState {
+    me {
+      id
+      identifier
+    }
+    activeCustomer {
+      id
+      firstName
+      lastName
+      emailAddress
+      phoneNumber
+    }
+    activeOrder {
+      id
+      code
+      state
+      total
+      lines {
+        id
+        quantity
+        productVariant {
+          id
+          name
+          price
+        }
+      }
+    }
+  }
+`;
+
+export const CUSTOMER_DETAILS_QUERY = gql`
+  ${CUSTOMER_FRAGMENT}
+  query CustomerDetails {
+    activeCustomer {
+      ...Customer
+    }
+  }
+`;

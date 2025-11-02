@@ -2,10 +2,12 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Header } from '@/components/header';
 import { CartProvider } from '@/contexts/cart-context';
+import { AuthProvider } from '@/contexts/auth-context';
 import { QueryProvider } from '@/lib/query-client';
 import { Toaster } from '@/components/ui/sonner';
 import localFont from 'next/font/local';
 import { ConditionalHeader } from '@/components/conditional-header';
+import AuthModal from '@/components/auth/auth-modal';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from "@vercel/speed-insights/next"
 
@@ -119,11 +121,14 @@ export default function RootLayout({
       <Analytics />
       <SpeedInsights />
         <QueryProvider>
-          <CartProvider>
-            <ConditionalHeader />
-            {children}
-            <Toaster position="bottom-right" />
-          </CartProvider>
+          <AuthProvider>
+            <CartProvider>
+              <ConditionalHeader />
+              {children}
+              <AuthModal />
+              <Toaster position="bottom-right" />
+            </CartProvider>
+          </AuthProvider>
         </QueryProvider>
       </body>
     </html>

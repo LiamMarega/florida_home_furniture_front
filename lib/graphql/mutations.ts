@@ -210,3 +210,58 @@ export const LOGOUT = gql`
   }
 `;
 
+export const LOGIN_MUTATION = gql`
+  mutation Login($username: String!, $password: String!) {
+    login(username: $username, password: $password) {
+      __typename
+      ... on CurrentUser {
+        id
+        identifier
+      }
+      ... on InvalidCredentialsError {
+        errorCode
+        message
+      }
+      ... on NotVerifiedError {
+        errorCode
+        message
+      }
+    }
+  }
+`;
+
+export const REGISTER_MUTATION = gql`
+  mutation RegisterCustomer($input: RegisterCustomerInput!) {
+    registerCustomerAccount(input: $input) {
+      __typename
+      ... on Success {
+        success
+      }
+      ... on ErrorResult {
+        errorCode
+        message
+      }
+    }
+  }
+`;
+
+export const VERIFY_EMAIL_MUTATION = gql`
+  mutation VerifyEmail($token: String!) {
+    verifyCustomerAccount(token: $token) {
+      __typename
+      ... on CurrentUser {
+        id
+        identifier
+      }
+      ... on VerificationTokenInvalidError {
+        errorCode
+        message
+      }
+      ... on VerificationTokenExpiredError {
+        errorCode
+        message
+      }
+    }
+  }
+`;
+
