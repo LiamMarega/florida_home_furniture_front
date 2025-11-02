@@ -96,7 +96,7 @@ export default function CheckoutPage() {
   const currentStep = clientSecret ? CheckoutStep.PAYMENT : CheckoutStep.CUSTOMER_INFO;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white py-12">
+    <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white py-32">
       <div className="max-w-6xl mx-auto px-4">
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Content */}

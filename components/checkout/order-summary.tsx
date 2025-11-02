@@ -25,7 +25,7 @@ export function OrderSummary() {
   }
 
   return (
-    <Card className="p-6 sticky top-4">
+    <Card className="p-6 sticky top-24">
       <h3 className="text-lg font-semibold text-brand-dark-blue mb-4">Order Summary</h3>
       
       {/* Cart Items */}

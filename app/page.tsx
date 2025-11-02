@@ -14,7 +14,7 @@ export default function Home() {
 
       <PremiumCollection />
 
-      <TestimonialsSection />
+      {/* <TestimonialsSection /> */}
 
       <TrustSection />
 
