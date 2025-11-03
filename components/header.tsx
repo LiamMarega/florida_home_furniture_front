@@ -7,13 +7,16 @@ import Image from 'next/image';
 import { Search, Heart, User, Menu } from 'lucide-react';
 import { navigationItems } from '@/lib/data';
 import { MiniCart } from '@/components/cart/mini-cart';
+import { useAuth } from '@/contexts/auth-context';
 
 export function Header() {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const router = useRouter();
+  const { isAuthenticated, openAuthModal, loading: authLoading } = useAuth();
+  
   // Detectar si estamos en páginas de productos o páginas internas
-  const isProductPage = pathname?.startsWith('/products/') && pathname !== '/products';
+  const isProductPage = pathname?.startsWith('/product/') && pathname !== '/product';
   const isInternalPage = pathname !== '/' || scrolled;
   const shouldBeFixed = isProductPage || isInternalPage;
 
@@ -79,8 +82,15 @@ export function Header() {
               aria-label="Open account"
               className="hover:text-brand-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2 rounded p-2"
               onClick={() => {
-                router.push('/profile');
+                if (!authLoading) {
+                  if (isAuthenticated) {
+                    router.push('/profile');
+                  } else {
+                    openAuthModal('login');
+                  }
+                }
               }}
+              disabled={authLoading}
             >
               <User className="w-5 h-5 text-white" />
             </button>

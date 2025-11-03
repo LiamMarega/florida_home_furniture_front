@@ -71,7 +71,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
         creator: '@FloridaHomesFurn',
       },
       alternates: {
-        canonical: `/products/${params.slug}`,
+        canonical: `/product/${params.slug}`,
       },
       robots: {
         index: true,

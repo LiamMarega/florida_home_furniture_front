@@ -82,7 +82,7 @@ export function OrdersPanel() {
           }
           actionLabel="Start Shopping"
           onAction={() => {
-            window.location.href = '/products';
+            window.location.href = '/';
           }}
         />
       ) : (

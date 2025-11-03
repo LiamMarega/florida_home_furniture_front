@@ -87,7 +87,7 @@ export function ProductHero({ product }: ProductHeroProps) {
             {/* Breadcrumb */}
             <div className="flex items-center justify-center lg:justify-start gap-2 mb-6">
               <Link 
-                href="/products"
+                href="/product"
                 className="flex items-center gap-2 text-brand-dark-blue/70 hover:text-brand-primary transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />

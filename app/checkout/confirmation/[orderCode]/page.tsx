@@ -56,7 +56,7 @@ export default function ConfirmationPage() {
 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Button asChild variant="outline" size="lg">
-                    <Link href="/products">
+                    <Link href="/">
                       Continue Shopping
                       <ArrowRight className="w-5 h-5 ml-2" />
                     </Link>

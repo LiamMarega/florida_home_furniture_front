@@ -88,7 +88,7 @@ export function ProductCard({
       whileHover={hoverAnimation ? { y: -8, transition: { duration: 0.3 } } : undefined}
       className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-brand transition-all duration-300"
     >
-      <Link href={`/products/${slug}`} className="block" prefetch={true}>
+      <Link href={`/product/${slug}`} className="block" prefetch={true}>
         {/* Product Image */}
         <div className={`relative ${aspectRatioClass} overflow-hidden bg-brand-cream`}>
           {featuredAsset?.preview ? (
