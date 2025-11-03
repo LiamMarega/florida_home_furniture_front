@@ -23,6 +23,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (input: RegisterInput) => Promise<{ success: boolean; error?: string; message?: string }>;
+  verifyEmail: (token: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   openAuthModal: (view?: 'login' | 'register') => void;
   closeAuthModal: () => void;
@@ -176,6 +177,44 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // Verify email mutation
+  const verifyEmailMutation = useMutation({
+    mutationFn: async (token: string) => {
+      const response = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ token }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || error.message || 'Verification failed');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      // Invalidate and refetch auth status
+      queryClient.invalidateQueries({ queryKey: ['auth-status'] });
+      refetch();
+    },
+  });
+
+  const verifyEmail = async (token: string) => {
+    try {
+      const result = await verifyEmailMutation.mutateAsync(token);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Verification failed',
+      };
+    }
+  };
+
   const logout = async () => {
     try {
       await logoutMutation.mutateAsync();
@@ -207,10 +246,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const value: AuthContextType = {
     user,
     customer,
-    loading: isLoading || loginMutation.isPending || registerMutation.isPending || logoutMutation.isPending,
+    loading: isLoading || loginMutation.isPending || registerMutation.isPending || logoutMutation.isPending || verifyEmailMutation.isPending,
     isAuthenticated,
     login,
     register,
+    verifyEmail,
     logout,
     openAuthModal,
     closeAuthModal,

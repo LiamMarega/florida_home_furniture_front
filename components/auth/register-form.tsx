@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/auth-context';
+import { ResendVerification } from './resend-verification';
 import { Loader2, Mail, Lock, User } from 'lucide-react';
 
 const registerSchema = z
@@ -29,6 +30,7 @@ const RegisterForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
   const { register: registerUser, openAuthModal } = useAuth();
 
   const {
@@ -57,9 +59,8 @@ const RegisterForm: React.FC = () => {
       setIsLoading(false);
     } else {
       // Show success message about email verification
-      setSuccessMessage(
-        'Registration successful! Please check your email to verify your account before logging in.'
-      );
+      setSuccessMessage('Registration successful!');
+      setRegisteredEmail(registerData.email);
       setIsLoading(false);
     }
   };
@@ -72,8 +73,11 @@ const RegisterForm: React.FC = () => {
         </div>
       )}
       {successMessage && (
-        <div className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 text-sm p-3 rounded-md">
-          {successMessage}
+        <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-md">
+          <p className="font-medium">Registration Successful!</p>
+          <p className="text-sm mt-1">
+            Please check your email for a verification link. You&apos;ll need to verify your email before you can log in.
+          </p>
         </div>
       )}
 
@@ -173,6 +177,12 @@ const RegisterForm: React.FC = () => {
           'Create Account'
         )}
       </Button>
+
+      {successMessage && registeredEmail && (
+        <div className="mt-4">
+          <ResendVerification email={registeredEmail} />
+        </div>
+      )}
 
       <div className="text-center text-sm text-muted-foreground">
         <p>
