@@ -125,7 +125,7 @@ export function RelatedProducts({ products }: RelatedProductsProps) {
                 {/* Product Info */}
                 <div className="p-6">
                   <h3 className="font-bold text-brand-dark-blue text-lg mb-2 line-clamp-2 font-tango-sans group-hover:text-brand-primary transition-colors">
-                    <Link href={`/products/${product.slug}`}>
+                    <Link href={`/product/${product.slug}`}>
                       {product.name}
                     </Link>
                   </h3>
@@ -158,7 +158,7 @@ export function RelatedProducts({ products }: RelatedProductsProps) {
                   )}
 
                   {/* Action Button */}
-                  <Link href={`/products/${product.slug}`} className="block">
+                  <Link href={`/product/${product.slug}`} className="block">
                     <Button className="w-full bg-brand-primary hover:bg-brand-primary/90 text-white group">
                       View Details
                       <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
@@ -177,7 +177,7 @@ export function RelatedProducts({ products }: RelatedProductsProps) {
           variants={fadeInUp}
           className="text-center"
         >
-          <Link href="/products">
+          <Link href="/">
             <Button
               size="lg"
               variant="outline"

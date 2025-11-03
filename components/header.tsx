@@ -16,7 +16,7 @@ export function Header() {
   const { isAuthenticated, openAuthModal, loading: authLoading } = useAuth();
   
   // Detectar si estamos en páginas de productos o páginas internas
-  const isProductPage = pathname?.startsWith('/products/') && pathname !== '/products';
+  const isProductPage = pathname?.startsWith('/product/') && pathname !== '/product';
   const isInternalPage = pathname !== '/' || scrolled;
   const shouldBeFixed = isProductPage || isInternalPage;
 

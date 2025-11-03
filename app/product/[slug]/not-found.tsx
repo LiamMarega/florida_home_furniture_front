@@ -26,7 +26,7 @@ export default function ProductNotFound() {
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button asChild size="lg" className="bg-brand-primary hover:bg-brand-primary/90 text-white">
-            <Link href="/products">
+            <Link href="/">
               <ArrowLeft className="w-5 h-5 mr-2" />
               Browse All Products
             </Link>
@@ -67,7 +67,7 @@ export default function ProductNotFound() {
             {['Sofas', 'Chairs', 'Tables', 'Storage', 'Bedroom', 'Dining'].map((category) => (
               <Link
                 key={category}
-                href={`/products?category=${category.toLowerCase()}`}
+                href={`/product?category=${category.toLowerCase()}`}
                 className="px-4 py-2 bg-white border border-brand-cream rounded-full text-sm text-brand-dark-blue hover:bg-brand-primary hover:text-white transition-colors"
               >
                 {category}

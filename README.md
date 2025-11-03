@@ -278,7 +278,7 @@ The project follows Next.js 14 best practices:
 - **Benefits**: Better performance, SEO, and caching
 
 ```tsx
-// app/products/page.tsx - Server Component
+// app/product/page.tsx - Server Component
 import { getAllProducts } from '@/lib/vendure-server';
 
 export default async function ProductsPage() {
