@@ -74,6 +74,44 @@ export const GET_PRODUCTS_PAGINATED = gql`
   }
 `;
 
+/**
+ * Search products with facet filtering
+ * Uses Vendure search query which supports facetsFilter
+ */
+export const SEARCH_PRODUCTS_BY_FACETS = gql`
+  query SearchProductsByFacets($input: SearchInput!) {
+    search(input: $input) {
+      totalItems
+      items {
+        productId
+        productName
+        slug
+        productAsset {
+          id
+          preview
+          focalPoint {
+            x
+            y
+          }
+        }
+        productVariantId
+        productVariantName
+        priceWithTax {
+          ... on SinglePrice {
+            value
+          }
+          ... on PriceRange {
+            min
+            max
+          }
+        }
+        currencyCode
+        description
+      }
+    }
+  }
+`;
+
 export const ELIGIBLE_SHIPPING_METHODS = /* GraphQL */ `
   query EligibleShippingMethods {
     eligibleShippingMethods {

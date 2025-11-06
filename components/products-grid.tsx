@@ -25,6 +25,7 @@ interface ProductsGridProps {
   imageAspectRatio?: 'square' | 'portrait' | 'landscape';
   initialSort?: 'featured' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc' | 'newest';
   className?: string;
+  facetValueIds?: string | string[];
 }
 
 export function ProductsGrid({
@@ -41,6 +42,7 @@ export function ProductsGrid({
   imageAspectRatio = 'square',
   initialSort = 'featured',
   className = '',
+  facetValueIds,
 }: ProductsGridProps) {
   const { ref, isVisible } = useScrollAnimation();
   
@@ -62,6 +64,7 @@ export function ProductsGrid({
     itemsPerPage,
     initialSort,
     useServerPagination: true,
+    facetValueIds,
   });
 
   // Grid column classes based on props

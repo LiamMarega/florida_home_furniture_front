@@ -8,6 +8,7 @@ interface UseProductsGridOptions {
   itemsPerPage?: number;
   initialSort?: SortOption;
   useServerPagination?: boolean;
+  facetValueIds?: string | string[];
 }
 
 /**
@@ -37,6 +38,7 @@ export function useProductsGrid({
   itemsPerPage = 20,
   initialSort = 'featured',
   useServerPagination = true,
+  facetValueIds,
 }: UseProductsGridOptions = {}) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>(initialSort);
@@ -64,6 +66,7 @@ export function useProductsGrid({
     limit: itemsPerPage,
     search: debouncedSearch || undefined,
     sort: sortBy,
+    facetValueIds,
     enabled: useServerPagination,
   });
 

@@ -5,13 +5,19 @@ import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Search, Heart, User, Menu } from 'lucide-react';
-import { navigationItems } from '@/lib/data';
 import { MiniCart } from '@/components/cart/mini-cart';
 import { useAuth } from '@/contexts/auth-context';
+
+interface Category {
+  name: string;
+  href: string;
+  productCount?: number;
+}
 
 export function Header() {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
   const router = useRouter();
   const { isAuthenticated, openAuthModal, loading: authLoading } = useAuth();
   
@@ -27,6 +33,28 @@ export function Header() {
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Fetch categories from API
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/products/get-categories');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.categories && data.categories.length > 0) {
+            setCategories(data.categories);
+          }
+        } else {
+          console.warn('Failed to fetch categories, using default navigation items');
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        // Keep default navigationItems on error
+      }
+    };
+
+    fetchCategories();
   }, []);
 
   return (
@@ -49,7 +77,7 @@ export function Header() {
           </Link>
 
           <nav className="hidden lg:flex gap-8">
-            {navigationItems.map((item) => (
+            {categories.map((item) => (
               <Link
                 key={item.name}
                 href={item.href}

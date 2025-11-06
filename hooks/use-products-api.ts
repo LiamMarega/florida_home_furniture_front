@@ -10,6 +10,7 @@ export const productApiKeys = {
     limit?: number;
     search?: string;
     sort?: string;
+    facetValueIds?: string | string[];
   }) => [...productApiKeys.lists(), filters] as const,
 };
 
@@ -30,6 +31,7 @@ interface UseProductsOptions {
   limit?: number;
   search?: string;
   sort?: 'featured' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc' | 'newest';
+  facetValueIds?: string | string[];
   enabled?: boolean;
 }
 
@@ -43,6 +45,12 @@ async function fetchProducts(options: UseProductsOptions): Promise<PaginatedProd
   if (options.limit) params.set('limit', options.limit.toString());
   if (options.search) params.set('search', options.search);
   if (options.sort) params.set('sort', options.sort);
+  if (options.facetValueIds) {
+    const ids = Array.isArray(options.facetValueIds) 
+      ? options.facetValueIds.join(',') 
+      : options.facetValueIds;
+    params.set('facetValueIds', ids);
+  }
 
   const response = await fetch(`/api/products?${params.toString()}`, {
     credentials: 'include',
@@ -78,12 +86,13 @@ export function useProductsApi(options: UseProductsOptions = {}) {
     limit = 20,
     search,
     sort = 'featured',
+    facetValueIds,
     enabled = true,
   } = options;
 
   return useQuery({
-    queryKey: productApiKeys.list({ page, limit, search, sort }),
-    queryFn: () => fetchProducts({ page, limit, search, sort }),
+    queryKey: productApiKeys.list({ page, limit, search, sort, facetValueIds }),
+    queryFn: () => fetchProducts({ page, limit, search, sort, facetValueIds }),
     staleTime: 5 * 60 * 1000, // 5 minutes
     enabled,
   });
