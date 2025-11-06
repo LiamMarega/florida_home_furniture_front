@@ -10,7 +10,7 @@ import { ProductsGridFilters } from './products/products-grid-filters';
 import { Pagination } from './products/pagination';
 import { Product } from '@/lib/types';
 
-interface EnhancedProductsGridProps {
+interface ProductsGridProps {
   // Customization options
   title?: string;
   subtitle?: string;
@@ -27,7 +27,7 @@ interface EnhancedProductsGridProps {
   className?: string;
 }
 
-export function EnhancedProductsGrid({
+export function ProductsGrid({
   title = 'Explore latest collection',
   subtitle = 'Quality furniture that fits your budget and style',
   itemsPerPage = 20,
@@ -41,7 +41,7 @@ export function EnhancedProductsGrid({
   imageAspectRatio = 'square',
   initialSort = 'featured',
   className = '',
-}: EnhancedProductsGridProps) {
+}: ProductsGridProps) {
   const { ref, isVisible } = useScrollAnimation();
   
   // Use products grid hook with server-side pagination
