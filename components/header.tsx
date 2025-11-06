@@ -43,7 +43,7 @@ export function Header() {
         if (response.ok) {
           const data = await response.json();
           if (data.categories && data.categories.length > 0) {
-            setCategories(data.categories);
+            setCategories(data.categories.reverse());
           }
         } else {
           console.warn('Failed to fetch categories, using default navigation items');

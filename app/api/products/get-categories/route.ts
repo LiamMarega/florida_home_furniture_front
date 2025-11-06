@@ -143,14 +143,14 @@ export async function GET(req: NextRequest) {
 
     console.log('📊 Categories with counts:', categoriesWithCounts.map(c => `${c.name}: ${c.productCount}`).join(', '));
 
-    // Step 3: Sort by product count (descending) and take top 6
+    // Step 3: Sort by product count (descending - mayor a menor) and take top 6
     // If no categories have products, return all categories (up to 6) sorted by name
     const hasProducts = categoriesWithCounts.some(cat => cat.productCount > 0);
     
     const topCategories = hasProducts
       ? categoriesWithCounts
           .filter((cat) => cat.productCount > 0) // Only include categories with products
-          .sort((a, b) => b.productCount - a.productCount)
+          .sort((a, b) => b.productCount - a.productCount) // Ordenar de mayor a menor cantidad de productos
           .slice(0, 6)
       : categoriesWithCounts
           .sort((a, b) => a.name.localeCompare(b.name)) // Sort alphabetically if no products
