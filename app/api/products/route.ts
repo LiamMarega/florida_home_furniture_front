@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
-import { GET_PRODUCTS_PAGINATED, SEARCH_PRODUCTS_BY_FACETS } from '@/lib/graphql/queries';
+import { GET_PRODUCTS_PAGINATED, SEARCH_PRODUCTS_BY_FACETS, GET_PRODUCTS_BY_IDS } from '@/lib/graphql/queries';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -14,6 +14,8 @@ export const dynamic = 'force-dynamic';
  * - search: string (optional) - Search term for product name/description
  * - sort: string (optional) - Sort field and direction (e.g., 'name-asc', 'price-low')
  * - facetValueIds: string (optional) - Comma-separated list of facet value IDs to filter by
+ *   Filters products at the PRODUCT level, not variant level. Products with facets are returned
+ *   even if their variants don't have the facet assigned.
  * 
  * Returns paginated products from Vendure
  */
@@ -39,16 +41,20 @@ export async function GET(req: NextRequest) {
     // Calculate skip for Vendure
     const skip = (page - 1) * limit;
 
-    // If filtering by facetValueIds, use search query instead of products query
+    // If filtering by facetValueIds, use a hybrid approach:
+    // 1. Use search to get product IDs (may include products with facet in variants)
+    // 2. Fetch full products by IDs
+    // 3. Filter to only include products with facet at PRODUCT level
     if (facetValueIdsParam) {
       const facetValueIds = facetValueIdsParam.split(',').map(id => id.trim()).filter(Boolean);
       
       if (facetValueIds.length > 0) {
-        // Build SearchInput for Vendure search query
+        // Step 1: Use search to get product IDs (with groupByProduct to get unique products)
         const searchInput: any = {
-          take: limit,
-          skip: skip,
+          take: 1000, // Get a large number to ensure we get all products
+          skip: 0,
           groupByProduct: true, // Group variants by product
+          facetValueIds: facetValueIds,
         };
 
         // Add text search if provided
@@ -56,36 +62,9 @@ export async function GET(req: NextRequest) {
           searchInput.term = search.trim();
         }
 
-        // Add facetValueIds filter
-        searchInput.facetValueIds = facetValueIds;
+        console.log('🔍 Searching products with facets to get product IDs:', JSON.stringify(searchInput, null, 2));
 
-        // Add sorting - SearchInput uses different sort fields
-        switch (sort) {
-          case 'price-low':
-            searchInput.sort = { price: 'ASC' };
-            break;
-          case 'price-high':
-            searchInput.sort = { price: 'DESC' };
-            break;
-          case 'name-asc':
-            searchInput.sort = { name: 'ASC' };
-            break;
-          case 'name-desc':
-            searchInput.sort = { name: 'DESC' };
-            break;
-          case 'newest':
-            searchInput.sort = { createdAt: 'DESC' };
-            break;
-          case 'featured':
-          default:
-            // Default: sort by relevance (no sort specified means default relevance)
-            break;
-        }
-
-        console.log('🔍 Searching products with facets:', JSON.stringify(searchInput, null, 2));
-
-        // Use search query for facet filtering
-        const response = await fetchGraphQL(
+        const searchResponse = await fetchGraphQL(
           {
             query: SEARCH_PRODUCTS_BY_FACETS,
             variables: { input: searchInput },
@@ -95,54 +74,128 @@ export async function GET(req: NextRequest) {
           }
         );
 
-        if (response.errors) {
-          console.error('❌ GraphQL errors:', response.errors);
+        if (searchResponse.errors) {
+          console.error('❌ GraphQL errors in search:', searchResponse.errors);
           return NextResponse.json(
-            { error: 'Failed to search products', details: response.errors },
+            { error: 'Failed to search products', details: searchResponse.errors },
             { status: 500 }
           );
         }
 
-        // Transform search results to match Product format
-        const searchResults = response.data?.search?.items || [];
-        const totalItems = response.data?.search?.totalItems || 0;
+        // Get unique product IDs from search results
+        const searchItems = searchResponse.data?.search?.items || [];
+        const productIds = [...new Set(searchItems.map((item: any) => item.productId))];
+        
+        console.log(`📋 Found ${productIds.length} unique product IDs from search`);
+
+        if (productIds.length === 0) {
+          return NextResponse.json({
+            products: [],
+            pagination: {
+              page,
+              limit,
+              totalItems: 0,
+              totalPages: 0,
+              hasNextPage: false,
+              hasPreviousPage: false,
+            },
+          });
+        }
+
+        // Step 2: Fetch full products by IDs
+        const productOptions: any = {
+          take: productIds.length, // Get all products
+          skip: 0,
+          filter: {
+            id: { in: productIds }
+          }
+        };
+
+        // Add search filter if provided (for name search)
+        if (search && search.trim()) {
+          productOptions.filter.name = {
+            contains: search.trim()
+          };
+        }
+
+        const productsResponse = await fetchGraphQL(
+          {
+            query: GET_PRODUCTS_BY_IDS,
+            variables: { 
+              options: productOptions 
+            },
+          },
+          {
+            req,
+          }
+        );
+
+        if (productsResponse.errors) {
+          console.error('❌ GraphQL errors fetching products:', productsResponse.errors);
+          return NextResponse.json(
+            { error: 'Failed to fetch products', details: productsResponse.errors },
+            { status: 500 }
+          );
+        }
+
+        // Step 3: Filter products to only include those with facet at PRODUCT level
+        const allProducts = productsResponse.data?.products?.items || [];
+        const productsWithFacet = allProducts.filter((product: any) => {
+          const productFacetValueIds = (product.facetValues || []).map((fv: any) => fv.id);
+          return facetValueIds.some((facetValueId: string) => productFacetValueIds.includes(facetValueId));
+        });
+
+        console.log(`✅ Filtered to ${productsWithFacet.length} products with facet at product level (from ${allProducts.length} total)`);
+
+        // Step 4: Apply sorting
+        let sortedProducts = [...productsWithFacet];
+        switch (sort) {
+          case 'price-low':
+            sortedProducts.sort((a, b) => {
+              const priceA = a.variants?.[0]?.price || 0;
+              const priceB = b.variants?.[0]?.price || 0;
+              return priceA - priceB;
+            });
+            break;
+          case 'price-high':
+            sortedProducts.sort((a, b) => {
+              const priceA = a.variants?.[0]?.price || 0;
+              const priceB = b.variants?.[0]?.price || 0;
+              return priceB - priceA;
+            });
+            break;
+          case 'name-asc':
+            sortedProducts.sort((a, b) => a.name.localeCompare(b.name));
+            break;
+          case 'name-desc':
+            sortedProducts.sort((a, b) => b.name.localeCompare(a.name));
+            break;
+          case 'newest':
+            sortedProducts.sort((a, b) => {
+              const dateA = new Date(a.createdAt).getTime();
+              const dateB = new Date(b.createdAt).getTime();
+              return dateB - dateA;
+            });
+            break;
+          case 'featured':
+          default:
+            sortedProducts.sort((a, b) => {
+              const dateA = new Date(a.createdAt).getTime();
+              const dateB = new Date(b.createdAt).getTime();
+              return dateB - dateA;
+            });
+            break;
+        }
+
+        // Step 5: Apply pagination
+        const totalItems = sortedProducts.length;
         const totalPages = Math.ceil(totalItems / limit);
+        const paginatedProducts = sortedProducts.slice(skip, skip + limit);
 
-        // Transform search results to Product format
-        const products = searchResults.map((item: any) => ({
-          id: item.productId,
-          name: item.productName,
-          slug: item.slug,
-          description: item.description || '',
-          enabled: true,
-          featuredAsset: item.productAsset ? {
-            id: item.productAsset.id,
-            preview: item.productAsset.preview,
-            source: item.productAsset.preview, // Use preview as source for compatibility
-            focalPoint: item.productAsset.focalPoint,
-          } : undefined,
-          variants: [{
-            id: item.productVariantId,
-            name: item.productVariantName,
-            price: typeof item.priceWithTax === 'object' && 'value' in item.priceWithTax 
-              ? item.priceWithTax.value 
-              : typeof item.priceWithTax === 'object' && 'min' in item.priceWithTax
-              ? item.priceWithTax.min
-              : 0,
-            priceWithTax: typeof item.priceWithTax === 'object' && 'value' in item.priceWithTax 
-              ? item.priceWithTax.value 
-              : typeof item.priceWithTax === 'object' && 'min' in item.priceWithTax
-              ? item.priceWithTax.min
-              : 0,
-            currencyCode: item.currencyCode,
-          }],
-          collections: [],
-        }));
-
-        console.log(`✅ Found ${products.length} products (page ${page}/${totalPages}, total: ${totalItems})`);
+        console.log(`✅ Returning ${paginatedProducts.length} products (page ${page}/${totalPages}, total: ${totalItems})`);
 
         const nextResponse = NextResponse.json({
-          products,
+          products: paginatedProducts,
           pagination: {
             page,
             limit,
@@ -153,8 +206,9 @@ export async function GET(req: NextRequest) {
           },
         });
 
-        if (response.setCookies && response.setCookies.length > 0) {
-          response.setCookies.forEach((cookie) => {
+        // Forward Set-Cookie headers from Vendure if present
+        if (productsResponse.setCookies && productsResponse.setCookies.length > 0) {
+          productsResponse.setCookies.forEach((cookie) => {
             nextResponse.headers.append('Set-Cookie', cookie);
           });
         }
@@ -163,7 +217,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Build Vendure ProductListOptions for regular product query
+    // Regular product query (no facet filtering)
     const options: any = {
       take: limit,
       skip: skip,
