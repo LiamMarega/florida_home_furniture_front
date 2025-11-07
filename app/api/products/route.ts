@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
 
         // Get unique product IDs from search results
         const searchItems = searchResponse.data?.search?.items || [];
-        const productIds = [...new Set(searchItems.map((item: any) => item.productId))];
+        const productIds = Array.from(new Set(searchItems.map((item: any) => item.productId)));
         
         console.log(`📋 Found ${productIds.length} unique product IDs from search`);
 
