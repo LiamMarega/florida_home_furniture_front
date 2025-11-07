@@ -6,8 +6,6 @@ import Image from 'next/image';
 import { Product } from '@/lib/types';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { Badge } from '@/components/ui/badge';
-import { Search, Download, Share2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 interface ProductGalleryProps {
   product: Product;
@@ -42,41 +40,16 @@ export function ProductGallery({ product }: ProductGalleryProps) {
     <div className="space-y-6">
       {/* Main Image Display */}
       <div className="relative group">
-        <div className="relative aspect-square bg-white rounded-2xl overflow-hidden shadow-lg">
+        <div className="relative w-full bg-white rounded-2xl overflow-hidden shadow-lg" style={{ aspectRatio: '1 / 1', maxHeight: '400px' }}>
           {currentImage && (
             <Image
               src={currentImage.preview}
               alt={`${product.name} - Image ${selectedImageIndex + 1}`}
               fill
-              className="object-cover transition-transform duration-300 group-hover:scale-105 scale-90"
+              className="object-contain transition-transform duration-300 group-hover:scale-105"
               sizes="(max-width: 768px) 100vw, 50vw"
             />
           )}
-        </div>
-
-        {/* Image Overlay Actions */}
-        <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="bg-white/90 backdrop-blur-sm hover:bg-white"
-          >
-            <Search className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="bg-white/90 backdrop-blur-sm hover:bg-white"
-          >
-            <Download className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="bg-white/90 backdrop-blur-sm hover:bg-white"
-          >
-            <Share2 className="w-4 h-4" />
-          </Button>
         </div>
 
         {/* Image Counter */}

@@ -110,7 +110,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
           {product.name}
         </h1>
         
-        {price && (
+        {price !== null && price !== undefined && price > 0 && (
           <div className="flex items-baseline gap-3 mb-4">
             <span className="text-3xl font-bold text-brand-primary">
               {formatPrice(price, currencyCode)}
@@ -121,17 +121,6 @@ export function ProductDetails({ product }: ProductDetailsProps) {
           </div>
         )}
 
-        {/* Product Rating */}
-        <div className="flex items-center gap-2 mb-4">
-          <div className="flex text-yellow-400">
-            {[...Array(5)].map((_, i) => (
-              <svg key={i} className="w-5 h-5 fill-current" viewBox="0 0 20 20">
-                <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
-              </svg>
-            ))}
-          </div>
-          <span className="text-sm text-brand-dark-blue/70">(4.8) • 127 reviews</span>
-        </div>
       </div>
 
       {/* Product Description */}
@@ -241,7 +230,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       <Separator />
 
       {/* Product Specifications */}
-      <div>
+      {/* <div>
         <h3 className="text-lg font-semibold text-brand-dark-blue mb-4">Specifications</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {productSpecs.map((spec, index) => (
@@ -251,7 +240,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
             </div>
           ))}
         </div>
-      </div>
+      </div> */}
 
       {/* Shipping & Returns */}
       <div className="bg-brand-cream/30 rounded-lg p-6 space-y-4">

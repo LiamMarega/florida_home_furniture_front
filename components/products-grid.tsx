@@ -33,7 +33,7 @@ export function ProductsGrid({
   subtitle = 'Quality furniture that fits your budget and style',
   itemsPerPage = 20,
   columnsDesktop = 4,
-  columnsMobile = 1,
+  columnsMobile = 2,
   showSearch = true,
   showSort = true,
   showFilters = true,
@@ -76,7 +76,7 @@ export function ProductsGrid({
     5: 'grid-cols-5',
   };
 
-  const gridClassName = `grid ${gridColsClass[columnsMobile]} lg:${gridColsClass[columnsDesktop]} gap-6`;
+  const gridClassName = `grid ${gridColsClass[columnsMobile]} md:${gridColsClass[columnsDesktop]} lg:${gridColsClass[columnsDesktop]} gap-3 sm:gap-4 lg:gap-6`;
 
   return (
     <section id="products-section" ref={ref} className={`py-20 ${className}`}>

@@ -29,14 +29,14 @@ export function ProductPage({ product, relatedProducts }: ProductPageProps) {
         className="pt-32 pb-16 bg-white"
       >
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 lg:gap-16">
             {/* Product Gallery */}
-            <div className="order-2 lg:order-1">
+            <div className="order-1 md:order-1">
               <ProductGallery product={product} />
             </div>
 
             {/* Product Details */}
-            <div className="order-1 lg:order-2">
+            <div className="order-2 md:order-2">
               <ProductDetails product={product} />
             </div>
           </div>
@@ -56,7 +56,7 @@ export function ProductPage({ product, relatedProducts }: ProductPageProps) {
         variants={fadeInUp}
         className="py-16 bg-white"
       >
-        <ProductReviews product={product} />
+        {/* <ProductReviews product={product} /> */}
       </motion.section>
 
       {/* Related Products */}
