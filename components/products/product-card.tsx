@@ -86,11 +86,11 @@ export function ProductCard({
   return (
     <motion.div
       whileHover={hoverAnimation ? { y: -8, transition: { duration: 0.3 } } : undefined}
-      className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-brand transition-all duration-300"
+      className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-brand transition-all duration-300 h-full flex flex-col"
     >
-      <Link href={`/product/${slug}`} className="block" prefetch={true}>
-        {/* Product Image */}
-        <div className={`relative ${aspectRatioClass} overflow-hidden bg-brand-cream`}>
+      <Link href={`/product/${slug}`} className="flex flex-col h-full" prefetch={true}>
+        {/* Product Image - Fixed height */}
+        <div className="relative h-64 sm:h-72 md:h-80 overflow-hidden bg-brand-cream flex-shrink-0">
           {featuredAsset?.preview ? (
             <Image
               src={featuredAsset.preview}
@@ -99,7 +99,7 @@ export function ProductCard({
               className="object-cover group-hover:scale-105 transition-transform duration-300"
             />
           ) : (
-            <div className="w-full h-full bg-brand-cream rounded-md flex items-center justify-center">
+            <div className="w-full h-full bg-brand-cream flex items-center justify-center">
               <Image
                 src="/images/logos/ISO.png"
                 alt={name}
@@ -118,24 +118,25 @@ export function ProductCard({
           </div>
         </div>
 
-        {/* Product Info */}
-        <div className="p-6">
-          <h3 className="font-bold text-brand-dark-blue text-lg mb-2 line-clamp-2 font-tango-sans group-hover:text-brand-primary transition-colors">
+        {/* Product Info - Flex grow to fill remaining space */}
+        <div className="p-4 sm:p-6 flex flex-col flex-grow">
+          <h3 className="font-bold text-brand-dark-blue text-base sm:text-lg mb-2 line-clamp-2 font-tango-sans group-hover:text-brand-primary transition-colors min-h-[3rem] sm:min-h-[3.5rem] flex items-start">
             {name}
           </h3>
 
           {description && (
-            <p className="text-sm text-brand-dark-blue/70 mb-3 line-clamp-2">
+            <p className="text-xs sm:text-sm text-brand-dark-blue/70 mb-3 line-clamp-2 min-h-[2.5rem] sm:min-h-[3rem] overflow-hidden text-ellipsis">
               {description}
             </p>
           )}
 
-          <div className="flex items-end justify-between mt-4">
-            <div>
+          {/* Price and Button - Always at bottom */}
+          <div className="flex items-end justify-between mt-auto pt-2">
+            <div className="flex-shrink-0">
               {displayPrice ? (
                 <>
                   <div className="text-xs text-brand-dark-blue/60 mb-1">Starting at</div>
-                  <div className="text-xl font-bold text-brand-dark-blue">
+                  <div className="text-lg sm:text-xl font-bold text-brand-dark-blue">
                     {formatPrice(displayPrice)}
                   </div>
                 </>
@@ -147,12 +148,13 @@ export function ProductCard({
             {showQuickAdd && defaultVariantId && (
               <Button
                 size="sm"
-                className="gap-2 bg-brand-primary hover:bg-brand-primary/90 text-white"
+                className="gap-1 sm:gap-2 bg-brand-primary hover:bg-brand-primary/90 text-white text-xs sm:text-sm px-2 sm:px-4 flex-shrink-0"
                 onClick={handleAddToCart}
                 disabled={isAddingToCart}
               >
-                <ShoppingCart className="w-4 h-4" />
-                {isAddingToCart ? 'Adding...' : 'Add to Cart'}
+                <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">{isAddingToCart ? 'Adding...' : 'Add to Cart'}</span>
+                <span className="sm:hidden">{isAddingToCart ? '...' : 'Add'}</span>
               </Button>
             )}
           </div>

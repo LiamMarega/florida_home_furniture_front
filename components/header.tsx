@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { Search, Heart, User, Menu } from 'lucide-react';
 import { MiniCart } from '@/components/cart/mini-cart';
 import { useAuth } from '@/contexts/auth-context';
+import { MobileMenuDrawer } from '@/components/header/mobile-menu-drawer';
 
 interface Category {
   name: string;
@@ -18,6 +19,7 @@ export function Header() {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const router = useRouter();
   const { isAuthenticated, openAuthModal, loading: authLoading } = useAuth();
   
@@ -126,12 +128,18 @@ export function Header() {
             <button
               aria-label="Open menu"
               className="lg:hidden hover:text-brand-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2 rounded p-2"
+              onClick={() => setIsMobileMenuOpen(true)}
             >
               <Menu className="w-6 h-6 text-white" />
             </button>
           </div>
         </div>
       </div>
+      
+      <MobileMenuDrawer 
+        isOpen={isMobileMenuOpen} 
+        onClose={() => setIsMobileMenuOpen(false)} 
+      />
     </header>
   );
 }

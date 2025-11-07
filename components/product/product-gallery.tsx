@@ -48,7 +48,7 @@ export function ProductGallery({ product }: ProductGalleryProps) {
               src={currentImage.preview}
               alt={`${product.name} - Image ${selectedImageIndex + 1}`}
               fill
-              className="object-cover transition-transform duration-300 group-hover:scale-105"
+              className="object-cover transition-transform duration-300 group-hover:scale-105 scale-90"
               sizes="(max-width: 768px) 100vw, 50vw"
             />
           )}
@@ -99,9 +99,9 @@ export function ProductGallery({ product }: ProductGalleryProps) {
             }}
             className="w-full"
           >
-            <CarouselContent className="-ml-2 md:-ml-4">
+            <CarouselContent className="-ml-2 md:-ml-4 p-10">
               {allImages.map((image, index) => (
-                <CarouselItem key={image.id} className="pl-2 md:pl-4 basis-1/4">
+                <CarouselItem key={image.id} className="pl-2 md:pl-4 basis-1/4 ">
                   <motion.div
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -122,7 +122,7 @@ export function ProductGallery({ product }: ProductGalleryProps) {
                     
                     {/* Selected indicator */}
                     {selectedImageIndex === index && (
-                      <div className="absolute inset-0 bg-brand-primary/20"></div>
+                      <div className="absolute inset-2 bg-brand-primary/20 rounded-md"></div>
                     )}
                   </motion.div>
                 </CarouselItem>

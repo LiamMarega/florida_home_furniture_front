@@ -6,8 +6,10 @@ import { Product } from '@/lib/types';
 import { fadeInUp, slideInLeft } from '@/lib/animations';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { AddToCartButton } from '@/components/cart/add-to-cart-button';
 import { ArrowLeft, Heart, Share2 } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 interface ProductHeroProps {
   product: Product;
@@ -24,6 +26,25 @@ export function ProductHero({ product }: ProductHeroProps) {
   const mainVariant = product.variants?.[0];
   const price = mainVariant?.priceWithTax;
   const currencyCode = mainVariant?.currencyCode || 'USD';
+  const stockLevel = mainVariant?.stockLevel;
+
+  // Check if product should show Add to Cart button
+  // Hide if: no price, price is 0, or no stock (stockLevel is "0", empty, or null)
+  const hasValidPrice = price !== null && price !== undefined && price > 0;
+  const hasStock = stockLevel && stockLevel !== '0' && stockLevel !== '';
+  const shouldShowAddToCart = hasValidPrice && hasStock;
+
+  // Handle Share button click
+  const handleShare = async () => {
+    try {
+      const currentUrl = window.location.href;
+      await navigator.clipboard.writeText(currentUrl);
+      toast.success('Enlace copiado');
+    } catch (error) {
+      console.error('Error copying URL:', error);
+      toast.error('Error al copiar enlace');
+    }
+  };
 
   return (
     <section className="relative min-h-[60vh] bg-gradient-to-br from-brand-cream via-brand-accent/20 to-brand-dark-blue/50 overflow-hidden">
@@ -121,12 +142,14 @@ export function ProductHero({ product }: ProductHeroProps) {
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-              <Button 
-                size="lg" 
-                className="bg-brand-primary hover:bg-brand-primary/90 text-white px-8 py-4 text-lg font-semibold rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-              >
-                Add to Cart
-              </Button>
+              {shouldShowAddToCart && mainVariant && (
+                <AddToCartButton
+                  productVariantId={mainVariant.id}
+                  productName={product.name}
+                  size="lg"
+                  className="bg-brand-primary hover:bg-brand-primary/90 text-white px-8 py-4 text-lg font-semibold rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                />
+              )}
               
               <div className="flex gap-3 justify-center lg:justify-start">
                 <Button 
@@ -141,6 +164,7 @@ export function ProductHero({ product }: ProductHeroProps) {
                 <Button 
                   variant="outline" 
                   size="lg"
+                  onClick={handleShare}
                   className="border-2 border-brand-dark-blue text-brand-dark-blue hover:bg-brand-dark-blue hover:text-white px-6 py-4 rounded-full transition-all duration-300"
                 >
                   <Share2 className="w-5 h-5 mr-2" />

@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { AddToCartButton } from '@/components/cart/add-to-cart-button';
 import { ShoppingCart, Heart, Share2, Truck, Shield, RotateCcw } from 'lucide-react';
 import { fadeInUp } from '@/lib/animations';
+import { toast } from 'sonner';
 
 interface ProductDetailsProps {
   product: Product;
@@ -49,6 +50,30 @@ export function ProductDetails({ product }: ProductDetailsProps) {
   const mainVariant = product.variants?.find(v => v.id === selectedVariant) || product.variants?.[0];
   const price = mainVariant?.priceWithTax;
   const currencyCode = mainVariant?.currencyCode || 'USD';
+  const stockLevel = mainVariant?.stockLevel;
+
+  // Check if product should show Add to Cart button
+  // Hide if: no price, price is 0, or no stock (stockLevel is "0", empty, or null)
+  const hasValidPrice = price !== null && price !== undefined && price > 0;
+  const hasStock = stockLevel && stockLevel !== '0' && stockLevel !== '';
+  const shouldShowAddToCart = hasValidPrice && hasStock;
+
+  // Extract category from facetValues
+  const category = product.facetValues?.find(
+    (fv) => fv.facet?.code?.toLowerCase() === 'category' || fv.facet?.name?.toLowerCase() === 'category'
+  );
+
+  // Handle Share button click
+  const handleShare = async () => {
+    try {
+      const currentUrl = window.location.href;
+      await navigator.clipboard.writeText(currentUrl);
+      toast.success('Enlace copiado');
+    } catch (error) {
+      console.error('Error copying URL:', error);
+      toast.error('Error al copiar enlace');
+    }
+  };
 
   const handleQuantityChange = (newQuantity: number) => {
     if (newQuantity >= 1 && newQuantity <= 10) {
@@ -74,6 +99,13 @@ export function ProductDetails({ product }: ProductDetailsProps) {
     >
       {/* Product Title and Price */}
       <div>
+        {category && (
+          <div className="mb-2">
+            <span className="text-sm font-medium text-brand-primary uppercase tracking-wide">
+              {category.name}
+            </span>
+          </div>
+        )}
         <h1 className="text-3xl sm:text-4xl font-bold text-brand-dark-blue mb-4 font-tango-sans">
           {product.name}
         </h1>
@@ -141,43 +173,45 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       )}
 
       {/* Quantity Selection */}
-      <div>
-        <h3 className="text-lg font-semibold text-brand-dark-blue mb-3">Quantity</h3>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center border border-brand-cream rounded-lg">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleQuantityChange(quantity - 1)}
-              disabled={quantity <= 1}
-              className="h-10 w-10"
-            >
-              -
-            </Button>
-            <span className="px-4 py-2 font-medium text-brand-dark-blue min-w-[3rem] text-center">
-              {quantity}
+      {shouldShowAddToCart && (
+        <div>
+          <h3 className="text-lg font-semibold text-brand-dark-blue mb-3">Quantity</h3>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center border border-brand-cream rounded-lg">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleQuantityChange(quantity - 1)}
+                disabled={quantity <= 1}
+                className="h-10 w-10"
+              >
+                -
+              </Button>
+              <span className="px-4 py-2 font-medium text-brand-dark-blue min-w-[3rem] text-center">
+                {quantity}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleQuantityChange(quantity + 1)}
+                disabled={quantity >= 10}
+                className="h-10 w-10"
+              >
+                +
+              </Button>
+            </div>
+            <span className="text-sm text-brand-dark-blue/70">
+              {quantity === 1 ? '1 item' : `${quantity} items`}
             </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleQuantityChange(quantity + 1)}
-              disabled={quantity >= 10}
-              className="h-10 w-10"
-            >
-              +
-            </Button>
           </div>
-          <span className="text-sm text-brand-dark-blue/70">
-            {quantity === 1 ? '1 item' : `${quantity} items`}
-          </span>
         </div>
-      </div>
+      )}
 
       <Separator />
 
       {/* Add to Cart Section */}
       <div className="space-y-4">
-        {selectedVariant && (
+        {selectedVariant && shouldShowAddToCart && (
           <AddToCartButton
             productVariantId={selectedVariant}
             productName={product.name}
@@ -195,6 +229,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
           </Button>
           <Button
             variant="outline"
+            onClick={handleShare}
             className="flex-1 h-12 border-2 border-brand-dark-blue text-brand-dark-blue hover:bg-brand-dark-blue hover:text-white"
           >
             <Share2 className="w-5 h-5 mr-2" />

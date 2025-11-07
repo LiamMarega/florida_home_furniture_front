@@ -45,7 +45,7 @@ export function Footer() {
           <h3 className="text-[14px] font-semibold text-brand-dark-blue mb-3">Email:</h3>
           <p className="text-[12px] text-brand-dark-blue/70 leading-6">
             For inquiries:<br />
-            alexlsabramovich11@gmail.com
+            floridahome.fh@gmail.com
           </p>
         </div>
 

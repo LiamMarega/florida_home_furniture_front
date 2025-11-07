@@ -150,7 +150,7 @@ export function ProductsGrid({
               className={gridClassName}
             >
               {displayedProducts.map((product: Product) => (
-                <motion.div key={product.id} variants={staggerItem}>
+                <motion.div key={product.id} variants={staggerItem} className="h-full">
                   <ProductCard
                     id={product.id}
                     name={product.name}

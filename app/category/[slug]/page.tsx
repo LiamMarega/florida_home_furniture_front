@@ -81,7 +81,7 @@ export default function CategoryPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen py-10">
       <ProductsGrid
         title={categoryInfo.name}
         subtitle={`Explore our collection of ${categoryInfo.name.toLowerCase()} furniture`}
