@@ -112,6 +112,51 @@ export const SEARCH_PRODUCTS_BY_FACETS = gql`
   }
 `;
 
+/**
+ * Get products by their IDs
+ * Used to fetch full product data after getting product IDs from search
+ */
+export const GET_PRODUCTS_BY_IDS = gql`
+  ${ASSET_FRAGMENT}
+  ${PRODUCT_VARIANT_FRAGMENT}
+  query GetProductsByIds($options: ProductListOptions) {
+    products(options: $options) {
+      items {
+        id
+        createdAt
+        updatedAt
+        languageCode
+        name
+        slug
+        description
+        enabled
+        featuredAsset {
+          ...Asset
+        }
+        variants {
+          ...ProductVariant
+        }
+        facetValues {
+          id
+          name
+          code
+          facet {
+            id
+            name
+            code
+          }
+        }
+        collections {
+          id
+          name
+          slug
+        }
+      }
+      totalItems
+    }
+  }
+`;
+
 export const ELIGIBLE_SHIPPING_METHODS = /* GraphQL */ `
   query EligibleShippingMethods {
     eligibleShippingMethods {
