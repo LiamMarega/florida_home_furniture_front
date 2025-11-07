@@ -12,16 +12,6 @@ const trustElements = [
     description: 'All products come with a comprehensive 2-year warranty for your peace of mind'
   },
   {
-    icon: Truck,
-    title: 'Free Shipping',
-    description: 'Free delivery on all orders over $200 directly to your doorstep'
-  },
-  {
-    icon: RotateCcw,
-    title: '30-Day Returns',
-    description: 'Not satisfied? Return any item within 30 days for a full refund'
-  },
-  {
     icon: Award,
     title: 'Quality Guaranteed',
     description: 'Quality materials and careful craftsmanship in every piece'

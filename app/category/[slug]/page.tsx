@@ -54,10 +54,10 @@ export default function CategoryPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
+      <div className="min-h-screen flex items-center justify-center pt-20 pb-20">
+        <div className="text-center px-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-primary mx-auto mb-4"></div>
-          <p className="text-brand-dark-blue/60 text-lg">Loading category...</p>
+          <p className="text-brand-dark-blue/60 text-base sm:text-lg">Loading category...</p>
         </div>
       </div>
     );
@@ -65,13 +65,14 @@ export default function CategoryPage() {
 
   if (error || !categoryInfo || !facetValueId) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-brand-dark-blue mb-4">Category Not Found</h1>
-          <p className="text-brand-dark-blue/60 text-lg mb-8">{error || 'The category you are looking for does not exist.'}</p>
+      <div className="min-h-screen flex items-center justify-center pt-20 pb-20">
+        <div className="text-center px-4 sm:px-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-brand-dark-blue mb-4">Category Not Found</h1>
+          <p className="text-brand-dark-blue/60 text-base sm:text-lg mb-8">{error || 'The category you are looking for does not exist.'}</p>
           <a
             href="/"
-            className="inline-block px-6 py-3 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 transition-colors"
+            className="inline-block px-6 py-3 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 transition-colors touch-manipulation h-12 flex items-center justify-center"
+            aria-label="Go to homepage"
           >
             Go to Homepage
           </a>
@@ -81,7 +82,7 @@ export default function CategoryPage() {
   }
 
   return (
-    <div className="min-h-screen py-10">
+    <div className="min-h-screen py-6 sm:py-10">
       <ProductsGrid
         title={categoryInfo.name}
         subtitle={`Explore our collection of ${categoryInfo.name.toLowerCase()} furniture`}

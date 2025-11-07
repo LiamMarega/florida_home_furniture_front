@@ -108,11 +108,11 @@ export function ProductFeatures({ product }: ProductFeaturesProps) {
             </span>
           </div>
           
-          <h2 className="text-4xl sm:text-5xl font-bold text-brand-dark-blue mb-4 font-tango-sans">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-brand-dark-blue mb-4 font-tango-sans leading-tight">
             Built for Excellence
           </h2>
           
-          <p className="text-lg text-brand-dark-blue/80 max-w-2xl mx-auto">
+          <p className="text-base sm:text-lg text-brand-dark-blue/80 max-w-2xl mx-auto px-4 sm:px-0">
             Every detail has been carefully considered to provide you with the best possible furniture experience
           </p>
         </motion.div>
@@ -122,7 +122,7 @@ export function ProductFeatures({ product }: ProductFeaturesProps) {
           initial="hidden"
           animate={isVisible ? 'visible' : 'hidden'}
           variants={staggerContainer}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-20"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mb-12 sm:mb-20"
         >
           {features.map((feature, index) => {
             const Icon = feature.icon;
@@ -135,7 +135,7 @@ export function ProductFeatures({ product }: ProductFeaturesProps) {
                   y: -8, 
                   transition: { duration: 0.3 } 
                 }}
-                className="group bg-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border border-brand-cream"
+                className="group bg-white rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-lg hover:shadow-2xl transition-all duration-300 border border-brand-cream"
               >
                 <div className={`w-16 h-16 ${feature.bgColor} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300`}>
                   <Icon className={`w-8 h-8 ${feature.color}`} />

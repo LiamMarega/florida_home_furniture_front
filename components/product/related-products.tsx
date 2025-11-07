@@ -44,11 +44,11 @@ export function RelatedProducts({ products }: RelatedProductsProps) {
             </span>
           </div>
           
-          <h2 className="text-4xl sm:text-5xl font-bold text-brand-dark-blue mb-4 font-tango-sans">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-brand-dark-blue mb-4 font-tango-sans leading-tight px-4 sm:px-0">
             Related Products
           </h2>
           
-          <p className="text-lg text-brand-dark-blue/80 max-w-2xl mx-auto">
+          <p className="text-base sm:text-lg text-brand-dark-blue/80 max-w-2xl mx-auto px-4 sm:px-0">
             Discover more beautiful pieces that complement your style
           </p>
         </motion.div>
@@ -58,7 +58,7 @@ export function RelatedProducts({ products }: RelatedProductsProps) {
           initial="hidden"
           animate={isVisible ? 'visible' : 'hidden'}
           variants={staggerContainer}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-12"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 mb-8 sm:mb-12"
         >
           {products.map((product, index) => {
             const mainVariant = product.variants?.[0];
@@ -70,7 +70,7 @@ export function RelatedProducts({ products }: RelatedProductsProps) {
                 key={product.id}
                 variants={staggerItem}
                 whileHover={{ y: -8, transition: { duration: 0.3 } }}
-                className="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 border border-brand-cream"
+                className="group bg-white rounded-xl sm:rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 border border-brand-cream"
               >
                 {/* Product Image */}
                 <div className="relative aspect-square overflow-hidden bg-brand-cream">
@@ -80,7 +80,9 @@ export function RelatedProducts({ products }: RelatedProductsProps) {
                       alt={product.name}
                       fill
                       className="object-cover group-hover:scale-110 transition-transform duration-500"
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                      loading="lazy"
+                      quality={85}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
@@ -123,14 +125,14 @@ export function RelatedProducts({ products }: RelatedProductsProps) {
                 </div>
 
                 {/* Product Info */}
-                <div className="p-6">
-                  <h3 className="font-bold text-brand-dark-blue text-lg mb-2 line-clamp-2 font-tango-sans group-hover:text-brand-primary transition-colors">
-                    <Link href={`/product/${product.slug}`}>
+                <div className="p-4 sm:p-6">
+                  <h3 className="font-bold text-brand-dark-blue text-base sm:text-lg mb-2 line-clamp-2 font-tango-sans group-hover:text-brand-primary transition-colors">
+                    <Link href={`/product/${product.slug}`} prefetch={true}>
                       {product.name}
                     </Link>
                   </h3>
 
-                  <p className="text-sm text-brand-dark-blue/70 mb-4 line-clamp-2">
+                  <p className="text-xs sm:text-sm text-brand-dark-blue/70 mb-3 sm:mb-4 line-clamp-2">
                     {product.description || 'Beautiful furniture piece for your home'}
                   </p>
 
@@ -158,8 +160,8 @@ export function RelatedProducts({ products }: RelatedProductsProps) {
                   )}
 
                   {/* Action Button */}
-                  <Link href={`/product/${product.slug}`} className="block">
-                    <Button className="w-full bg-brand-primary hover:bg-brand-primary/90 text-white group">
+                  <Link href={`/product/${product.slug}`} className="block" prefetch={true}>
+                    <Button className="w-full bg-brand-primary hover:bg-brand-primary/90 text-white group h-10 sm:h-11 text-sm sm:text-base touch-manipulation">
                       View Details
                       <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                     </Button>
