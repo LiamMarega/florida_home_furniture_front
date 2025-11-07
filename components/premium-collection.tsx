@@ -92,7 +92,7 @@ export function PremiumCollection() {
               <div className="absolute inset-0 bg-gradient-to-t from-brand-dark-blue/80 via-brand-dark-blue/40 to-transparent group-hover:from-brand-dark-blue/90 transition-all duration-300"></div>
 
               <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                <h3 className="text-2xl font-bold mb-2 group-hover:translate-y-0 translate-y-2 transition-transform font-tango-sans">
+                <h3 className="text-primary text-2xl font-bold mb-2 group-hover:translate-y-0 translate-y-2 transition-transform font-tango-sans">
                   {item.title}
                 </h3>
                 <p className="text-white/90 mb-4 group-hover:translate-y-0 translate-y-2 transition-transform delay-75">

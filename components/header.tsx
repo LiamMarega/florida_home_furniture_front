@@ -5,13 +5,21 @@ import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Search, Heart, User, Menu } from 'lucide-react';
-import { navigationItems } from '@/lib/data';
 import { MiniCart } from '@/components/cart/mini-cart';
 import { useAuth } from '@/contexts/auth-context';
+import { MobileMenuDrawer } from '@/components/header/mobile-menu-drawer';
+
+interface Category {
+  name: string;
+  href: string;
+  productCount?: number;
+}
 
 export function Header() {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const router = useRouter();
   const { isAuthenticated, openAuthModal, loading: authLoading } = useAuth();
   
@@ -27,6 +35,28 @@ export function Header() {
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Fetch categories from API
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/products/get-categories');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.categories && data.categories.length > 0) {
+            setCategories(data.categories.reverse());
+          }
+        } else {
+          console.warn('Failed to fetch categories, using default navigation items');
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        // Keep default navigationItems on error
+      }
+    };
+
+    fetchCategories();
   }, []);
 
   return (
@@ -49,7 +79,7 @@ export function Header() {
           </Link>
 
           <nav className="hidden lg:flex gap-8">
-            {navigationItems.map((item) => (
+            {categories.map((item) => (
               <Link
                 key={item.name}
                 href={item.href}
@@ -98,12 +128,18 @@ export function Header() {
             <button
               aria-label="Open menu"
               className="lg:hidden hover:text-brand-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-accent focus-visible:ring-offset-2 rounded p-2"
+              onClick={() => setIsMobileMenuOpen(true)}
             >
               <Menu className="w-6 h-6 text-white" />
             </button>
           </div>
         </div>
       </div>
+      
+      <MobileMenuDrawer 
+        isOpen={isMobileMenuOpen} 
+        onClose={() => setIsMobileMenuOpen(false)} 
+      />
     </header>
   );
 }

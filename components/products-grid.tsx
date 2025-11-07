@@ -10,7 +10,7 @@ import { ProductsGridFilters } from './products/products-grid-filters';
 import { Pagination } from './products/pagination';
 import { Product } from '@/lib/types';
 
-interface EnhancedProductsGridProps {
+interface ProductsGridProps {
   // Customization options
   title?: string;
   subtitle?: string;
@@ -25,14 +25,15 @@ interface EnhancedProductsGridProps {
   imageAspectRatio?: 'square' | 'portrait' | 'landscape';
   initialSort?: 'featured' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc' | 'newest';
   className?: string;
+  facetValueIds?: string | string[];
 }
 
-export function EnhancedProductsGrid({
+export function ProductsGrid({
   title = 'Explore latest collection',
   subtitle = 'Quality furniture that fits your budget and style',
   itemsPerPage = 20,
   columnsDesktop = 4,
-  columnsMobile = 1,
+  columnsMobile = 2,
   showSearch = true,
   showSort = true,
   showFilters = true,
@@ -41,7 +42,8 @@ export function EnhancedProductsGrid({
   imageAspectRatio = 'square',
   initialSort = 'featured',
   className = '',
-}: EnhancedProductsGridProps) {
+  facetValueIds,
+}: ProductsGridProps) {
   const { ref, isVisible } = useScrollAnimation();
   
   // Use products grid hook with server-side pagination
@@ -62,6 +64,7 @@ export function EnhancedProductsGrid({
     itemsPerPage,
     initialSort,
     useServerPagination: true,
+    facetValueIds,
   });
 
   // Grid column classes based on props
@@ -73,7 +76,7 @@ export function EnhancedProductsGrid({
     5: 'grid-cols-5',
   };
 
-  const gridClassName = `grid ${gridColsClass[columnsMobile]} lg:${gridColsClass[columnsDesktop]} gap-6`;
+  const gridClassName = `grid ${gridColsClass[columnsMobile]} md:${gridColsClass[columnsDesktop]} lg:${gridColsClass[columnsDesktop]} gap-3 sm:gap-4 lg:gap-6`;
 
   return (
     <section id="products-section" ref={ref} className={`py-20 ${className}`}>
@@ -147,7 +150,7 @@ export function EnhancedProductsGrid({
               className={gridClassName}
             >
               {displayedProducts.map((product: Product) => (
-                <motion.div key={product.id} variants={staggerItem}>
+                <motion.div key={product.id} variants={staggerItem} className="h-full">
                   <ProductCard
                     id={product.id}
                     name={product.name}

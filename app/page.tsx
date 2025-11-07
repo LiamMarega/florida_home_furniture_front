@@ -1,5 +1,5 @@
 import { HeroNew } from '@/components/hero-new';
-import { EnhancedProductsGrid } from '@/components/enhanced-products-grid';
+import { ProductsGrid } from '@/components/products-grid';
 import { PremiumCollection } from '@/components/premium-collection';
 import { TestimonialsSection } from '@/components/testimonials-section';
 import { TrustSection } from '@/components/trust-section';
@@ -10,7 +10,7 @@ export default function Home() {
     <main className="w-full">
       <HeroNew />
 
-      <EnhancedProductsGrid />
+      <ProductsGrid />
 
       <PremiumCollection />
 
@@ -18,7 +18,6 @@ export default function Home() {
 
       <TrustSection />
 
-      <Footer />
     </main>
   );
 }

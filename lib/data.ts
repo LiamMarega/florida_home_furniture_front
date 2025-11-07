@@ -1,13 +1,6 @@
 import { Stat, NavigationItem } from './types';
 
-export const navigationItems: NavigationItem[] = [
-  { name: 'Living Room', href: '/collections/living-room' },
-  { name: 'Bedroom', href: '/collections/bedroom' },
-  { name: 'Dining Room', href: '/collections/dining-room' },
-  { name: 'Office', href: '/collections/office' },
-  { name: 'Outdoor', href: '/collections/outdoor' },
-  { name: 'Accessories', href: '/collections/accessories' },
-];
+
 
 export const stats: Stat[] = [
   {
