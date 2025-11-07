@@ -4,13 +4,13 @@ export default function ProductLoading() {
   return (
     <div className="min-h-screen bg-white">
       {/* Gallery and Details Skeleton */}
-      <section className="pt-32 pb-16 bg-white">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
+      <section className="pt-24 sm:pt-28 md:pt-32 pb-12 sm:pb-16 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-16">
             {/* Gallery Skeleton */}
             <div className="space-y-6">
-              <Skeleton className="aspect-square rounded-2xl" />
-              <div className="grid grid-cols-4 gap-4">
+              <Skeleton className="aspect-square rounded-xl sm:rounded-2xl" />
+              <div className="grid grid-cols-4 gap-2 sm:gap-4">
                 {[...Array(4)].map((_, i) => (
                   <Skeleton key={i} className="aspect-square rounded-lg" />
                 ))}

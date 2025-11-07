@@ -106,16 +106,16 @@ export function ProductDetails({ product }: ProductDetailsProps) {
             </span>
           </div>
         )}
-        <h1 className="text-3xl sm:text-4xl font-bold text-brand-dark-blue mb-4 font-tango-sans">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-brand-dark-blue mb-4 font-tango-sans leading-tight">
           {product.name}
         </h1>
         
         {price !== null && price !== undefined && price > 0 && (
-          <div className="flex items-baseline gap-3 mb-4">
-            <span className="text-3xl font-bold text-brand-primary">
+          <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3 mb-4">
+            <span className="text-2xl sm:text-3xl font-bold text-brand-primary">
               {formatPrice(price, currencyCode)}
             </span>
-            <span className="text-sm text-brand-dark-blue/60">
+            <span className="text-xs sm:text-sm text-brand-dark-blue/60">
               (including tax)
             </span>
           </div>
@@ -125,8 +125,8 @@ export function ProductDetails({ product }: ProductDetailsProps) {
 
       {/* Product Description */}
       <div>
-        <h3 className="text-xl font-semibold text-brand-dark-blue mb-3">Description</h3>
-        <p className="text-brand-dark-blue/80 leading-relaxed">
+        <h3 className="text-lg sm:text-xl font-semibold text-brand-dark-blue mb-3">Description</h3>
+        <p className="text-sm sm:text-base text-brand-dark-blue/80 leading-relaxed">
           {product.description || 'This beautifully crafted piece combines modern design with timeless elegance. Made from premium materials and finished with attention to detail, it will enhance any space in your home.'}
         </p>
       </div>
@@ -165,18 +165,19 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       {shouldShowAddToCart && (
         <div>
           <h3 className="text-lg font-semibold text-brand-dark-blue mb-3">Quantity</h3>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
             <div className="flex items-center border border-brand-cream rounded-lg">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => handleQuantityChange(quantity - 1)}
                 disabled={quantity <= 1}
-                className="h-10 w-10"
+                className="h-11 w-11 sm:h-10 sm:w-10 touch-manipulation"
+                aria-label="Decrease quantity"
               >
                 -
               </Button>
-              <span className="px-4 py-2 font-medium text-brand-dark-blue min-w-[3rem] text-center">
+              <span className="px-4 py-2 font-medium text-brand-dark-blue min-w-[3rem] text-center text-base sm:text-sm">
                 {quantity}
               </span>
               <Button
@@ -184,7 +185,8 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                 size="sm"
                 onClick={() => handleQuantityChange(quantity + 1)}
                 disabled={quantity >= 10}
-                className="h-10 w-10"
+                className="h-11 w-11 sm:h-10 sm:w-10 touch-manipulation"
+                aria-label="Increase quantity"
               >
                 +
               </Button>
@@ -204,22 +206,25 @@ export function ProductDetails({ product }: ProductDetailsProps) {
           <AddToCartButton
             productVariantId={selectedVariant}
             productName={product.name}
-            className="w-full h-12 text-lg font-semibold"
+            className="w-full h-12 sm:h-12 text-base sm:text-lg font-semibold touch-manipulation"
           />
         )}
         
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <Button
             variant="outline"
-            className="flex-1 h-12 border-2 border-brand-dark-blue text-brand-dark-blue hover:bg-brand-dark-blue hover:text-white"
+            className="flex-1 h-12 sm:h-12 border-2 border-brand-dark-blue text-brand-dark-blue hover:bg-brand-dark-blue hover:text-white touch-manipulation"
+            aria-label="Add to wishlist"
           >
             <Heart className="w-5 h-5 mr-2" />
-            Add to Wishlist
+            <span className="hidden sm:inline">Add to Wishlist</span>
+            <span className="sm:hidden">Wishlist</span>
           </Button>
           <Button
             variant="outline"
             onClick={handleShare}
-            className="flex-1 h-12 border-2 border-brand-dark-blue text-brand-dark-blue hover:bg-brand-dark-blue hover:text-white"
+            className="flex-1 h-12 sm:h-12 border-2 border-brand-dark-blue text-brand-dark-blue hover:bg-brand-dark-blue hover:text-white touch-manipulation"
+            aria-label="Share product"
           >
             <Share2 className="w-5 h-5 mr-2" />
             Share
@@ -243,20 +248,20 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       </div> */}
 
       {/* Shipping & Returns */}
-      <div className="bg-brand-cream/30 rounded-lg p-6 space-y-4">
-        <h3 className="text-lg font-semibold text-brand-dark-blue">Shipping & Returns</h3>
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <Truck className="w-5 h-5 text-brand-primary" />
-            <span className="text-brand-dark-blue/80">Free shipping on orders over $200</span>
+      <div className="bg-brand-cream/30 rounded-lg p-4 sm:p-6 space-y-3 sm:space-y-4">
+        <h3 className="text-base sm:text-lg font-semibold text-brand-dark-blue">Shipping & Returns</h3>
+        <div className="space-y-2 sm:space-y-3">
+          <div className="flex items-start sm:items-center gap-2 sm:gap-3">
+            <Truck className="w-5 h-5 text-brand-primary flex-shrink-0 mt-0.5 sm:mt-0" />
+            <span className="text-sm sm:text-base text-brand-dark-blue/80">Free shipping on orders over $200</span>
           </div>
-          <div className="flex items-center gap-3">
-            <Shield className="w-5 h-5 text-brand-primary" />
-            <span className="text-brand-dark-blue/80">2-year warranty included</span>
+          <div className="flex items-start sm:items-center gap-2 sm:gap-3">
+            <Shield className="w-5 h-5 text-brand-primary flex-shrink-0 mt-0.5 sm:mt-0" />
+            <span className="text-sm sm:text-base text-brand-dark-blue/80">2-year warranty included</span>
           </div>
-          <div className="flex items-center gap-3">
-            <RotateCcw className="w-5 h-5 text-brand-primary" />
-            <span className="text-brand-dark-blue/80">30-day return policy</span>
+          <div className="flex items-start sm:items-center gap-2 sm:gap-3">
+            <RotateCcw className="w-5 h-5 text-brand-primary flex-shrink-0 mt-0.5 sm:mt-0" />
+            <span className="text-sm sm:text-base text-brand-dark-blue/80">30-day return policy</span>
           </div>
         </div>
       </div>

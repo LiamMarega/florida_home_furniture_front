@@ -4,8 +4,8 @@ import { ArrowLeft, Search, Home } from 'lucide-react';
 
 export default function ProductNotFound() {
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center pt-20">
-      <div className="max-w-2xl mx-auto px-6 text-center">
+    <div className="min-h-screen bg-white flex items-center justify-center pt-20 pb-20">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
         {/* 404 Illustration */}
         <div className="mb-8">
           <div className="w-32 h-32 mx-auto mb-6 bg-brand-cream rounded-full flex items-center justify-center">
@@ -15,24 +15,24 @@ export default function ProductNotFound() {
 
         {/* Error Message */}
         <div className="mb-8">
-          <h1 className="text-4xl sm:text-5xl font-bold text-brand-dark-blue mb-4 font-tango-sans">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-brand-dark-blue mb-4 font-tango-sans leading-tight">
             Product Not Found
           </h1>
-          <p className="text-lg text-brand-dark-blue/80 mb-6">
+          <p className="text-base sm:text-lg text-brand-dark-blue/80 mb-6">
             Sorry, we couldn&apos;t find the product you&apos;re looking for. It might have been moved, deleted, or the link might be incorrect.
           </p>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button asChild size="lg" className="bg-brand-primary hover:bg-brand-primary/90 text-white">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+          <Button asChild size="lg" className="bg-brand-primary hover:bg-brand-primary/90 text-white h-12 touch-manipulation">
             <Link href="/">
               <ArrowLeft className="w-5 h-5 mr-2" />
               Browse All Products
             </Link>
           </Button>
           
-          <Button asChild variant="outline" size="lg" className="border-2 border-brand-dark-blue text-brand-dark-blue hover:bg-brand-dark-blue hover:text-white">
+          <Button asChild variant="outline" size="lg" className="border-2 border-brand-dark-blue text-brand-dark-blue hover:bg-brand-dark-blue hover:text-white h-12 touch-manipulation">
             <Link href="/">
               <Home className="w-5 h-5 mr-2" />
               Go Home
