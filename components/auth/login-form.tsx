@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/auth-context';
 import { Loader2, Mail, Lock } from 'lucide-react';
+import { toast } from 'sonner';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -19,37 +20,40 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 const LoginForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const { login, openAuthModal } = useAuth();
+  const { login, openAuthModal, authModalOpen } = useAuth();
 
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
 
+
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
-    setError(null);
 
     const result = await login(data.email, data.password);
 
     if (!result.success) {
-      setError(result.error || 'Login failed');
+      const errorMessage = result.error || 'Login failed';
+      toast.error('Login Failed', {
+        description: errorMessage,
+      });
       setIsLoading(false);
+    } else {
+      toast.success('Welcome Back!', {
+        description: 'You have successfully logged in.',
+      });
+      reset();
+      // Modal will close automatically via the context after a short delay
     }
-    // On success, the modal will close automatically via the context
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      {error && (
-        <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md">
-          {error}
-        </div>
-      )}
 
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>

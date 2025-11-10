@@ -2,15 +2,46 @@
 
 import { useState } from 'react';
 import { Twitter, Instagram, Hash } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from './ui/button';
 
 export function Footer() {
   const [email, setEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Newsletter signup:', email);
-    setEmail('');
+    
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch('/api/newsletter/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al suscribirse al newsletter');
+      }
+
+      toast.success('¡Suscripción exitosa!', {
+        description: 'Te has suscrito exitosamente a nuestro newsletter.',
+      });
+      setEmail('');
+    } catch (error) {
+      toast.error('Error', {
+        description: error instanceof Error ? error.message : 'Error al suscribirse al newsletter',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -59,8 +90,11 @@ export function Footer() {
               placeholder="Enter email address"
               className="h-10 flex-1 rounded-lg border border-brand-cream px-4 text-[12px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2"
               required
+              disabled={isSubmitting}
             />
-            <Button type="submit" size="sm">Enter</Button>
+            <Button type="submit" size="sm" disabled={isSubmitting}>
+              {isSubmitting ? '...' : 'Enter'}
+            </Button>
           </form>
         </div>
       </div>

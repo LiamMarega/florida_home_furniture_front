@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       const res = NextResponse.json({
         success: true,
         user: verifyData,
-        message: 'Email verified successfully!',
+        message: 'Email verified successfully! You can now log in.',
       });
 
       // Propagar cookies si las hay
@@ -89,10 +89,21 @@ export async function POST(req: NextRequest) {
 
     // Si hay algún error
     console.warn('[verify] Verification failed:', verifyData);
+    
+    let errorMessage = 'Verification failed';
+    if (verifyData.__typename === 'VerificationTokenInvalidError') {
+      errorMessage = 'Invalid verification token. Please request a new verification email.';
+    } else if (verifyData.__typename === 'VerificationTokenExpiredError') {
+      errorMessage = 'Verification token has expired. Please request a new verification email.';
+    } else {
+      errorMessage = verifyData.message || 'Verification failed';
+    }
+    
     return NextResponse.json(
       {
         success: false,
-        error: verifyData.message || 'Verification failed',
+        error: errorMessage,
+        message: errorMessage,
         errorCode: verifyData.errorCode,
       },
       { status: 400 }

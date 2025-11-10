@@ -62,6 +62,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ errors: result.errors }, { status: 400 });
   }
 
+  // Check if setCustomerForOrder returned an error (e.g., EMAIL_ADDRESS_CONFLICT_ERROR)
+  if (result.data?.setCustomerForOrder?.errorCode) {
+    console.error('[set-customer] setCustomerForOrder error:', result.data.setCustomerForOrder);
+    return NextResponse.json(
+      { 
+        setCustomerForOrder: result.data.setCustomerForOrder,
+        error: result.data.setCustomerForOrder.message 
+      }, 
+      { status: 400 }
+    );
+  }
+
   const res = NextResponse.json(result.data);
   for (const c of result.setCookies ?? []) res.headers.append('Set-Cookie', c);
   console.log('[set-customer] Success response sent:', JSON.stringify(result.data, null, 2));

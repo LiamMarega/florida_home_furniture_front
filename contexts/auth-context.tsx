@@ -22,7 +22,7 @@ interface AuthContextType {
   loading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  register: (input: RegisterInput) => Promise<{ success: boolean; error?: string; message?: string }>;
+  register: (input: RegisterInput) => Promise<{ success: boolean; error?: string; errorCode?: string; message?: string }>;
   verifyEmail: (token: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   openAuthModal: (view?: 'login' | 'register') => void;
@@ -85,7 +85,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error?.message || error.error || 'Login failed');
+        const errorMessage = error.message || error.error?.message || error.error || 'Login failed';
+        throw new Error(errorMessage);
       }
 
       return response.json();
@@ -96,7 +97,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       queryClient.invalidateQueries({ queryKey: ['active-order'] });
       queryClient.invalidateQueries({ queryKey: ['cart'] });
       refetch();
-      closeAuthModal();
+      // Delay closing modal to allow success message to be displayed
+      setTimeout(() => {
+        closeAuthModal();
+      }, 2000);
     },
   });
 
@@ -114,7 +118,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error?.message || error.error || 'Registration failed');
+        const errorObj = error.error || {};
+        const errorMessage = typeof errorObj === 'string' 
+          ? errorObj 
+          : errorObj.message || error.error?.message || 'Registration failed';
+        const errorCode = typeof errorObj === 'object' ? errorObj.errorCode : undefined;
+        const errorWithCode = new Error(errorMessage) as Error & { errorCode?: string };
+        if (errorCode) {
+          errorWithCode.errorCode = errorCode;
+        }
+        throw errorWithCode;
       }
 
       return response.json();
@@ -170,9 +183,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         message: 'Registration successful. Please login.',
       };
     } catch (error) {
+      const errorCode = (error as Error & { errorCode?: string })?.errorCode;
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Registration failed',
+        errorCode,
       };
     }
   };

@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Header } from '@/components/header';
 import { CartProvider } from '@/contexts/cart-context';
 import { AuthProvider } from '@/contexts/auth-context';
+import { SearchProvider } from '@/contexts/search-context';
 import { QueryProvider } from '@/lib/query-client';
 import { Toaster } from '@/components/ui/sonner';
 import localFont from 'next/font/local';
@@ -124,11 +125,13 @@ export default function RootLayout({
         <QueryProvider>
           <AuthProvider>
             <CartProvider>
-              <ConditionalHeader />
-              {children}
-              <AuthModal />
-              <Toaster position="bottom-right" />
-              <Footer />
+              <SearchProvider>
+                <ConditionalHeader />
+                {children}
+                <AuthModal />
+                <Toaster position="bottom-right" />
+                <Footer />
+              </SearchProvider>
             </CartProvider>
           </AuthProvider>
         </QueryProvider>

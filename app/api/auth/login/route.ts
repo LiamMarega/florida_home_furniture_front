@@ -51,7 +51,13 @@ export async function POST(req: NextRequest) {
 
   const { emailAddress, password } = raw;
   if (!emailAddress || !password) {
-    return NextResponse.json({ error: 'Missing credentials' }, { status: 400 });
+    return NextResponse.json(
+      { 
+        error: 'Missing credentials',
+        message: 'Please provide both email and password'
+      },
+      { status: 400 }
+    );
   }
 
   // Ejecutar login
@@ -69,7 +75,39 @@ export async function POST(req: NextRequest) {
 
   if (!loginData || loginData.__typename !== 'CurrentUser') {
     console.warn('[login] Login failed:', loginData);
-    return NextResponse.json({ error: loginData }, { status: 401 });
+    
+    // Manejar diferentes tipos de errores
+    if (loginData?.__typename === 'InvalidCredentialsError') {
+      return NextResponse.json(
+        {
+          error: 'Invalid credentials',
+          message: loginData.message || 'Email or password is incorrect',
+          errorCode: loginData.errorCode,
+        },
+        { status: 401 }
+      );
+    }
+    
+    if (loginData?.__typename === 'NotVerifiedError') {
+      return NextResponse.json(
+        {
+          error: 'Email not verified',
+          message: loginData.message || 'Please verify your email before logging in',
+          errorCode: loginData.errorCode,
+        },
+        { status: 403 }
+      );
+    }
+    
+    // Error genérico
+    return NextResponse.json(
+      {
+        error: 'Login failed',
+        message: loginData?.message || 'Unable to log in. Please try again.',
+        errorCode: loginData?.errorCode,
+      },
+      { status: 401 }
+    );
   }
 
   // Obtener estado post-login
@@ -77,8 +115,10 @@ export async function POST(req: NextRequest) {
   console.log('[login] AuthState:', JSON.stringify(authState, null, 2));
 
   const res = NextResponse.json({
+    success: true,
     user: loginData,
     auth: authState.data,
+    message: 'Login successful',
   });
 
   // Propagar cookies (Vendure session)

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/auth-context';
 import { ResendVerification } from './resend-verification';
 import { Loader2, Mail, Lock, User } from 'lucide-react';
+import { toast } from 'sonner';
 
 const registerSchema = z
   .object({
@@ -28,23 +29,30 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 
 const RegisterForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
-  const { register: registerUser, openAuthModal } = useAuth();
+  const { register: registerUser, openAuthModal, authModalOpen } = useAuth();
 
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
   });
 
+  // Reset success message when modal closes or view changes
+  useEffect(() => {
+    if (!authModalOpen) {
+      setShowSuccess(false);
+      setRegisteredEmail(null);
+    }
+  }, [authModalOpen]);
+
   const onSubmit = async (data: RegisterFormData) => {
     setIsLoading(true);
-    setError(null);
-    setSuccessMessage(null);
+    setShowSuccess(false);
 
     const { confirmPassword, ...registerData } = data;
     const result = await registerUser({
@@ -55,31 +63,57 @@ const RegisterForm: React.FC = () => {
     });
 
     if (!result.success) {
-      setError(result.error || 'Registration failed');
+      // Check if the error is related to email already being registered
+      const errorCode = result.errorCode;
+      const errorMessage = result.error || result.message || 'Registration failed';
+      const isEmailConflict = 
+        errorCode === 'EMAIL_ADDRESS_CONFLICT_ERROR' ||
+        errorCode === 'EMAIL_NOT_VERIFIED' ||
+        errorMessage.includes('EMAIL_ADDRESS_CONFLICT_ERROR') ||
+        errorMessage.includes('EMAIL_NOT_VERIFIED') ||
+        (errorMessage.toLowerCase().includes('email') && 
+         (errorMessage.toLowerCase().includes('already') || 
+          errorMessage.toLowerCase().includes('exists') ||
+          errorMessage.toLowerCase().includes('registered')));
+
+      if (errorCode === 'EMAIL_NOT_VERIFIED') {
+        toast.error('Email Already Registered', {
+          description: 'This email is already registered but not verified. Please check your email for the verification link or try signing in.',
+          action: {
+            label: 'Sign In',
+            onClick: () => openAuthModal('login'),
+          },
+          duration: 6000,
+        });
+      } else if (isEmailConflict) {
+        toast.error('Email Already Registered', {
+          description: 'This email address is already registered. Please sign in instead.',
+          action: {
+            label: 'Sign In',
+            onClick: () => openAuthModal('login'),
+          },
+        });
+      } else {
+        toast.error('Registration Failed', {
+          description: errorMessage,
+        });
+      }
       setIsLoading(false);
     } else {
       // Show success message about email verification
-      setSuccessMessage('Registration successful!');
+      toast.success('Account Created Successfully!', {
+        description: 'Please check your email for a verification link. You\'ll need to verify your email before you can log in.',
+        duration: 5000,
+      });
+      setShowSuccess(true);
       setRegisteredEmail(registerData.email);
+      reset();
       setIsLoading(false);
     }
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      {error && (
-        <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md">
-          {error}
-        </div>
-      )}
-      {successMessage && (
-        <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-md">
-          <p className="font-medium">Registration Successful!</p>
-          <p className="text-sm mt-1">
-            Please check your email for a verification link. You&apos;ll need to verify your email before you can log in.
-          </p>
-        </div>
-      )}
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -178,7 +212,7 @@ const RegisterForm: React.FC = () => {
         )}
       </Button>
 
-      {successMessage && registeredEmail && (
+      {showSuccess && registeredEmail && (
         <div className="mt-4">
           <ResendVerification email={registeredEmail} />
         </div>
