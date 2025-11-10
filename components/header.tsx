@@ -91,6 +91,14 @@ export function Header() {
             ))}
           </nav>
 
+          <button
+            className="lg:hidden text-sm font-medium text-white hover:text-brand-accent transition-colors"
+            onClick={() => setIsMobileMenuOpen(true)}
+            aria-label="View all categories"
+          >
+            View More
+          </button>
+
           <div className="flex gap-4 items-center text-white">
             <button
               aria-label="Open search"

@@ -9,6 +9,7 @@ interface UseProductsGridOptions {
   initialSort?: SortOption;
   useServerPagination?: boolean;
   facetValueIds?: string | string[];
+  collectionId?: string;
 }
 
 /**
@@ -39,6 +40,7 @@ export function useProductsGrid({
   initialSort = 'featured',
   useServerPagination = true,
   facetValueIds,
+  collectionId,
 }: UseProductsGridOptions = {}) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>(initialSort);
@@ -67,6 +69,7 @@ export function useProductsGrid({
     search: debouncedSearch || undefined,
     sort: sortBy,
     facetValueIds,
+    collectionId,
     enabled: useServerPagination,
   });
 

@@ -11,6 +11,7 @@ export const productApiKeys = {
     search?: string;
     sort?: string;
     facetValueIds?: string | string[];
+    collectionId?: string;
   }) => [...productApiKeys.lists(), filters] as const,
 };
 
@@ -32,6 +33,7 @@ interface UseProductsOptions {
   search?: string;
   sort?: 'featured' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc' | 'newest';
   facetValueIds?: string | string[];
+  collectionId?: string;
   enabled?: boolean;
 }
 
@@ -50,6 +52,9 @@ async function fetchProducts(options: UseProductsOptions): Promise<PaginatedProd
       ? options.facetValueIds.join(',') 
       : options.facetValueIds;
     params.set('facetValueIds', ids);
+  }
+  if (options.collectionId) {
+    params.set('collectionId', options.collectionId);
   }
 
   const response = await fetch(`/api/products?${params.toString()}`, {
@@ -87,12 +92,13 @@ export function useProductsApi(options: UseProductsOptions = {}) {
     search,
     sort = 'featured',
     facetValueIds,
+    collectionId,
     enabled = true,
   } = options;
 
   return useQuery({
-    queryKey: productApiKeys.list({ page, limit, search, sort, facetValueIds }),
-    queryFn: () => fetchProducts({ page, limit, search, sort, facetValueIds }),
+    queryKey: productApiKeys.list({ page, limit, search, sort, facetValueIds, collectionId }),
+    queryFn: () => fetchProducts({ page, limit, search, sort, facetValueIds, collectionId }),
     staleTime: 5 * 60 * 1000, // 5 minutes
     enabled,
   });

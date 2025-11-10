@@ -26,6 +26,7 @@ interface ProductsGridProps {
   initialSort?: 'featured' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc' | 'newest';
   className?: string;
   facetValueIds?: string | string[];
+  collectionId?: string;
 }
 
 export function ProductsGrid({
@@ -43,6 +44,7 @@ export function ProductsGrid({
   initialSort = 'featured',
   className = '',
   facetValueIds,
+  collectionId,
 }: ProductsGridProps) {
   const { ref, isVisible } = useScrollAnimation();
   
@@ -65,6 +67,7 @@ export function ProductsGrid({
     initialSort,
     useServerPagination: true,
     facetValueIds,
+    collectionId,
   });
 
   // Grid column classes based on props
