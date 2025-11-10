@@ -1,15 +1,15 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/auth-context';
-import { Loader2, Mail, Lock, CheckCircle2 } from 'lucide-react';
+import { Loader2, Mail, Lock } from 'lucide-react';
+import { toast } from 'sonner';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -20,8 +20,6 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 const LoginForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showSuccess, setShowSuccess] = useState(false);
   const { login, openAuthModal, authModalOpen } = useAuth();
 
   const {
@@ -33,52 +31,29 @@ const LoginForm: React.FC = () => {
     resolver: zodResolver(loginSchema),
   });
 
-  // Reset success message when modal closes
-  useEffect(() => {
-    if (!authModalOpen) {
-      setShowSuccess(false);
-      setError(null);
-    }
-  }, [authModalOpen]);
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
-    setError(null);
-    setShowSuccess(false);
 
     const result = await login(data.email, data.password);
 
     if (!result.success) {
-      setError(result.error || 'Login failed');
+      const errorMessage = result.error || 'Login failed';
+      toast.error('Login Failed', {
+        description: errorMessage,
+      });
       setIsLoading(false);
     } else {
-      // Show success message briefly before modal closes
-      setShowSuccess(true);
+      toast.success('Welcome Back!', {
+        description: 'You have successfully logged in.',
+      });
       reset();
       // Modal will close automatically via the context after a short delay
-      setTimeout(() => {
-        setShowSuccess(false);
-      }, 2000);
     }
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      {showSuccess && (
-        <Alert variant="success">
-          <CheckCircle2 className="h-4 w-4" />
-          <AlertTitle>Success!</AlertTitle>
-          <AlertDescription>
-            You have successfully logged in. Welcome back!
-          </AlertDescription>
-        </Alert>
-      )}
-      {error && (
-        <Alert variant="destructive">
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
 
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>

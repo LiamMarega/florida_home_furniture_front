@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { CustomerFormData } from '@/lib/checkout/types';
+import { useAuth } from '@/contexts/auth-context';
 
 interface UseCheckoutProcessReturn {
   clientSecret: string | null;
@@ -16,6 +17,7 @@ export function useCheckoutProcess(): UseCheckoutProcessReturn {
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { openAuthModal } = useAuth();
 
   const processCheckout = useCallback(async (data: CustomerFormData, selectedShippingMethod: string) => {
     setIsProcessing(true);
@@ -23,7 +25,7 @@ export function useCheckoutProcess(): UseCheckoutProcessReturn {
 
     try {
       // Set customer information
-      await fetch('/api/checkout/set-customer', {
+      const setCustomerRes = await fetch('/api/checkout/set-customer', {
         method: 'POST',
         body: JSON.stringify({
           firstName: data.firstName,
@@ -34,6 +36,34 @@ export function useCheckoutProcess(): UseCheckoutProcessReturn {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
       });
+
+      const setCustomerData = await setCustomerRes.json();
+
+      // Check for EMAIL_ADDRESS_CONFLICT_ERROR
+      if (
+        setCustomerData?.setCustomerForOrder?.errorCode === 'EMAIL_ADDRESS_CONFLICT_ERROR' ||
+        setCustomerData?.errors?.some((e: any) => 
+          e.extensions?.code === 'EMAIL_ADDRESS_CONFLICT_ERROR' ||
+          e.message?.includes('EMAIL_ADDRESS_CONFLICT_ERROR')
+        )
+      ) {
+        const errorMessage = setCustomerData?.setCustomerForOrder?.message || 
+                           setCustomerData?.errors?.[0]?.message || 
+                           'This email address is already registered. Please login to continue.';
+        setError(errorMessage);
+        // Open login modal
+        openAuthModal('login');
+        setIsProcessing(false);
+        return; // Stop the checkout process
+      }
+
+      // Check for other errors in the response
+      if (!setCustomerRes.ok) {
+        const errorMessage = setCustomerData?.error || 
+                           setCustomerData?.setCustomerForOrder?.message ||
+                           'Failed to set customer information';
+        throw new Error(errorMessage);
+      }
 
       // Set shipping address
       await fetch('/api/checkout/set-shipping-address', {
@@ -72,7 +102,7 @@ export function useCheckoutProcess(): UseCheckoutProcessReturn {
     } finally {
       setIsProcessing(false);
     }
-  }, []);
+  }, [openAuthModal]);
 
   const resetCheckout = useCallback(() => {
     setClientSecret(null);
