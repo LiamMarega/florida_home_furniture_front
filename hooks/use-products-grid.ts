@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useProductsApi } from './use-products-api';
+import { useSearch } from '@/contexts/search-context';
 import { Product } from '@/lib/types';
 
 export type SortOption = 'featured' | 'price-low' | 'price-high' | 'name-asc' | 'name-desc' | 'newest';
@@ -42,10 +43,16 @@ export function useProductsGrid({
   facetValueIds,
   collectionId,
 }: UseProductsGridOptions = {}) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const { searchQuery: contextSearchQuery, setSearchQuery: setContextSearchQuery } = useSearch();
+  const [searchQuery, setSearchQuery] = useState(contextSearchQuery);
   const [sortBy, setSortBy] = useState<SortOption>(initialSort);
   const [currentPage, setCurrentPage] = useState(1);
   const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Sync local search query with context
+  useEffect(() => {
+    setSearchQuery(contextSearchQuery);
+  }, [contextSearchQuery]);
 
   // Debounce search query
   useEffect(() => {
@@ -104,7 +111,8 @@ export function useProductsGrid({
   // Handle search change
   const handleSearchChange = useCallback((query: string) => {
     setSearchQuery(query);
-  }, []);
+    setContextSearchQuery(query);
+  }, [setContextSearchQuery]);
 
   // Handle sort change
   const handleSortChange = useCallback((sort: SortOption) => {
