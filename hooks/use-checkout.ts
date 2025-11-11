@@ -1,48 +1,25 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useCallback } from 'react';
+import { useAuth } from '@/contexts/auth-context';
+import { CustomerFormData, ShippingMethod } from '@/lib/checkout/types';
 
-// Query keys for checkout operations
+// Query keys
 export const checkoutKeys = {
   all: ['checkout'] as const,
   shippingMethods: () => [...checkoutKeys.all, 'shipping-methods'] as const,
-  paymentIntent: (orderCode: string) => [...checkoutKeys.all, 'payment-intent', orderCode] as const,
 };
 
 // Types
-interface ShippingMethod {
-  id: string;
-  code: string;
-  name: string;
-  description: string;
-  priceWithTax: number;
-}
-
-interface CustomerData {
-  firstName: string;
-  lastName: string;
-  emailAddress: string;
-  phoneNumber?: string;
-  forceGuest?: boolean;
-}
-
-interface AddressData {
-  fullName: string;
-  streetLine1: string;
-  streetLine2?: string;
-  city: string;
-  province: string;
-  postalCode: string;
-  country: string;
-  phoneNumber: string;
-}
-
 interface PaymentIntentData {
   clientSecret: string;
+  paymentIntentId?: string;
 }
 
-// Fetch shipping methods
-async function fetchShippingMethods(): Promise<{ shippingMethods: ShippingMethod[] }> {
+// API functions
+async function fetchShippingMethods(): Promise<{ eligibleShippingMethods: ShippingMethod[] }> {
   const response = await fetch('/api/checkout/shipping-methods', {
     credentials: 'include',
+    cache: 'no-store',
   });
 
   if (!response.ok) {
@@ -53,8 +30,12 @@ async function fetchShippingMethods(): Promise<{ shippingMethods: ShippingMethod
   return response.json();
 }
 
-// Set customer information
-async function setCustomer(customerData: CustomerData): Promise<any> {
+async function setCustomer(customerData: {
+  firstName: string;
+  lastName: string;
+  emailAddress: string;
+  phoneNumber?: string;
+}): Promise<any> {
   const response = await fetch('/api/checkout/set-customer', {
     method: 'POST',
     credentials: 'include',
@@ -71,8 +52,7 @@ async function setCustomer(customerData: CustomerData): Promise<any> {
   return data;
 }
 
-// Set shipping address
-async function setShippingAddress(addressData: AddressData): Promise<any> {
+async function setShippingAddress(addressData: CustomerFormData): Promise<any> {
   const response = await fetch('/api/checkout/set-shipping-address', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -89,33 +69,12 @@ async function setShippingAddress(addressData: AddressData): Promise<any> {
   return data;
 }
 
-// Set billing address
-async function setBillingAddress(addressData: AddressData): Promise<any> {
-  const response = await fetch('/api/checkout/set-billing-address', {
+async function setShippingMethod(shippingMethodId: string): Promise<any> {
+  const response = await fetch('/api/checkout/shipping-methods', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify(addressData),
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error || 'Failed to set billing address');
-  }
-
-  return data;
-}
-
-// Set shipping method
-async function setShippingMethod({ shippingMethodId }: { shippingMethodId: string }): Promise<any> {
-  const response = await fetch('/api/checkout/set-shipping-method', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({
-      shippingMethodId,
-    }),
+    body: JSON.stringify({ shippingMethodIds: [shippingMethodId] }),
   });
 
   const data = await response.json();
@@ -127,33 +86,11 @@ async function setShippingMethod({ shippingMethodId }: { shippingMethodId: strin
   return data;
 }
 
-// Create payment intent
-async function createPaymentIntent({ 
-  orderCode, 
-  emailAddress, 
-  timestamp, 
-  forceNew 
-}: { 
-  orderCode: string; 
-  emailAddress?: string; 
-  timestamp?: number; 
-  forceNew?: boolean; 
-}): Promise<PaymentIntentData> {
+async function createPaymentIntent(): Promise<PaymentIntentData> {
   const response = await fetch('/api/checkout/payment-intent', {
     method: 'POST',
     credentials: 'include',
-    body: JSON.stringify({ 
-      orderCode,
-      timestamp: timestamp || Date.now(),
-      forceNew: forceNew || true,
-      emailAddress,
-    }),
-    headers: { 
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache',
-      'Expires': '0'
-    },
+    headers: { 'Content-Type': 'application/json' },
   });
 
   const data = await response.json();
@@ -170,70 +107,120 @@ async function createPaymentIntent({
   return data;
 }
 
-// Hook to get shipping methods
+// Hooks
 export function useShippingMethods() {
   return useQuery({
     queryKey: checkoutKeys.shippingMethods(),
     queryFn: fetchShippingMethods,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
+    select: (data) => ({
+      shippingMethods: data.eligibleShippingMethods || [],
+      selectedShippingMethod: data.eligibleShippingMethods?.[0]?.id || '',
+    }),
   });
 }
 
-// Hook to set customer
-export function useSetCustomer() {
+export function useCheckoutProcess() {
   const queryClient = useQueryClient();
+  const { openAuthModal } = useAuth();
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  return useMutation({
+  const setCustomerMutation = useMutation({
     mutationFn: setCustomer,
     onSuccess: () => {
-      // Invalidate cart data to refresh order totals
       queryClient.invalidateQueries({ queryKey: ['cart'] });
     },
   });
-}
 
-// Hook to set shipping address
-export function useSetShippingAddress() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
+  const setShippingAddressMutation = useMutation({
     mutationFn: setShippingAddress,
     onSuccess: () => {
-      // Invalidate cart data to refresh order totals
       queryClient.invalidateQueries({ queryKey: ['cart'] });
     },
   });
-}
 
-// Hook to set billing address
-export function useSetBillingAddress() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: setBillingAddress,
-    onSuccess: () => {
-      // Invalidate cart data to refresh order totals
-      queryClient.invalidateQueries({ queryKey: ['cart'] });
-    },
-  });
-}
-
-// Hook to set shipping method
-export function useSetShippingMethod() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
+  const setShippingMethodMutation = useMutation({
     mutationFn: setShippingMethod,
     onSuccess: () => {
-      // Invalidate cart data to refresh order totals
       queryClient.invalidateQueries({ queryKey: ['cart'] });
     },
   });
-}
 
-// Hook to create payment intent
-export function useCreatePaymentIntent() {
-  return useMutation({
+  const createPaymentIntentMutation = useMutation({
     mutationFn: createPaymentIntent,
   });
+
+  const processCheckout = useCallback(
+    async (data: CustomerFormData, selectedShippingMethod: string) => {
+      setError(null);
+
+      try {
+        // Set customer information
+        const setCustomerData = await setCustomerMutation.mutateAsync({
+          firstName: data.firstName,
+          lastName: data.lastName,
+          emailAddress: data.emailAddress,
+          phoneNumber: data.shippingPhoneNumber,
+        });
+
+        // Check for EMAIL_ADDRESS_CONFLICT_ERROR
+        if (
+          setCustomerData?.setCustomerForOrder?.errorCode === 'EMAIL_ADDRESS_CONFLICT_ERROR' ||
+          setCustomerData?.errors?.some(
+            (e: any) =>
+              e.extensions?.code === 'EMAIL_ADDRESS_CONFLICT_ERROR' ||
+              e.message?.includes('EMAIL_ADDRESS_CONFLICT_ERROR')
+          )
+        ) {
+          const errorMessage =
+            setCustomerData?.setCustomerForOrder?.message ||
+            setCustomerData?.errors?.[0]?.message ||
+            'This email address is already registered. Please login to continue.';
+          setError(errorMessage);
+          openAuthModal('login');
+          return;
+        }
+
+        // Set shipping address (includes billing if needed)
+        await setShippingAddressMutation.mutateAsync(data);
+
+        // Set shipping method
+        if (selectedShippingMethod) {
+          await setShippingMethodMutation.mutateAsync(selectedShippingMethod);
+        }
+
+        // Create payment intent
+        const paymentIntent = await createPaymentIntentMutation.mutateAsync();
+        setClientSecret(paymentIntent.clientSecret);
+        setPaymentIntentId(paymentIntent.paymentIntentId || null);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'An error occurred during checkout';
+        setError(errorMessage);
+        throw err;
+      }
+    },
+    [setCustomerMutation, setShippingAddressMutation, setShippingMethodMutation, createPaymentIntentMutation, openAuthModal]
+  );
+
+  const resetCheckout = useCallback(() => {
+    setClientSecret(null);
+    setPaymentIntentId(null);
+    setError(null);
+  }, []);
+
+  return {
+    clientSecret,
+    paymentIntentId,
+    isProcessing:
+      setCustomerMutation.isPending ||
+      setShippingAddressMutation.isPending ||
+      setShippingMethodMutation.isPending ||
+      createPaymentIntentMutation.isPending,
+    error,
+    processCheckout,
+    resetCheckout,
+    setError,
+  };
 }

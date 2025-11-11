@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
@@ -22,8 +22,7 @@ import { BillingAddressSection } from '@/components/checkout/billing-address-sec
 import { ShippingMethodsSection } from '@/components/checkout/shipping-methods-section';
 
 // Hooks and types
-import { useShippingMethods } from '@/hooks/use-shipping-methods';
-import { useCheckoutProcess } from '@/hooks/use-checkout-process';
+import { useShippingMethods, useCheckoutProcess } from '@/hooks/use-checkout';
 import { customerSchema, CustomerFormData, CheckoutStep } from '@/lib/checkout/types';
 
 // Stripe configuration
@@ -34,12 +33,12 @@ export default function CheckoutPage() {
   
   // Custom hooks for state management
   const {
-    shippingMethods,
-    selectedShippingMethod,
-    isLoadingShippingMethods,
-    setSelectedShippingMethod,
-    fetchShippingMethods,
+    data: shippingData,
+    isLoading: isLoadingShippingMethods,
   } = useShippingMethods();
+
+  const shippingMethods = shippingData?.shippingMethods || [];
+  const [selectedShippingMethod, setSelectedShippingMethod] = useState<string>('');
 
   const {
     clientSecret,
@@ -65,10 +64,12 @@ export default function CheckoutPage() {
     },
   });
 
-  // Fetch shipping methods on component mount
+  // Initialize selected shipping method when data loads
   useEffect(() => {
-    fetchShippingMethods();
-  }, [fetchShippingMethods]);
+    if (shippingData?.selectedShippingMethod && !selectedShippingMethod) {
+      setSelectedShippingMethod(shippingData.selectedShippingMethod);
+    }
+  }, [shippingData?.selectedShippingMethod, selectedShippingMethod]);
 
   // Update form when shipping method changes
   useEffect(() => {

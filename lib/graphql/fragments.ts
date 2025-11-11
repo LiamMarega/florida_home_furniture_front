@@ -348,6 +348,7 @@ export const SHIPPING_METHOD_QUOTE = gql`
     price
     priceWithTax
     description
+    name
     metadata
   }
 `;
