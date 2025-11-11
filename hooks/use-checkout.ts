@@ -122,7 +122,7 @@ export function useShippingMethods() {
 
 export function useCheckoutProcess() {
   const queryClient = useQueryClient();
-  const { openAuthModal } = useAuth();
+  const { openAuthModal, isAuthenticated } = useAuth();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -157,30 +157,32 @@ export function useCheckoutProcess() {
       setError(null);
 
       try {
-        // Set customer information
-        const setCustomerData = await setCustomerMutation.mutateAsync({
-          firstName: data.firstName,
-          lastName: data.lastName,
-          emailAddress: data.emailAddress,
-          phoneNumber: data.shippingPhoneNumber,
-        });
+        // Set customer information only if user is not authenticated
+        if (!isAuthenticated) {
+          const setCustomerData = await setCustomerMutation.mutateAsync({
+            firstName: data.firstName,
+            lastName: data.lastName,
+            emailAddress: data.emailAddress,
+            phoneNumber: data.shippingPhoneNumber,
+          });
 
-        // Check for EMAIL_ADDRESS_CONFLICT_ERROR
-        if (
-          setCustomerData?.setCustomerForOrder?.errorCode === 'EMAIL_ADDRESS_CONFLICT_ERROR' ||
-          setCustomerData?.errors?.some(
-            (e: any) =>
-              e.extensions?.code === 'EMAIL_ADDRESS_CONFLICT_ERROR' ||
-              e.message?.includes('EMAIL_ADDRESS_CONFLICT_ERROR')
-          )
-        ) {
-          const errorMessage =
-            setCustomerData?.setCustomerForOrder?.message ||
-            setCustomerData?.errors?.[0]?.message ||
-            'This email address is already registered. Please login to continue.';
-          setError(errorMessage);
-          openAuthModal('login');
-          return;
+          // Check for EMAIL_ADDRESS_CONFLICT_ERROR
+          if (
+            setCustomerData?.setCustomerForOrder?.errorCode === 'EMAIL_ADDRESS_CONFLICT_ERROR' ||
+            setCustomerData?.errors?.some(
+              (e: any) =>
+                e.extensions?.code === 'EMAIL_ADDRESS_CONFLICT_ERROR' ||
+                e.message?.includes('EMAIL_ADDRESS_CONFLICT_ERROR')
+            )
+          ) {
+            const errorMessage =
+              setCustomerData?.setCustomerForOrder?.message ||
+              setCustomerData?.errors?.[0]?.message ||
+              'This email address is already registered. Please login to continue.';
+            setError(errorMessage);
+            openAuthModal('login');
+            return;
+          }
         }
 
         // Set shipping address (includes billing if needed)
@@ -201,7 +203,7 @@ export function useCheckoutProcess() {
         throw err;
       }
     },
-    [setCustomerMutation, setShippingAddressMutation, setShippingMethodMutation, createPaymentIntentMutation, openAuthModal]
+    [setCustomerMutation, setShippingAddressMutation, setShippingMethodMutation, createPaymentIntentMutation, openAuthModal, isAuthenticated]
   );
 
   const resetCheckout = useCallback(() => {
