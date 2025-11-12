@@ -1,46 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GET_ACTIVE_ORDER } from '@/lib/graphql/queries';
 import { fetchGraphQL } from '@/lib/vendure-server';
+import { createErrorResponse, forwardCookies, HTTP_STATUS, ERROR_CODES } from '@/lib/api-utils';
 
-// Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const response = await fetchGraphQL(
-      {
-        query: GET_ACTIVE_ORDER,
-        variables: {},
-      },
-      {
-        req: request, // Pass the request to include cookies
-      }
-    );
+    const response = await fetchGraphQL({ query: GET_ACTIVE_ORDER }, { req });
 
     if (response.errors) {
-      console.error('GraphQL errors:', response.errors);
-      return NextResponse.json(
-        { error: 'Failed to get active order', details: response.errors },
-        { status: 400 }
+      return createErrorResponse(
+        'Failed to get active order',
+        response.errors[0]?.message || 'Failed to get active order',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        response.errors
       );
     }
 
-    // Create response with data
-    const nextResponse = NextResponse.json(response.data);
-
-    // Forward Set-Cookie headers from Vendure if present
-    if (response.setCookies && response.setCookies.length > 0) {
-      response.setCookies.forEach(cookie => {
-        nextResponse.headers.append('Set-Cookie', cookie);
-      });
-    }
-
-    return nextResponse;
+    const res = NextResponse.json(response.data);
+    forwardCookies(res, response);
+    return res;
   } catch (error) {
-    console.error('Get active order error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+    return createErrorResponse(
+      'Internal server error',
+      error instanceof Error ? error.message : 'Failed to get active order',
+      HTTP_STATUS.INTERNAL_ERROR,
+      ERROR_CODES.INTERNAL_ERROR
     );
   }
 }

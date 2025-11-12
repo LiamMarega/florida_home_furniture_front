@@ -1,44 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
+import { GET_FACETS, COUNT_PRODUCTS_BY_FACET_VALUE } from '@/lib/graphql/queries';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
-
-/**
- * GraphQL query to get facets
- */
-const GET_FACETS_QUERY = `
-  query GetFacets {
-    facets {
-      items {
-        id
-        name
-        code
-        values {
-          id
-          name
-          code
-        }
-      }
-    }
-  }
-`;
-
-/**
- * GraphQL query to count products by facet value
- */
-const COUNT_PRODUCTS_BY_FACET_VALUE = `
-  query CountProductsByFacetValue($facetValueIds: [ID!]!) {
-    products(options: { 
-      filter: { 
-        facetValueIds: $facetValueIds 
-      },
-      take: 1
-    }) {
-      totalItems
-    }
-  }
-`;
 
 /**
  * GET /api/products/get-categories
@@ -51,7 +16,7 @@ export async function GET(req: NextRequest) {
     // Step 1: Fetch all facets to find the "Category" facet
     const facetsResponse = await fetchGraphQL(
       {
-        query: GET_FACETS_QUERY,
+        query: GET_FACETS,
       },
       {
         req,

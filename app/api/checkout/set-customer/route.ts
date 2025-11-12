@@ -1,66 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
 import { SET_CUSTOMER_FOR_ORDER } from '@/lib/graphql/mutations';
-
-const AUTH_STATE = /* GraphQL */ `
-  query AuthState {
-    me { id identifier }
-    activeCustomer { id firstName lastName emailAddress }
-    activeOrder { id code state customer { id emailAddress } }
-  }
-`;
+import { AUTH_STATE_QUERY } from '@/lib/graphql/queries';
+import { createErrorResponse, forwardCookies, validateRequiredFields, HTTP_STATUS, ERROR_CODES } from '@/lib/api-utils';
 
 export async function POST(req: NextRequest) {
-  const raw = await req.json().catch(() => ({}));
+  try {
+    const body = await req.json().catch(() => ({}));
 
-  const input = {
-    firstName: raw.firstName?.trim(),
-    lastName: raw.lastName?.trim(),
-    emailAddress: raw.emailAddress?.trim(),
-    phoneNumber: raw.phoneNumber?.trim() || undefined,
-  };
+    const input = {
+      firstName: body.firstName?.trim(),
+      lastName: body.lastName?.trim(),
+      emailAddress: body.emailAddress?.trim(),
+      phoneNumber: body.phoneNumber?.trim() || undefined,
+    };
 
-  // Check if user is already authenticated
-  const auth = await fetchGraphQL({ query: AUTH_STATE }, { req });
-  const meForbiddenOnly =
-    auth.errors?.length &&
-    auth.errors.every((e) => e.extensions?.code === 'FORBIDDEN' && e.path?.[0] === 'me');
+    const auth = await fetchGraphQL({ query: AUTH_STATE_QUERY }, { req });
+    const meForbiddenOnly =
+      auth.errors?.length &&
+      auth.errors.every((e) => e.extensions?.code === 'FORBIDDEN' && e.path?.[0] === 'me');
 
-  const isLoggedIn = !!auth.data?.me || !!auth.data?.activeCustomer;
-  if (isLoggedIn) {
-    const res = NextResponse.json({ auth: auth.data });
-    for (const c of auth.setCookies ?? []) res.headers.append('Set-Cookie', c);
+    const isLoggedIn = !!auth.data?.me || !!auth.data?.activeCustomer;
+    if (isLoggedIn) {
+      const res = NextResponse.json({ auth: auth.data });
+      forwardCookies(res, auth);
+      return res;
+    }
+
+    const validation = validateRequiredFields(input, ['firstName', 'lastName', 'emailAddress']);
+    if (!validation.isValid) {
+      return createErrorResponse(
+        'Missing required customer fields',
+        `Missing fields: ${validation.missing.join(', ')}`,
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
+
+    const result = await fetchGraphQL(
+      { query: SET_CUSTOMER_FOR_ORDER, variables: { input } },
+      { req }
+    );
+
+    if (result.errors && !meForbiddenOnly) {
+      return createErrorResponse(
+        'Failed to set customer',
+        result.errors[0]?.message || 'Failed to set customer for order',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        result.errors
+      );
+    }
+
+    if (result.data?.setCustomerForOrder?.errorCode) {
+      return createErrorResponse(
+        'Failed to set customer',
+        result.data.setCustomerForOrder.message || 'Failed to set customer for order',
+        HTTP_STATUS.BAD_REQUEST,
+        result.data.setCustomerForOrder.errorCode,
+        result.data.setCustomerForOrder
+      );
+    }
+
+    const res = NextResponse.json(result.data);
+    forwardCookies(res, result);
     return res;
-  }
-
-  // Validate required fields for guest checkout
-  if (!input.firstName || !input.lastName || !input.emailAddress) {
-    return NextResponse.json({ error: 'Missing required customer fields' }, { status: 400 });
-  }
-
-  // Set customer for order (guest)
-  const result = await fetchGraphQL(
-    { query: SET_CUSTOMER_FOR_ORDER, variables: { input } },
-    { req }
-  );
-
-  // Return GraphQL errors (excluding FORBIDDEN on me)
-  if (result.errors && !meForbiddenOnly) {
-    return NextResponse.json({ errors: result.errors }, { status: 400 });
-  }
-
-  // Check for setCustomerForOrder errors (e.g., EMAIL_ADDRESS_CONFLICT_ERROR)
-  if (result.data?.setCustomerForOrder?.errorCode) {
-    return NextResponse.json(
-      {
-        setCustomerForOrder: result.data.setCustomerForOrder,
-        error: result.data.setCustomerForOrder.message,
-      },
-      { status: 400 }
+  } catch (error) {
+    return createErrorResponse(
+      'Internal server error',
+      error instanceof Error ? error.message : 'Failed to set customer',
+      HTTP_STATUS.INTERNAL_ERROR,
+      ERROR_CODES.INTERNAL_ERROR
     );
   }
-
-  const res = NextResponse.json(result.data);
-  for (const c of result.setCookies ?? []) res.headers.append('Set-Cookie', c);
-  return res;
 }

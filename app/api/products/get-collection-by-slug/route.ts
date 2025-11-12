@@ -1,29 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
+import { GET_COLLECTION_BY_SLUG } from '@/lib/graphql/queries';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
-
-/**
- * GraphQL query to get collection by slug
- */
-const GET_COLLECTION_BY_SLUG_QUERY = `
-  query GetCollectionBySlug($slug: String!) {
-    collection(slug: $slug) {
-      id
-      name
-      slug
-      description
-      featuredAsset {
-        id
-        preview
-      }
-      productVariants {
-        totalItems
-      }
-    }
-  }
-`;
 
 /**
  * GET /api/products/get-collection-by-slug?slug={slug}
@@ -47,7 +27,7 @@ export async function GET(req: NextRequest) {
     // Fetch collection from Vendure
     const collectionResponse = await fetchGraphQL(
       {
-        query: GET_COLLECTION_BY_SLUG_QUERY,
+        query: GET_COLLECTION_BY_SLUG,
         variables: {
           slug,
         },

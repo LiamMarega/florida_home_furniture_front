@@ -1,32 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
+import { GET_COLLECTIONS } from '@/lib/graphql/queries';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
-
-/**
- * GraphQL query to get collections
- */
-const GET_COLLECTIONS_QUERY = `
-  query GetCollections($options: CollectionListOptions) {
-    collections(options: $options) {
-      items {
-        id
-        name
-        slug
-        description
-        featuredAsset {
-          id
-          preview
-        }
-        productVariants {
-          totalItems
-        }
-      }
-      totalItems
-    }
-  }
-`;
 
 /**
  * GET /api/products/get-collections
@@ -46,7 +23,7 @@ export async function GET(req: NextRequest) {
     // Fetch collections from Vendure
     const collectionsResponse = await fetchGraphQL(
       {
-        query: GET_COLLECTIONS_QUERY,
+        query: GET_COLLECTIONS,
         variables: {
           options: limit ? { take: limit } : undefined,
         },
