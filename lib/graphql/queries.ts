@@ -474,10 +474,9 @@ export const GET_FACETS = gql`
 
 export const COUNT_PRODUCTS_BY_FACET_VALUE = gql`
   query CountProductsByFacetValue($facetValueIds: [ID!]!) {
-    products(options: { 
-      filter: { 
-        facetValueIds: $facetValueIds 
-      },
+    search(input: {
+      facetValueIds: $facetValueIds
+      groupByProduct: true
       take: 1
     }) {
       totalItems

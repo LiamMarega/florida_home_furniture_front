@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
             };
           }
 
-          const productCount = countResponse.data?.products?.totalItems ?? 0;
+          const productCount = countResponse.data?.search?.totalItems ?? 0;
           console.log(`  ✓ ${categoryValue.name}: ${productCount} products (Response: ${JSON.stringify(countResponse.data)})`);
 
           return {
