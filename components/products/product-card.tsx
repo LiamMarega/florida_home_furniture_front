@@ -5,18 +5,22 @@ import { motion } from 'framer-motion';
 import { ShoppingCart, Eye } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { LazyLoadImage } from 'react-lazy-load-image-component';
+import 'react-lazy-load-image-component/src/effects/blur.css';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/contexts/cart-context';
 import { toast } from 'sonner';
-import { ProductVariant } from '@/lib/types';
+import { ProductVariant, Asset } from '@/lib/types';
+import { getThumbnailUrl, getFullImageUrl } from '@/lib/utils';
 
 interface ProductCardProps {
   id: string;
   name: string;
   slug: string;
-  featuredAsset?: {
+  featuredAsset?: Asset | {
     id: string;
     preview: string;
+    source?: string;
   };
   variants?: ProductVariant[];
   description?: string;
@@ -92,11 +96,14 @@ export function ProductCard({
         {/* Product Image - Fixed height */}
         <div className="relative h-40 sm:h-56 md:h-64 lg:h-72 xl:h-80 overflow-hidden bg-brand-cream flex-shrink-0">
           {featuredAsset?.preview ? (
-            <Image
-              src={featuredAsset.preview}
+            <LazyLoadImage
+              src={getFullImageUrl(featuredAsset.source || '', featuredAsset.preview)}
+              placeholderSrc={getThumbnailUrl(featuredAsset.preview, 50)}
               alt={name}
-              fill
-              className="object-cover group-hover:scale-105 transition-transform duration-300"
+              effect="blur"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              wrapperClassName="!w-full !h-full"
+              threshold={500}
             />
           ) : (
             <div className="w-full h-full bg-brand-cream flex items-center justify-center">
@@ -111,7 +118,7 @@ export function ProductCard({
           )}
 
           {/* Quick View Badge */}
-          <div className="absolute top-2 right-2 sm:top-4 sm:right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute top-2 right-2 sm:top-4 sm:right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
             <div className="bg-white/90 backdrop-blur-sm rounded-full p-1.5 sm:p-2 shadow-lg">
               <Eye className="w-3 h-3 sm:w-4 sm:h-4 text-brand-dark-blue" />
             </div>
