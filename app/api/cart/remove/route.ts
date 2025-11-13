@@ -1,57 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { REMOVE_ORDER_LINE } from '@/lib/graphql/mutations';
 import { fetchGraphQL } from '@/lib/vendure-server';
+import { createErrorResponse, forwardCookies, validateRequiredFields, HTTP_STATUS, ERROR_CODES } from '@/lib/api-utils';
 
-// Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const { orderLineId } = await request.json();
+    const body = await req.json().catch(() => ({}));
+    const { orderLineId } = body;
 
-    if (!orderLineId) {
-      return NextResponse.json(
-        { error: 'orderLineId is required' },
-        { status: 400 }
+    const validation = validateRequiredFields(body, ['orderLineId']);
+    if (!validation.isValid) {
+      return createErrorResponse(
+        'orderLineId required',
+        'orderLineId is required',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR
       );
     }
 
     const response = await fetchGraphQL(
-      {
-        query: REMOVE_ORDER_LINE,
-        variables: {
-          orderLineId,
-        },
-      },
-      {
-        req: request, // Pass the request to include cookies
-      }
+      { query: REMOVE_ORDER_LINE, variables: { orderLineId } },
+      { req }
     );
 
     if (response.errors) {
-      console.error('GraphQL errors:', response.errors);
-      return NextResponse.json(
-        { error: 'Failed to remove cart item', details: response.errors },
-        { status: 400 }
+      return createErrorResponse(
+        'Failed to remove cart item',
+        response.errors[0]?.message || 'Failed to remove cart item',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        response.errors
       );
     }
 
-    // Create response with data
-    const nextResponse = NextResponse.json(response.data);
-
-    // Forward Set-Cookie headers from Vendure if present
-    if (response.setCookies && response.setCookies.length > 0) {
-      response.setCookies.forEach(cookie => {
-        nextResponse.headers.append('Set-Cookie', cookie);
-      });
-    }
-
-    return nextResponse;
+    const res = NextResponse.json(response.data);
+    forwardCookies(res, response);
+    return res;
   } catch (error) {
-    console.error('Remove cart error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+    return createErrorResponse(
+      'Internal server error',
+      error instanceof Error ? error.message : 'Failed to remove cart item',
+      HTTP_STATUS.INTERNAL_ERROR,
+      ERROR_CODES.INTERNAL_ERROR
     );
   }
 }

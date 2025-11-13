@@ -1,45 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
 import { LOGOUT } from '@/lib/graphql/mutations';
-import { Success } from '@/lib/types';
+import { createErrorResponse, forwardCookies, HTTP_STATUS, ERROR_CODES } from '@/lib/api-utils';
 
 export async function POST(req: NextRequest) {
   try {
-    console.log('🚪 Logging out user...');
-    
-    const response = await fetchGraphQL<{ logout: Success }>({
-      query: LOGOUT,
-    }, { req });
-
-    console.log('📦 Logout response:', JSON.stringify(response, null, 2));
+    const response = await fetchGraphQL<{ logout: { success: boolean } }>(
+      { query: LOGOUT },
+      { req }
+    );
 
     if (response.errors) {
-      console.error('❌ Logout errors:', response.errors);
-      return NextResponse.json(
-        { error: 'Failed to logout', details: response.errors },
-        { status: 500 }
+      return createErrorResponse(
+        'Logout failed',
+        response.errors[0]?.message || 'Failed to logout',
+        HTTP_STATUS.INTERNAL_ERROR,
+        ERROR_CODES.INTERNAL_ERROR,
+        response.errors
       );
     }
 
     const logoutResult = response.data?.logout;
     if (!logoutResult?.success) {
-      console.error('❌ Logout failed:', logoutResult);
-      return NextResponse.json(
-        { error: 'Logout failed', details: logoutResult },
-        { status: 500 }
+      return createErrorResponse(
+        'Logout failed',
+        'Logout operation did not complete successfully',
+        HTTP_STATUS.INTERNAL_ERROR,
+        ERROR_CODES.INTERNAL_ERROR
       );
     }
 
-    console.log('✅ User logged out successfully');
-    return NextResponse.json({ 
+    const res = NextResponse.json({
       success: true,
-      message: 'Logged out successfully'
+      message: 'Logged out successfully',
     });
+
+    forwardCookies(res, response);
+    return res;
   } catch (error) {
-    console.error('💥 Error logging out:', error);
-    return NextResponse.json(
-      { error: 'Failed to logout', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
+    return createErrorResponse(
+      'Internal server error',
+      error instanceof Error ? error.message : 'Failed to logout',
+      HTTP_STATUS.INTERNAL_ERROR,
+      ERROR_CODES.INTERNAL_ERROR
     );
   }
 }

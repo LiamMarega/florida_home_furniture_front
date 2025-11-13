@@ -1,131 +1,94 @@
-// app/api/auth/login/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
-
-// Mutation para login
-const LOGIN_MUTATION = /* GraphQL */ `
-  mutation Login($username: String!, $password: String!) {
-    login(username: $username, password: $password) {
-      __typename
-      ... on CurrentUser {
-        id
-        identifier
-      }
-      ... on InvalidCredentialsError {
-        errorCode
-        message
-      }
-      ... on NotVerifiedError {
-        errorCode
-        message
-      }
-    }
-  }
-`;
-
-// Query para obtener información del cliente y orden activa después del login
-const AUTH_STATE = /* GraphQL */ `
-  query AuthState {
-    me {
-      id
-      identifier
-    }
-    activeCustomer {
-      id
-      firstName
-      lastName
-      emailAddress
-    }
-    activeOrder {
-      id
-      code
-      state
-    }
-  }
-`;
+import { LOGIN_MUTATION } from '@/lib/graphql/mutations';
+import { AUTH_STATE_QUERY } from '@/lib/graphql/queries';
+import { createErrorResponse, forwardCookies, validateRequiredFields, HTTP_STATUS, ERROR_CODES } from '@/lib/api-utils';
 
 export async function POST(req: NextRequest) {
-  console.log('[login] POST request received');
-  const raw = await req.json().catch(() => ({}));
-  console.log('[login] Body:', raw);
+  try {
+    const body = await req.json().catch(() => ({}));
+    const { emailAddress, password } = body;
 
-  const { emailAddress, password } = raw;
-  if (!emailAddress || !password) {
-    return NextResponse.json(
-      { 
-        error: 'Missing credentials',
-        message: 'Please provide both email and password'
-      },
-      { status: 400 }
-    );
-  }
-
-  // Ejecutar login
-  console.log('[login] Executing Vendure login...');
-  const result = await fetchGraphQL(
-    {
-      query: LOGIN_MUTATION,
-      variables: { username: emailAddress, password },
-    },
-    { req }
-  );
-  console.log('[login] Login response:', JSON.stringify(result, null, 2));
-
-  const loginData = result.data?.login;
-
-  if (!loginData || loginData.__typename !== 'CurrentUser') {
-    console.warn('[login] Login failed:', loginData);
-    
-    // Manejar diferentes tipos de errores
-    if (loginData?.__typename === 'InvalidCredentialsError') {
-      return NextResponse.json(
-        {
-          error: 'Invalid credentials',
-          message: loginData.message || 'Email or password is incorrect',
-          errorCode: loginData.errorCode,
-        },
-        { status: 401 }
+    const validation = validateRequiredFields(body, ['emailAddress', 'password']);
+    if (!validation.isValid) {
+      return createErrorResponse(
+        'Missing credentials',
+        'Please provide both email and password',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR
       );
     }
-    
-    if (loginData?.__typename === 'NotVerifiedError') {
-      return NextResponse.json(
-        {
-          error: 'Email not verified',
-          message: loginData.message || 'Please verify your email before logging in',
-          errorCode: loginData.errorCode,
-        },
-        { status: 403 }
-      );
-    }
-    
-    // Error genérico
-    return NextResponse.json(
+
+    const loginResult = await fetchGraphQL(
       {
-        error: 'Login failed',
-        message: loginData?.message || 'Unable to log in. Please try again.',
-        errorCode: loginData?.errorCode,
+        query: LOGIN_MUTATION,
+        variables: { username: emailAddress.trim(), password },
       },
-      { status: 401 }
+      { req }
+    );
+
+    if (loginResult.errors) {
+      return createErrorResponse(
+        'Login failed',
+        loginResult.errors[0]?.message || 'Unable to log in',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        loginResult.errors
+      );
+    }
+
+    const loginData = loginResult.data?.login;
+
+    if (!loginData || loginData.__typename !== 'CurrentUser') {
+      if (loginData?.__typename === 'InvalidCredentialsError') {
+        return createErrorResponse(
+          'Invalid credentials',
+          loginData.message || 'Email or password is incorrect',
+          HTTP_STATUS.UNAUTHORIZED,
+          'INVALID_CREDENTIALS'
+        );
+      }
+
+      if (loginData?.__typename === 'NotVerifiedError') {
+        return createErrorResponse(
+          'Email not verified',
+          loginData.message || 'Please verify your email before logging in',
+          HTTP_STATUS.FORBIDDEN,
+          'EMAIL_NOT_VERIFIED'
+        );
+      }
+
+      return createErrorResponse(
+        'Login failed',
+        loginData?.message || 'Unable to log in. Please try again.',
+        HTTP_STATUS.UNAUTHORIZED,
+        'LOGIN_FAILED'
+      );
+    }
+
+    const authStateResult = await fetchGraphQL(
+      { query: AUTH_STATE_QUERY },
+      { req }
+    );
+
+    const response = NextResponse.json({
+      success: true,
+      user: loginData,
+      auth: authStateResult.data,
+      message: 'Login successful',
+    });
+
+    forwardCookies(response, loginResult);
+    forwardCookies(response, authStateResult);
+
+    return response;
+  } catch (error) {
+    return createErrorResponse(
+      'Internal server error',
+      error instanceof Error ? error.message : 'Failed to process login',
+      HTTP_STATUS.INTERNAL_ERROR,
+      ERROR_CODES.INTERNAL_ERROR
     );
   }
-
-  // Obtener estado post-login
-  const authState = await fetchGraphQL({ query: AUTH_STATE }, { req });
-  console.log('[login] AuthState:', JSON.stringify(authState, null, 2));
-
-  const res = NextResponse.json({
-    success: true,
-    user: loginData,
-    auth: authState.data,
-    message: 'Login successful',
-  });
-
-  // Propagar cookies (Vendure session)
-  for (const c of result.setCookies ?? []) res.headers.append('Set-Cookie', c);
-  for (const c of authState.setCookies ?? []) res.headers.append('Set-Cookie', c);
-
-  console.log('[login] User logged in successfully');
-  return res;
 }
 

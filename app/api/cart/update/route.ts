@@ -1,58 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ADJUST_ORDER_LINE } from '@/lib/graphql/mutations';
 import { fetchGraphQL } from '@/lib/vendure-server';
+import { createErrorResponse, forwardCookies, validateRequiredFields, HTTP_STATUS, ERROR_CODES } from '@/lib/api-utils';
 
-// Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const { orderLineId, quantity } = await request.json();
+    const body = await req.json().catch(() => ({}));
+    const { orderLineId, quantity } = body;
 
-    if (!orderLineId || quantity === undefined) {
-      return NextResponse.json(
-        { error: 'orderLineId and quantity are required' },
-        { status: 400 }
+    const validation = validateRequiredFields(body, ['orderLineId', 'quantity']);
+    if (!validation.isValid || quantity <= 0) {
+      return createErrorResponse(
+        'Invalid input',
+        'orderLineId and quantity (greater than 0) are required',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR
       );
     }
 
     const response = await fetchGraphQL(
-      {
-        query: ADJUST_ORDER_LINE,
-        variables: {
-          orderLineId,
-          quantity: Number(quantity),
-        },
-      },
-      {
-        req: request, // Pass the request to include cookies
-      }
+      { query: ADJUST_ORDER_LINE, variables: { orderLineId, quantity: Number(quantity) } },
+      { req }
     );
 
     if (response.errors) {
-      console.error('GraphQL errors:', response.errors);
-      return NextResponse.json(
-        { error: 'Failed to update cart item', details: response.errors },
-        { status: 400 }
+      return createErrorResponse(
+        'Failed to update cart item',
+        response.errors[0]?.message || 'Failed to update cart item',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        response.errors
       );
     }
 
-    // Create response with data
-    const nextResponse = NextResponse.json(response.data);
-
-    // Forward Set-Cookie headers from Vendure if present
-    if (response.setCookies && response.setCookies.length > 0) {
-      response.setCookies.forEach(cookie => {
-        nextResponse.headers.append('Set-Cookie', cookie);
-      });
-    }
-
-    return nextResponse;
+    const res = NextResponse.json(response.data);
+    forwardCookies(res, response);
+    return res;
   } catch (error) {
-    console.error('Update cart error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+    return createErrorResponse(
+      'Internal server error',
+      error instanceof Error ? error.message : 'Failed to update cart item',
+      HTTP_STATUS.INTERNAL_ERROR,
+      ERROR_CODES.INTERNAL_ERROR
     );
   }
 }

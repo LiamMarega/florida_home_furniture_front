@@ -1,28 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
+import { GET_FACETS } from '@/lib/graphql/queries';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
-
-/**
- * GraphQL query to get facets
- */
-const GET_FACETS_QUERY = `
-  query GetFacets {
-    facets {
-      items {
-        id
-        name
-        code
-        values {
-          id
-          name
-          code
-        }
-      }
-    }
-  }
-`;
 
 /**
  * GET /api/products/get-category-by-slug?slug={slug}
@@ -44,7 +25,7 @@ export async function GET(req: NextRequest) {
     // Fetch all facets to find the "Category" facet
     const facetsResponse = await fetchGraphQL(
       {
-        query: GET_FACETS_QUERY,
+        query: GET_FACETS,
       },
       {
         req,

@@ -4,7 +4,8 @@ import {
   ORDER_FRAGMENT, 
   ASSET_FRAGMENT, 
   PRODUCT_VARIANT_FRAGMENT,
-  CUSTOMER_FRAGMENT 
+  CUSTOMER_FRAGMENT,
+  SHIPPING_METHOD_QUOTE
 } from './fragments';
 
 
@@ -157,7 +158,8 @@ export const GET_PRODUCTS_BY_IDS = gql`
   }
 `;
 
-export const ELIGIBLE_SHIPPING_METHODS = /* GraphQL */ `
+export const ELIGIBLE_SHIPPING_METHODS = gql`
+  ${SHIPPING_METHOD_QUOTE}
   query EligibleShippingMethods {
     eligibleShippingMethods {
       ...ShippingMethodQuoteFields
@@ -422,20 +424,6 @@ export const GET_ACTIVE_ORDER_FOR_PAYMENT = gql`
   }
 `;
 
-
-
-export const ADD_PAYMENT_TO_ORDER = gql`
-  mutation AddPaymentToOrder($input: PaymentInput!) {
-    addPaymentToOrder(input: $input) {
-      __typename
-      ... on Order {
-        id code state totalWithTax currencyCode
-      }
-      ... on ErrorResult { errorCode message }
-    }
-  }
-`;
-
 export const AUTH_STATE_QUERY = gql`
   query AuthState {
     me {
@@ -467,11 +455,80 @@ export const AUTH_STATE_QUERY = gql`
   }
 `;
 
-export const CUSTOMER_DETAILS_QUERY = gql`
-  ${CUSTOMER_FRAGMENT}
-  query CustomerDetails {
-    activeCustomer {
-      ...Customer
+export const GET_FACETS = gql`
+  query GetFacets {
+    facets {
+      items {
+        id
+        name
+        code
+        values {
+          id
+          name
+          code
+        }
+      }
+    }
+  }
+`;
+
+export const COUNT_PRODUCTS_BY_FACET_VALUE = gql`
+  query CountProductsByFacetValue($facetValueIds: [ID!]!) {
+    search(input: {
+      facetValueIds: $facetValueIds
+      groupByProduct: true
+      take: 1
+    }) {
+      totalItems
+    }
+  }
+`;
+
+export const GET_COLLECTION_BY_SLUG = gql`
+  query GetCollectionBySlug($slug: String!) {
+    collection(slug: $slug) {
+      id
+      name
+      slug
+      description
+      featuredAsset {
+        id
+        preview
+      }
+      productVariants {
+        totalItems
+      }
+    }
+  }
+`;
+
+export const GET_COLLECTIONS = gql`
+  query GetCollections($options: CollectionListOptions) {
+    collections(options: $options) {
+      items {
+        id
+        name
+        slug
+        description
+        featuredAsset {
+          id
+          preview
+        }
+        productVariants {
+          totalItems
+        }
+      }
+      totalItems
+    }
+  }
+`;
+
+export const GET_ACTIVE_ORDER_STATE = gql`
+  query ActiveOrderState {
+    activeOrder {
+      id
+      code
+      state
     }
   }
 `;

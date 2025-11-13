@@ -7,18 +7,12 @@ import {
 import {
   ELIGIBLE_SHIPPING_METHODS,
 } from '@/lib/graphql/queries';
-import {
-  SHIPPING_METHOD_QUOTE,
-  ORDER_PRICING_SUMMARY,
-} from '@/lib/graphql/fragments';
 
 /**
  * GET -> Lista eligibleShippingMethods para la Active Order.
  */
 export async function GET(req: NextRequest) {
-  const query = `${SHIPPING_METHOD_QUOTE}\n${ELIGIBLE_SHIPPING_METHODS}`;
-
-  const result = await fetchGraphQL({ query }, { req });
+  const result = await fetchGraphQL({ query: ELIGIBLE_SHIPPING_METHODS }, { req });
   if (result.errors) {
     return NextResponse.json({ errors: result.errors }, { status: 400 });
   }
@@ -49,11 +43,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing shippingMethodIds' }, { status: 400 });
   }
 
-  // Componemos la mutation con fragment para devolver pricing actualizado
-  const mutation = `${ORDER_PRICING_SUMMARY}\n${SET_ORDER_SHIPPING_METHOD}`;
-
   const result = await fetchGraphQL(
-    { query: mutation, variables: { ids } },
+    { query: SET_ORDER_SHIPPING_METHOD, variables: { ids } },
     { req }
   );
 

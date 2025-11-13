@@ -1,44 +1,23 @@
-// app/api/auth/verify/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
-
-const VERIFY_EMAIL_MUTATION = /* GraphQL */ `
-  mutation VerifyEmail($token: String!) {
-    verifyCustomerAccount(token: $token) {
-      __typename
-      ... on CurrentUser {
-        id
-        identifier
-      }
-      ... on VerificationTokenInvalidError {
-        errorCode
-        message
-      }
-      ... on VerificationTokenExpiredError {
-        errorCode
-        message
-      }
-    }
-  }
-`;
+import { VERIFY_EMAIL_MUTATION } from '@/lib/graphql/mutations';
+import { createErrorResponse, forwardCookies, validateRequiredFields, HTTP_STATUS, ERROR_CODES } from '@/lib/api-utils';
 
 export async function POST(req: NextRequest) {
-  console.log('[verify] POST request received');
-  const raw = await req.json().catch(() => ({}));
-  console.log('[verify] Body:', raw);
-
-  const { token } = raw;
-
-  if (!token) {
-    console.warn('[verify] Missing token');
-    return NextResponse.json(
-      { error: 'Token missing' },
-      { status: 400 }
-    );
-  }
-
   try {
-    console.log('[verify] Verifying email with token...');
+    const body = await req.json().catch(() => ({}));
+    const { token } = body;
+
+    const validation = validateRequiredFields(body, ['token']);
+    if (!validation.isValid) {
+      return createErrorResponse(
+        'Token missing',
+        'Verification token is required',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
+
     const result = await fetchGraphQL(
       {
         query: VERIFY_EMAIL_MUTATION,
@@ -47,49 +26,38 @@ export async function POST(req: NextRequest) {
       { req }
     );
 
-    console.log('[verify] Vendure response:', JSON.stringify(result, null, 2));
-
-    // Manejo de errores
     if (result.errors?.length) {
-      console.error('[verify] GraphQL errors:', result.errors);
-      return NextResponse.json(
-        { errors: result.errors },
-        { status: 400 }
+      return createErrorResponse(
+        'Verification failed',
+        result.errors[0]?.message || 'Failed to verify email',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        result.errors
       );
     }
 
     const verifyData = result.data?.verifyCustomerAccount;
 
     if (!verifyData) {
-      console.warn('[verify] No verification data returned');
-      return NextResponse.json(
-        { error: 'Verification failed - no data returned' },
-        { status: 400 }
+      return createErrorResponse(
+        'Verification failed',
+        'No verification data returned',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR
       );
     }
 
-    // Si es CurrentUser, la verificación fue exitosa
     if (verifyData.__typename === 'CurrentUser') {
-      console.log('[verify] Email verified successfully');
-      const res = NextResponse.json({
+      const response = NextResponse.json({
         success: true,
         user: verifyData,
         message: 'Email verified successfully! You can now log in.',
       });
 
-      // Propagar cookies si las hay
-      if (result.setCookies?.length) {
-        result.setCookies.forEach(cookie => {
-          res.headers.append('Set-Cookie', cookie);
-        });
-      }
-
-      return res;
+      forwardCookies(response, result);
+      return response;
     }
 
-    // Si hay algún error
-    console.warn('[verify] Verification failed:', verifyData);
-    
     let errorMessage = 'Verification failed';
     if (verifyData.__typename === 'VerificationTokenInvalidError') {
       errorMessage = 'Invalid verification token. Please request a new verification email.';
@@ -98,24 +66,19 @@ export async function POST(req: NextRequest) {
     } else {
       errorMessage = verifyData.message || 'Verification failed';
     }
-    
-    return NextResponse.json(
-      {
-        success: false,
-        error: errorMessage,
-        message: errorMessage,
-        errorCode: verifyData.errorCode,
-      },
-      { status: 400 }
+
+    return createErrorResponse(
+      'Verification failed',
+      errorMessage,
+      HTTP_STATUS.BAD_REQUEST,
+      verifyData.errorCode
     );
   } catch (error) {
-    console.error('[verify] Error:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Verification failed',
-      },
-      { status: 500 }
+    return createErrorResponse(
+      'Internal server error',
+      error instanceof Error ? error.message : 'Failed to process verification',
+      HTTP_STATUS.INTERNAL_ERROR,
+      ERROR_CODES.INTERNAL_ERROR
     );
   }
 }

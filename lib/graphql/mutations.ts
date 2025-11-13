@@ -1,7 +1,15 @@
 import { gql } from 'graphql-request';
-import { ORDER_FRAGMENT, CUSTOMER_FRAGMENT, ORDER_BASIC_FRAGMENT } from './fragments';
+import { 
+  ORDER_FRAGMENT, 
+  CUSTOMER_FRAGMENT, 
+  ORDER_BASIC_FRAGMENT,
+  ORDER_SUMMARY_FRAGMENT,
+  ORDER_WITH_ADDRESSES,
+  ORDER_PRICING_SUMMARY
+} from './fragments';
 
 export const ADD_ITEM_TO_ORDER = gql`
+  ${ORDER_SUMMARY_FRAGMENT}
   mutation AddItemToOrder($productVariantId: ID!, $qty: Int!) {
     addItemToOrder(productVariantId: $productVariantId, quantity: $qty) {
       ... on Order {
@@ -72,6 +80,7 @@ export const SET_CUSTOMER_FOR_ORDER = gql`
 `;
 
 export const SET_ORDER_SHIPPING_ADDRESS = gql`
+  ${ORDER_WITH_ADDRESSES}
   mutation SetOrderShippingAddress($input: CreateAddressInput!) {
     setOrderShippingAddress(input: $input) {
       __typename
@@ -101,7 +110,8 @@ export const TRANSITION_ORDER_TO_STATE = gql`
   }
 `;
 
-export const SET_ORDER_SHIPPING_METHOD = /* GraphQL */ `
+export const SET_ORDER_SHIPPING_METHOD = gql`
+  ${ORDER_PRICING_SUMMARY}
   mutation SetOrderShippingMethod($ids: [ID!]!) {
     setOrderShippingMethod(shippingMethodId: $ids) {
       __typename
@@ -121,6 +131,7 @@ export const SET_ORDER_SHIPPING_METHOD = /* GraphQL */ `
 `;
 
 export const SET_ORDER_BILLING_ADDRESS = gql`
+  ${ORDER_WITH_ADDRESSES}
   mutation SetOrderBillingAddress($input: CreateAddressInput!) {
     setOrderBillingAddress(input: $input) {
       __typename
@@ -261,6 +272,16 @@ export const VERIFY_EMAIL_MUTATION = gql`
         errorCode
         message
       }
+    }
+  }
+`;
+
+export const TRANSITION_TO_ADDING = gql`
+  mutation BackToAdding {
+    transitionOrderToState(state: "AddingItems") {
+      __typename
+      ... on Order { id code state }
+      ... on OrderStateTransitionError { errorCode message transitionError fromState toState }
     }
   }
 `;

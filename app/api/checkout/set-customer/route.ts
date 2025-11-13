@@ -1,81 +1,76 @@
-// app/api/checkout/set-customer/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
 import { SET_CUSTOMER_FOR_ORDER } from '@/lib/graphql/mutations';
-
-const AUTH_STATE = /* GraphQL */ `
-  query AuthState {
-    me { id identifier }
-    activeCustomer { id firstName lastName emailAddress }
-    activeOrder { id code state customer { id emailAddress } }
-  }
-`;
+import { AUTH_STATE_QUERY } from '@/lib/graphql/queries';
+import { createErrorResponse, forwardCookies, validateRequiredFields, HTTP_STATUS, ERROR_CODES } from '@/lib/api-utils';
 
 export async function POST(req: NextRequest) {
-  console.log('[set-customer] POST request received');
-  const raw = await req.json().catch(() => ({}));
-  console.log('[set-customer] Raw body parsed:', raw);
+  try {
+    const body = await req.json().catch(() => ({}));
 
-  const input = {
-    firstName: raw.firstName?.trim(),
-    lastName: raw.lastName?.trim(),
-    emailAddress: raw.emailAddress?.trim(),
-    phoneNumber: raw.phoneNumber?.trim() || undefined,
-  };
-  console.log('[set-customer] Constructed input:', input);
+    const input = {
+      firstName: body.firstName?.trim(),
+      lastName: body.lastName?.trim(),
+      emailAddress: body.emailAddress?.trim(),
+      phoneNumber: body.phoneNumber?.trim() || undefined,
+    };
 
-  // 1) Chequear si hay sesión autenticada (y tolerar FORBIDDEN en `me`)
-  console.log('[set-customer] Checking authentication state');
-  const auth = await fetchGraphQL({ query: AUTH_STATE }, { req });
-  console.log('[set-customer] Auth response:', JSON.stringify(auth, null, 2));
+    const auth = await fetchGraphQL({ query: AUTH_STATE_QUERY }, { req });
+    const meForbiddenOnly =
+      auth.errors?.length &&
+      auth.errors.every((e) => e.extensions?.code === 'FORBIDDEN' && e.path?.[0] === 'me');
 
-  const meForbiddenOnly =
-    auth.errors?.length &&
-    auth.errors.every(e => e.extensions?.code === 'FORBIDDEN' && e.path?.[0] === 'me');
+    const isLoggedIn = !!auth.data?.me || !!auth.data?.activeCustomer;
+    if (isLoggedIn) {
+      const res = NextResponse.json({ auth: auth.data });
+      forwardCookies(res, auth);
+      return res;
+    }
 
-  const isLoggedIn = !!auth.data?.me || !!auth.data?.activeCustomer;
-  console.log('[set-customer] isLoggedIn:', isLoggedIn);
-  if (isLoggedIn) {
-    console.log('[set-customer] User already logged in, returning current auth info');
-    const res = NextResponse.json({ auth: auth.data });
-    for (const c of auth.setCookies ?? []) res.headers.append('Set-Cookie', c);
-    return res; // ya logueado → NO setCustomerForOrder
-  }
+    const validation = validateRequiredFields(input, ['firstName', 'lastName', 'emailAddress']);
+    if (!validation.isValid) {
+      return createErrorResponse(
+        'Missing required customer fields',
+        `Missing fields: ${validation.missing.join(', ')}`,
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
 
-  // 2) Guest: si faltan campos mínimos, error
-  if (!input.firstName || !input.lastName || !input.emailAddress) {
-    console.warn('[set-customer] Missing required customer fields:', input);
-    return NextResponse.json({ error: 'Missing customer fields' }, { status: 400 });
-  }
+    const result = await fetchGraphQL(
+      { query: SET_CUSTOMER_FOR_ORDER, variables: { input } },
+      { req }
+    );
 
-  // 3) Ejecutar setCustomerForOrder (guest)
-  console.log('[set-customer] Executing setCustomerForOrder mutation with:', input);
-  const result = await fetchGraphQL(
-    { query: SET_CUSTOMER_FOR_ORDER, variables: { input } },
-    { req }
-  );
-  console.log('[set-customer] setCustomerForOrder response:', JSON.stringify(result, null, 2));
+    if (result.errors && !meForbiddenOnly) {
+      return createErrorResponse(
+        'Failed to set customer',
+        result.errors[0]?.message || 'Failed to set customer for order',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        result.errors
+      );
+    }
 
-  // Si hubo errores reales (no relacionados con `me`), devolvelos
-  if (result.errors && !meForbiddenOnly) {
-    console.error('[set-customer] GraphQL errors:', result.errors);
-    return NextResponse.json({ errors: result.errors }, { status: 400 });
-  }
+    if (result.data?.setCustomerForOrder?.errorCode) {
+      return createErrorResponse(
+        'Failed to set customer',
+        result.data.setCustomerForOrder.message || 'Failed to set customer for order',
+        HTTP_STATUS.BAD_REQUEST,
+        result.data.setCustomerForOrder.errorCode,
+        result.data.setCustomerForOrder
+      );
+    }
 
-  // Check if setCustomerForOrder returned an error (e.g., EMAIL_ADDRESS_CONFLICT_ERROR)
-  if (result.data?.setCustomerForOrder?.errorCode) {
-    console.error('[set-customer] setCustomerForOrder error:', result.data.setCustomerForOrder);
-    return NextResponse.json(
-      { 
-        setCustomerForOrder: result.data.setCustomerForOrder,
-        error: result.data.setCustomerForOrder.message 
-      }, 
-      { status: 400 }
+    const res = NextResponse.json(result.data);
+    forwardCookies(res, result);
+    return res;
+  } catch (error) {
+    return createErrorResponse(
+      'Internal server error',
+      error instanceof Error ? error.message : 'Failed to set customer',
+      HTTP_STATUS.INTERNAL_ERROR,
+      ERROR_CODES.INTERNAL_ERROR
     );
   }
-
-  const res = NextResponse.json(result.data);
-  for (const c of result.setCookies ?? []) res.headers.append('Set-Cookie', c);
-  console.log('[set-customer] Success response sent:', JSON.stringify(result.data, null, 2));
-  return res;
 }

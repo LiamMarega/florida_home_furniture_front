@@ -1,7 +1,6 @@
 // app/api/webhooks/stripe/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { gql } from 'graphql-request';
 import { GET_ORDER_BY_CODE } from '@/lib/graphql/queries';
 import { TRANSITION_ORDER_TO_STATE, ADD_PAYMENT_TO_ORDER } from '@/lib/graphql/mutations';
 

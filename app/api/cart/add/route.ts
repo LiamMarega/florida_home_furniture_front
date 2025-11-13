@@ -1,84 +1,96 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
-import { ADD_ITEM_TO_ORDER } from '@/lib/graphql/mutations';
-import { ORDER_SUMMARY_FRAGMENT } from '@/lib/graphql/fragments';
-
-const ACTIVE_ORDER_STATE = /* GraphQL */ `
-  query ActiveOrderState {
-    activeOrder {
-      id
-      code
-      state
-    }
-  }
-`;
-
-const TRANSITION_TO_ADDING = /* GraphQL */ `
-  mutation BackToAdding {
-    transitionOrderToState(state: "AddingItems") {
-      __typename
-      ... on Order { id code state }
-      ... on OrderStateTransitionError { errorCode message transitionError fromState toState }
-    }
-  }
-`;
+import { ADD_ITEM_TO_ORDER, TRANSITION_TO_ADDING } from '@/lib/graphql/mutations';
+import { GET_ACTIVE_ORDER_STATE } from '@/lib/graphql/queries';
+import { createErrorResponse, forwardCookies, validateRequiredFields, HTTP_STATUS, ERROR_CODES } from '@/lib/api-utils';
 
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({}));
-  const { productVariantId, quantity = 1 } = body as {
-    productVariantId: string;
-    quantity?: number;
-  };
+  try {
+    const body = await req.json().catch(() => ({}));
+    const { productVariantId, quantity = 1 } = body as {
+      productVariantId: string;
+      quantity?: number;
+    };
 
-  if (!productVariantId || quantity <= 0) {
-    return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
-  }
-
-  // 1) Ver el estado actual
-  const auth = await fetchGraphQL({ query: ACTIVE_ORDER_STATE }, { req });
-  if (auth.errors) {
-    return NextResponse.json({ errors: auth.errors }, { status: 400 });
-  }
-  const state = auth.data?.activeOrder?.state as string | undefined;
-
-  // 2) Si está en ArrangingPayment, intentar volver a AddingItems
-  if (state === 'ArrangingPayment') {
-    const back = await fetchGraphQL({ query: TRANSITION_TO_ADDING }, { req });
-    const t = back.data?.transitionOrderToState;
-    if (t?.__typename !== 'Order') {
-      // No se pudo volver → devolvés info para que el front reintente/cancele pago
-      return NextResponse.json(
-        { error: 'ORDER_LOCKED_DURING_PAYMENT', detail: t },
-        { status: 409 },
+    const validation = validateRequiredFields(body, ['productVariantId']);
+    if (!validation.isValid || quantity <= 0) {
+      return createErrorResponse(
+        'Invalid input',
+        'productVariantId is required and quantity must be greater than 0',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR
       );
     }
-  }
 
-  // 3) Si ya está placed (p.ej. PaymentAuthorized / PaymentSettled), bloquear
-  if (state && state !== 'AddingItems' && state !== 'ArrangingPayment') {
-    return NextResponse.json(
-      {
-        error: 'ORDER_ALREADY_PLACED',
-        message:
-          'La orden ya fue confirmada. Creá una nueva orden para agregar items o usa Order Modification en Admin.',
-        state,
-      },
-      { status: 409 },
+    const orderStateResult = await fetchGraphQL(
+      { query: GET_ACTIVE_ORDER_STATE },
+      { req }
+    );
+
+    if (orderStateResult.errors) {
+      return createErrorResponse(
+        'Failed to check order state',
+        orderStateResult.errors[0]?.message || 'Failed to check order state',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        orderStateResult.errors
+      );
+    }
+
+    const state = orderStateResult.data?.activeOrder?.state as string | undefined;
+
+    if (state === 'ArrangingPayment') {
+      const transitionResult = await fetchGraphQL(
+        { query: TRANSITION_TO_ADDING },
+        { req }
+      );
+
+      const transition = transitionResult.data?.transitionOrderToState;
+      if (transition?.__typename !== 'Order') {
+        return createErrorResponse(
+          'Order locked during payment',
+          'Cannot add items while payment is being processed',
+          HTTP_STATUS.CONFLICT,
+          'ORDER_LOCKED_DURING_PAYMENT',
+          transition
+        );
+      }
+    }
+
+    if (state && state !== 'AddingItems' && state !== 'ArrangingPayment') {
+      return createErrorResponse(
+        'Order already placed',
+        'Order has been confirmed. Create a new order to add items.',
+        HTTP_STATUS.CONFLICT,
+        'ORDER_ALREADY_PLACED',
+        { state }
+      );
+    }
+
+    const result = await fetchGraphQL(
+      { query: ADD_ITEM_TO_ORDER, variables: { productVariantId, qty: quantity } },
+      { req }
+    );
+
+    if (result.errors) {
+      return createErrorResponse(
+        'Failed to add item',
+        result.errors[0]?.message || 'Failed to add item to cart',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        result.errors
+      );
+    }
+
+    const res = NextResponse.json(result.data);
+    forwardCookies(res, result);
+    return res;
+  } catch (error) {
+    return createErrorResponse(
+      'Internal server error',
+      error instanceof Error ? error.message : 'Failed to add item to cart',
+      HTTP_STATUS.INTERNAL_ERROR,
+      ERROR_CODES.INTERNAL_ERROR
     );
   }
-
-  // 4) Agregar item
-  const query = `${ORDER_SUMMARY_FRAGMENT}\n${ADD_ITEM_TO_ORDER}`;
-  const result = await fetchGraphQL(
-    { query, variables: { productVariantId, qty: quantity } },
-    { req },
-  );
-
-  if (result.errors) {
-    return NextResponse.json({ errors: result.errors }, { status: 400 });
-  }
-
-  const res = NextResponse.json(result.data);
-  for (const c of result.setCookies ?? []) res.headers.append('Set-Cookie', c);
-  return res;
 }

@@ -42,6 +42,7 @@ export function ShippingMethodsSection({
               }`}
               onClick={() => onShippingMethodSelect(method.id)}
             >
+                
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <input
@@ -54,7 +55,7 @@ export function ShippingMethodsSection({
                   />
                   <div>
                     <p className="font-medium text-brand-dark-blue">
-                      {method.description || 'Standard Shipping'}
+                      {method.name || 'Standard Shipping'}
                     </p>
                     {method.metadata && (
                       <p className="text-sm text-brand-dark-blue/70">

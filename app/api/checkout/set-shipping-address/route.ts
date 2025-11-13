@@ -4,7 +4,6 @@ import {
   SET_ORDER_SHIPPING_ADDRESS,
   SET_ORDER_BILLING_ADDRESS,
 } from '@/lib/graphql/mutations';
-import { ORDER_WITH_ADDRESSES } from '@/lib/graphql/fragments';
 
 function normalizeAddressBody(raw: any) {
   if (raw?.shipping?.streetLine1) return raw;
@@ -44,12 +43,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing shipping.streetLine1' }, { status: 400 });
   }
 
-  const shippingQuery = `${ORDER_WITH_ADDRESSES}\n${SET_ORDER_SHIPPING_ADDRESS}`;
-  const billingQuery  = `${ORDER_WITH_ADDRESSES}\n${SET_ORDER_BILLING_ADDRESS}`;
-
   // 1) Shipping
   const shipResult = await fetchGraphQL(
-    { query: shippingQuery, variables: { input: body.shipping } },
+    { query: SET_ORDER_SHIPPING_ADDRESS, variables: { input: body.shipping } },
     { req }
   );
   if (shipResult.errors) {
@@ -68,7 +64,7 @@ export async function POST(req: NextRequest) {
 
   if (billingSame) {
     const billResult = await fetchGraphQL(
-      { query: billingQuery, variables: { input: body.shipping } },
+      { query: SET_ORDER_BILLING_ADDRESS, variables: { input: body.shipping } },
       { req }
     );
     if (billResult.errors) {
@@ -81,7 +77,7 @@ export async function POST(req: NextRequest) {
     return res;
   } else if (body.billing?.streetLine1) {
     const billResult = await fetchGraphQL(
-      { query: billingQuery, variables: { input: body.billing } },
+      { query: SET_ORDER_BILLING_ADDRESS, variables: { input: body.billing } },
       { req }
     );
     if (billResult.errors) {
