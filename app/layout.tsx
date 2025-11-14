@@ -12,7 +12,6 @@ import AuthModal from '@/components/auth/auth-modal';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Footer } from '@/components/footer';
-import { FloatingWhatsApp } from 'react-floating-whatsapp'
 
 
 
@@ -132,6 +131,7 @@ export default function RootLayout({
                 {children}
                 <AuthModal />
                 <Toaster position="bottom-right" />
+          
                 <Footer />
               </SearchProvider>
             </CartProvider>
