@@ -50,7 +50,7 @@ export function Footer() {
         className="pointer-events-none absolute -bottom-4 left-6 text-[96px] md:text-[140px] font-black tracking-tight select-none"
         style={{ color: 'rgba(35, 68, 101, 0.05)' }}
       >
-        FLORIDA HOMES
+        Florida Home
       </div>
 
       <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">

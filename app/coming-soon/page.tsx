@@ -17,7 +17,7 @@ export default function ComingSoon() {
           <div className="inline-block mb-4">
             <Image
               src="/images/logos/logo_compacto_5.png"
-              alt="Florida Homes Furniture"
+              alt="Florida Home Furniture"
               width={180}
               height={180}
               priority

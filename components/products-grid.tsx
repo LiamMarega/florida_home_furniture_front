@@ -9,6 +9,8 @@ import { ProductCard } from './products/product-card';
 import { ProductsGridFilters } from './products/products-grid-filters';
 import { Pagination } from './products/pagination';
 import { Product } from '@/lib/types';
+import { FloatingWhatsApp } from 'react-floating-whatsapp'
+
 
 interface ProductsGridProps {
   // Customization options
@@ -181,6 +183,14 @@ export function ProductsGrid({
           </div>
         )}
       </div>
+      <FloatingWhatsApp
+                  phoneNumber="+1 (305) 924-0685"
+                  accountName="Florida Home Furniture"
+                  avatar="/images/favicon/favicon.ico"
+                  chatMessage="Hello, how can I help you?"
+                  statusMessage="Online"
+                  placeholder="Type your message here..."
+                />
     </section>
   );
 }

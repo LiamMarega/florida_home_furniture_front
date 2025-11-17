@@ -6,7 +6,7 @@ export const stats: Stat[] = [
   {
     value: '10+',
     description:
-      'With a decade of expertise, Florida Homes Furniture crafts modern, functional and accessible furniture from Miami.',
+      'With a decade of expertise, Florida Home Furniture crafts modern, functional and accessible furniture from Miami.',
   },
   {
     value: '800+',
@@ -16,6 +16,6 @@ export const stats: Stat[] = [
   {
     value: '1200+',
     description:
-      'Florida Homes Furniture has crafted over 1200 unique furniture pieces, from elegant sofas to functional cabinets, with precision and care.',
+      'Florida Home Furniture has crafted over 1200 unique furniture pieces, from elegant sofas to functional cabinets, with precision and care.',
   },
 ];

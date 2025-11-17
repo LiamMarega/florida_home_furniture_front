@@ -1,4 +1,4 @@
-# 🏠 Florida Homes Furniture - Quality Furniture E-commerce
+# 🏠 Florida Home Furniture - Quality Furniture E-commerce
 
 [![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.2-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
@@ -1307,7 +1307,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 <div align="center">
-  <p>Made with ❤️ by the Florida Homes Furniture Team</p>
+  <p>Made with ❤️ by the Florida Home Furniture Team</p>
   <p>
     <a href="https://github.com/your-username/florida_home_front">GitHub</a> •
     <a href="https://your-domain.com">Live Demo</a> •

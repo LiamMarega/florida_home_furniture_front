@@ -3,9 +3,13 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+import 'react-lazy-load-image-component/src/effects/blur.css';
 import { Product } from '@/lib/types';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { Badge } from '@/components/ui/badge';
+import { getThumbnailUrl, getFullImageUrl } from '@/lib/utils';
+import { LazyLoadImage } from 'react-lazy-load-image-component';
+
 
 interface ProductGalleryProps {
   product: Product;
@@ -42,15 +46,14 @@ export function ProductGallery({ product }: ProductGalleryProps) {
       <div className="relative group">
         <div className="relative w-full bg-white rounded-xl sm:rounded-2xl overflow-hidden shadow-lg" style={{ aspectRatio: '1 / 1', maxHeight: '400px' }}>
           {currentImage && (
-            <Image
-              src={currentImage.preview}
+            <LazyLoadImage
+              src={getFullImageUrl(currentImage.source || '', currentImage.preview)}
+              placeholderSrc={getThumbnailUrl(currentImage.preview, 50)}
               alt={`${product.name} - Image ${selectedImageIndex + 1}`}
-              fill
-              className="object-contain transition-transform duration-300 group-hover:scale-105"
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 600px"
-              priority={selectedImageIndex === 0}
-              loading={selectedImageIndex === 0 ? undefined : 'lazy'}
-              quality={90}
+              effect="blur"
+              className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
+              wrapperClassName="!w-full !h-full"
+              threshold={500}
             />
           )}
         </div>
@@ -97,14 +100,14 @@ export function ProductGallery({ product }: ProductGalleryProps) {
                       }
                     }}
                   >
-                    <Image
-                      src={image.preview}
+                    <LazyLoadImage
+                      src={getFullImageUrl(image.source || '', image.preview)}
+                      placeholderSrc={getThumbnailUrl(image.preview, 50)}
                       alt={`${product.name} thumbnail ${index + 1}`}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 640px) 25vw, (max-width: 1024px) 12.5vw, 150px"
-                      loading="lazy"
-                      quality={75}
+                      effect="blur"
+                      className="w-full h-full object-cover"
+                      wrapperClassName="!w-full !h-full !absolute !inset-0"
+                      threshold={500}
                     />
                     
                     {/* Selected indicator */}

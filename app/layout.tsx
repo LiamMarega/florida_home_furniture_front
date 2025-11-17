@@ -15,6 +15,7 @@ import { Footer } from '@/components/footer';
 
 
 
+
 const tangoSans = localFont({
   src: [
     {
@@ -57,14 +58,14 @@ const creatoDisplay = localFont({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'),
   title: {
-    default: 'Florida Homes Furniture - Modern Furniture Store | Miami',
-    template: '%s | Florida Homes Furniture',
+    default: 'Florida Home Furniture - Modern Furniture Store | Miami',
+    template: '%s | Florida Home Furniture',
   },
   description: 'Discover modern, affordable furniture from Miami. Shop sofas, chairs, tables, and more. Free shipping on orders over $200. 30-day returns guaranteed.',
   keywords: 'furniture, sofas, chairs, tables, home decor, office furniture, modern furniture, Miami furniture, Florida furniture',
-  authors: [{ name: 'Florida Homes Furniture' }],
-  creator: 'Florida Homes Furniture',
-  publisher: 'Florida Homes Furniture',
+  authors: [{ name: 'Florida Home Furniture' }],
+  creator: 'Florida Home Furniture',
+  publisher: 'Florida Home Furniture',
   robots: {
     index: true,
     follow: true,
@@ -98,13 +99,13 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_US',
     url: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001',
-    siteName: 'Florida Homes Furniture',
-    title: 'Florida Homes Furniture - Quality Furniture Store',
+    siteName: 'Florida Home Furniture',
+    title: 'Florida Home Furniture - Quality Furniture Store',
     description: 'Modern, affordable furniture from Miami. Create beautiful spaces that fit your budget.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Florida Homes Furniture - Quality Furniture Store',
+    title: 'Florida Home Furniture - Quality Furniture Store',
     description: 'Modern, affordable furniture from Miami. Create beautiful spaces that fit your budget.',
   },
   verification: {
@@ -130,6 +131,7 @@ export default function RootLayout({
                 {children}
                 <AuthModal />
                 <Toaster position="bottom-right" />
+          
                 <Footer />
               </SearchProvider>
             </CartProvider>
