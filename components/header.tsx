@@ -170,7 +170,7 @@ export function Header() {
                 <Link href="/" className="flex items-center">
                   <Image
                     src="/images/logos/logo_compacto.png"
-                    alt="Florida Homes Furniture"
+                    alt="Florida Home Furniture"
                     width={120}
                     height={120}
                   />

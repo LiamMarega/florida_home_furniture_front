@@ -46,13 +46,13 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
       title: product.name,
       description,
       keywords: `${product.name}, furniture, home decor, quality furniture, Miami furniture, Florida furniture, buy ${product.name}`,
-      authors: [{ name: 'Florida Homes Furniture' }],
+      authors: [{ name: 'Florida Home Furniture' }],
       openGraph: {
         type: 'website',
         locale: 'en_US',
         url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'}/product/${params.slug}`,
-        siteName: 'Florida Homes Furniture',
-        title: `${product.name} | Florida Homes Furniture`,
+        siteName: 'Florida Home Furniture',
+        title: `${product.name} | Florida Home Furniture`,
         description,
         images: [
           {
@@ -66,10 +66,10 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
       },
       twitter: {
         card: 'summary_large_image',
-        title: `${product.name} | Florida Homes Furniture`,
+        title: `${product.name} | Florida Home Furniture`,
         description,
         images: [imageUrl],
-        creator: '@FloridaHomesFurn',
+        creator: '@FloridaHomeFurniture',
       },
       alternates: {
         canonical: `/product/${params.slug}`,
@@ -177,7 +177,7 @@ export default async function ProductPageRoute({ params }: ProductPageProps) {
       mpn: variant?.sku || product.id,
       brand: {
         '@type': 'Brand',
-        name: 'Florida Homes Furniture',
+        name: 'Florida Home Furniture',
       },
       offers: price ? {
         '@type': 'Offer',
@@ -191,7 +191,7 @@ export default async function ProductPageRoute({ params }: ProductPageProps) {
         itemCondition: 'https://schema.org/NewCondition',
         seller: {
           '@type': 'Organization',
-          name: 'Florida Homes Furniture',
+          name: 'Florida Home Furniture',
         },
         shippingDetails: {
           '@type': 'OfferShippingDetails',

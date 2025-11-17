@@ -42,7 +42,7 @@ const creatoDisplay = localFont({
 });
 
 export const metadata: Metadata = {
-  title: 'Coming Soon - Florida Homes Furniture',
+  title: 'Coming Soon - Florida Home Furniture',
   description: 'We\'re crafting something beautiful for your home. Quality furniture at prices you\'ll love.',
   robots: {
     index: false,
