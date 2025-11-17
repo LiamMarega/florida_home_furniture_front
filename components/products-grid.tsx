@@ -185,7 +185,7 @@ export function ProductsGrid({
       </div>
       <FloatingWhatsApp
                   phoneNumber="+1 (305) 924-0685"
-                  accountName="Florida Homes Furniture"
+                  accountName="Florida Home Furniture"
                   avatar="/images/favicon/favicon.ico"
                   chatMessage="Hello, how can I help you?"
                   statusMessage="Online"
