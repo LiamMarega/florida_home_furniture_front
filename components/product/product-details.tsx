@@ -256,10 +256,6 @@ export function ProductDetails({ product }: ProductDetailsProps) {
             <span className="text-sm sm:text-base text-brand-dark-blue/80">Free shipping on orders over $200</span>
           </div>
           <div className="flex items-start sm:items-center gap-2 sm:gap-3">
-            <Shield className="w-5 h-5 text-brand-primary flex-shrink-0 mt-0.5 sm:mt-0" />
-            <span className="text-sm sm:text-base text-brand-dark-blue/80">2-year warranty included</span>
-          </div>
-          <div className="flex items-start sm:items-center gap-2 sm:gap-3">
             <RotateCcw className="w-5 h-5 text-brand-primary flex-shrink-0 mt-0.5 sm:mt-0" />
             <span className="text-sm sm:text-base text-brand-dark-blue/80">30-day return policy</span>
           </div>

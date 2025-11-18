@@ -190,6 +190,7 @@ export function ProductsGrid({
                   chatMessage="Hello, how can I help you?"
                   statusMessage="Online"
                   placeholder="Type your message here..."
+                  
                 />
     </section>
   );

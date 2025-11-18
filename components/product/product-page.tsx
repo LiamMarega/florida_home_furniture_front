@@ -9,6 +9,7 @@ import { ProductDetails } from './product-details';
 import { ProductFeatures } from './product-features';
 import { ProductReviews } from './product-reviews';
 import { RelatedProducts } from './related-products';
+import { FloatingWhatsApp } from 'react-floating-whatsapp';
 
 interface ProductPageProps {
   product: Product;
@@ -66,6 +67,14 @@ export function ProductPage({ product, relatedProducts }: ProductPageProps) {
       >
         <RelatedProducts products={relatedProducts} />
       </motion.section>
+      <FloatingWhatsApp
+                  phoneNumber="+1 (305) 924-0685"
+                  accountName="Florida Home Furniture"
+                  avatar="/images/favicon/favicon.ico"
+                  chatMessage="Hello, how can I help you?"
+                  statusMessage="Online"
+                  placeholder="Type your message here..."
+                />
     </motion.main>
   );
 }

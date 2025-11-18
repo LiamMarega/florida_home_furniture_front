@@ -243,6 +243,7 @@ export default async function ProductPageRoute({ params }: ProductPageProps) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
         <ProductPage product={product} relatedProducts={[]} />
+        
       </>
     );
   } catch (error) {
