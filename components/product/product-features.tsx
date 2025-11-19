@@ -36,20 +36,7 @@ const features = [
     color: 'text-green-600',
     bgColor: 'bg-green-100',
   },
-  {
-    icon: Award,
-    title: '2-Year Warranty',
-    description: 'Comprehensive warranty coverage for peace of mind',
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-100',
-  },
-  {
-    icon: Heart,
-    title: 'Customer Love',
-    description: 'Rated 4.8/5 stars by over 1000+ satisfied customers',
-    color: 'text-red-600',
-    bgColor: 'bg-red-100',
-  },
+
   {
     icon: Zap,
     title: 'Fast Assembly',
@@ -57,13 +44,7 @@ const features = [
     color: 'text-yellow-600',
     bgColor: 'bg-yellow-100',
   },
-  {
-    icon: Leaf,
-    title: 'Eco-Friendly',
-    description: 'Made from sustainable and environmentally safe materials',
-    color: 'text-emerald-600',
-    bgColor: 'bg-emerald-100',
-  },
+ 
 ];
 
 const benefits = [

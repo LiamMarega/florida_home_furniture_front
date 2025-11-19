@@ -10,9 +10,9 @@ export default function Home() {
     <main className="w-full">
       <HeroNew />
 
-      <ProductsGrid />
-
       <PremiumCollection />
+
+      <ProductsGrid />
 
       {/* <TestimonialsSection /> */}
 
