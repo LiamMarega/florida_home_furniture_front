@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { ChevronDown, Sofa, Armchair } from 'lucide-react';
+import Image from 'next/image';
 import { Button } from './ui/button';
 import { fadeInUp, fadeIn, slideInLeft } from '@/lib/animations';
 
@@ -18,8 +19,16 @@ export function HeroNew() {
       className="m-5 pt-16 relative min-h-[90dvh] rounded-2xl overflow-hidden bg-gradient-to-br from-brand-cream via-brand-accent/20 to-brand-dark-blue/50 flex items-end"
       // Use 90dvh for better mobile and desktop support, as per prompt
     >
-      <div className="absolute inset-0 bg-[url('/images/furniture-background_hd.jpg')] bg-cover bg-center opacity-100"></div>
-      <div className="absolute inset-0 bg-gradient-to-r from-brand-dark-blue/60 via-brand-dark-blue/50 to-transparent"></div>
+      <Image
+        src="/images/furniture-background_hd.jpg"
+        alt="Modern furniture background"
+        fill
+        priority
+        className="object-cover object-center opacity-100 pointer-events-none"
+        sizes="100vw"
+        quality={90}
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-brand-dark-blue/60 via-brand-dark-blue/50 to-transparent z-0"></div>
 
       {/* Flex container puts all text/buttons at the bottom; child for content fills width */}
       <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-16 flex flex-col justify-end min-h-[60vh] sm:min-h-[55vh] md:min-h-[50vh] lg:min-h-[45vh]">

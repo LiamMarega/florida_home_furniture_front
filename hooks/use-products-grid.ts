@@ -11,6 +11,11 @@ interface UseProductsGridOptions {
   useServerPagination?: boolean;
   facetValueIds?: string | string[];
   collectionId?: string;
+  initialProducts?: Product[];
+  initialPagination?: {
+    totalItems: number;
+    totalPages: number;
+  };
 }
 
 /**
@@ -42,6 +47,8 @@ export function useProductsGrid({
   useServerPagination = true,
   facetValueIds,
   collectionId,
+  initialProducts,
+  initialPagination,
 }: UseProductsGridOptions = {}) {
   const { searchQuery: contextSearchQuery, setSearchQuery: setContextSearchQuery } = useSearch();
   const [searchQuery, setSearchQuery] = useState(contextSearchQuery);
@@ -64,6 +71,19 @@ export function useProductsGrid({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Construct initial data object if provided
+  const initialApiData = (initialProducts && initialPagination) ? {
+    products: initialProducts,
+    pagination: {
+      page: 1,
+      limit: itemsPerPage,
+      totalItems: initialPagination.totalItems,
+      totalPages: initialPagination.totalPages,
+      hasNextPage: initialPagination.totalPages > 1,
+      hasPreviousPage: false,
+    }
+  } : undefined;
+
   // Fetch products from API with pagination
   const { 
     data, 
@@ -78,6 +98,7 @@ export function useProductsGrid({
     facetValueIds,
     collectionId,
     enabled: useServerPagination,
+    initialData: initialApiData,
   });
 
   const products = data?.products || [];

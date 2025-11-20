@@ -29,6 +29,11 @@ interface ProductsGridProps {
   className?: string;
   facetValueIds?: string | string[];
   collectionId?: string;
+  initialProducts?: Product[];
+  initialPagination?: {
+    totalItems: number;
+    totalPages: number;
+  };
 }
 
 export function ProductsGrid({
@@ -47,6 +52,8 @@ export function ProductsGrid({
   className = '',
   facetValueIds,
   collectionId,
+  initialProducts,
+  initialPagination,
 }: ProductsGridProps) {
   const { ref, isVisible } = useScrollAnimation();
   
@@ -70,6 +77,8 @@ export function ProductsGrid({
     useServerPagination: true,
     facetValueIds,
     collectionId,
+    initialProducts,
+    initialPagination,
   });
 
   // Grid column classes based on props
