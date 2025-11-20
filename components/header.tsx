@@ -225,6 +225,7 @@ export function Header() {
                     ref={searchInputRef}
                     type="text"
                     placeholder="Search furniture..."
+                    aria-label="Search furniture"
                     value={searchQuery}
                     onChange={handleSearchChange}
                     className="bg-transparent border-0 text-white placeholder:text-white/70 focus-visible:ring-0 focus-visible:ring-offset-0 h-auto px-0 py-0"
@@ -277,6 +278,7 @@ export function Header() {
                     ref={searchInputRef}
                     type="text"
                     placeholder="Search furniture..."
+                    aria-label="Search furniture"
                     value={searchQuery}
                     onChange={handleSearchChange}
                     className="bg-transparent border-0 text-white placeholder:text-white/70 focus-visible:ring-0 focus-visible:ring-offset-0 h-auto px-0 py-0 text-base flex-1 min-w-0"

@@ -20,15 +20,18 @@ interface Collection {
 
 interface PremiumCollectionProps {
   limit?: number;
+  initialCollections?: Collection[];
 }
 
-export function PremiumCollection({ limit = 4 }: PremiumCollectionProps) {
+export function PremiumCollection({ limit = 4, initialCollections }: PremiumCollectionProps) {
   const { ref, isVisible } = useScrollAnimation();
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [collections, setCollections] = useState<Collection[]>(initialCollections || []);
+  const [loading, setLoading] = useState(!initialCollections);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (initialCollections) return;
+
     const fetchCollections = async () => {
       try {
         setLoading(true);
@@ -51,7 +54,7 @@ export function PremiumCollection({ limit = 4 }: PremiumCollectionProps) {
     };
 
     fetchCollections();
-  }, [limit]);
+  }, [limit, initialCollections]);
 
   if (loading) {
     return (

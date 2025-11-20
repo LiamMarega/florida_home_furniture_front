@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { AddToCartButton } from '@/components/cart/add-to-cart-button';
-import { ShoppingCart, Heart, Share2, Truck, Shield, RotateCcw } from 'lucide-react';
+import { ShoppingCart, Heart, Share2, Truck, Shield, RotateCcw, MessageCircle } from 'lucide-react';
 import { fadeInUp } from '@/lib/animations';
 import { toast } from 'sonner';
 
@@ -73,6 +73,14 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       console.error('Error copying URL:', error);
       toast.error('Error al copiar enlace');
     }
+  };
+
+  // Handle WhatsApp inquiry
+  const handleWhatsApp = () => {
+    const phoneNumber = '13059240685';
+    const message = `Hello!\nI'm interested in the *${product.name}*.\nCould you please let me know if it's available and what the price is?\nThank you!`;
+    const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
   };
 
   const handleQuantityChange = (newQuantity: number) => {
@@ -139,12 +147,21 @@ export function ProductDetails({ product }: ProductDetailsProps) {
             {product.variants.map((variant) => (
               <div
                 key={variant.id}
-                className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-300 ${
+                role="radio"
+                aria-checked={selectedVariant === variant.id}
+                tabIndex={0}
+                className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-brand-primary ${
                   selectedVariant === variant.id
                     ? 'border-brand-primary bg-brand-primary/5'
                     : 'border-brand-cream hover:border-brand-primary/50'
                 }`}
                 onClick={() => setSelectedVariant(variant.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedVariant(variant.id);
+                  }
+                }}
               >
                 <div className="flex justify-between items-center">
                   <div>
@@ -211,15 +228,16 @@ export function ProductDetails({ product }: ProductDetailsProps) {
         )}
         
         <div className="flex flex-col sm:flex-row gap-3">
-          <Button
-            variant="outline"
-            className="flex-1 h-12 sm:h-12 border-2 border-brand-dark-blue text-brand-dark-blue hover:bg-brand-dark-blue hover:text-white touch-manipulation"
-            aria-label="Add to wishlist"
-          >
-            <Heart className="w-5 h-5 mr-2" />
-            <span className="hidden sm:inline">Add to Wishlist</span>
-            <span className="sm:hidden">Wishlist</span>
-          </Button>
+          {!hasValidPrice && (
+            <Button
+              onClick={handleWhatsApp}
+              className="flex-1 h-12 sm:h-12 bg-primary hover:bg-primary/80 text-white touch-manipulation"
+              aria-label="Check availability via WhatsApp"
+            >
+              <MessageCircle className="w-5 h-5 mr-2" />
+              Check Availability
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={handleShare}

@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 import { Product } from '@/lib/types';
 import { 
   Shield, 
@@ -139,7 +140,7 @@ export function ProductFeatures({ product }: ProductFeaturesProps) {
           initial="hidden"
           animate={isVisible ? 'visible' : 'hidden'}
           variants={fadeInUp}
-          className="bg-white rounded-3xl p-8 lg:p-12 shadow-xl border border-brand-cream"
+          className="relative bg-white rounded-3xl p-8 lg:p-12 shadow-xl border border-brand-cream"
         >
           <div className="text-center mb-12">
             <h3 className="text-3xl font-bold text-brand-dark-blue mb-4 font-tango-sans">
@@ -181,6 +182,15 @@ export function ProductFeatures({ product }: ProductFeaturesProps) {
               );
             })}
           </motion.div>
+
+          {/* Decorative Illustration */}
+          <Image
+            src="/images/illustrations/9.png"
+            alt="Decorative illustration"
+            width={96}
+            height={96}
+            className="absolute bottom-4 right-4 w-44 h-7w-44 object-contain opacity-10 z-0 -rotate-12"
+          />
         </motion.div>
 
         {/* Call to Action */}
@@ -190,28 +200,38 @@ export function ProductFeatures({ product }: ProductFeaturesProps) {
           variants={fadeInUp}
           className="text-center mt-16"
         >
-          <div className="bg-gradient-to-r from-brand-primary to-brand-accent rounded-2xl p-8 lg:p-12 text-white">
-            <h3 className="text-2xl lg:text-3xl font-bold mb-4 font-tango-sans">
-              Ready to Transform Your Space?
-            </h3>
-            <p className="text-lg mb-6 opacity-90">
-              Join thousands of satisfied customers who have already made this choice
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="bg-white text-brand-primary px-8 py-4 rounded-full font-semibold hover:bg-gray-50 transition-colors"
-              >
-                Add to Cart Now
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="border-2 border-white text-white px-8 py-4 rounded-full font-semibold hover:bg-white hover:text-brand-primary transition-colors"
-              >
-                Learn More
-              </motion.button>
+          <div className="relative overflow-hidden rounded-2xl p-8 lg:p-12 text-white" style={{ backgroundImage: 'url(/images/backgrounds/orange_bg.png)', backgroundRepeat: 'repeat', backgroundSize: '500px 500px' }}>
+            {/* Dark overlay for better text readability */}
+            <div className="absolute inset-0 bg-black/10 rounded-2xl" />
+            {/* Background Bubbles */}
+            <div className="absolute -top-24 -left-24 w-48 h-48 bg-white/10 rounded-full blur-2xl" />
+            <div className="absolute top-1/2 left-1/4 w-24 h-24 bg-white/10 rounded-full blur-xl" />
+            <div className="absolute -bottom-12 right-12 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
+            <div className="absolute top-12 right-1/4 w-32 h-32 bg-white/5 rounded-full blur-2xl" />
+
+            <div className="relative z-10">
+              <h3 className="text-2xl lg:text-3xl font-bold mb-4 font-tango-sans">
+                Ready to Transform Your Space?
+              </h3>
+              <p className="text-lg mb-6 opacity-90">
+                Join thousands of satisfied customers who have already made this choice
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="bg-white text-brand-primary px-8 py-4 rounded-full font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  Add to Cart Now
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="border-2 border-white text-white px-8 py-4 rounded-full font-semibold hover:bg-white hover:text-brand-primary transition-colors"
+                >
+                  Learn More
+                </motion.button>
+              </div>
             </div>
           </div>
         </motion.div>

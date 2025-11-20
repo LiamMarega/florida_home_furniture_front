@@ -35,6 +35,7 @@ interface UseProductsOptions {
   facetValueIds?: string | string[];
   collectionId?: string;
   enabled?: boolean;
+  initialData?: PaginatedProductsResponse;
 }
 
 /**
@@ -94,6 +95,7 @@ export function useProductsApi(options: UseProductsOptions = {}) {
     facetValueIds,
     collectionId,
     enabled = true,
+    initialData,
   } = options;
 
   return useQuery({
@@ -101,6 +103,7 @@ export function useProductsApi(options: UseProductsOptions = {}) {
     queryFn: () => fetchProducts({ page, limit, search, sort, facetValueIds, collectionId }),
     staleTime: 5 * 60 * 1000, // 5 minutes
     enabled,
+    initialData: (initialData && page === 1 && !search && sort === 'featured' && !facetValueIds && !collectionId) ? initialData : undefined,
   });
 }
 

@@ -97,12 +97,12 @@ export default function CheckoutPage() {
   const currentStep = clientSecret ? CheckoutStep.PAYMENT : CheckoutStep.CUSTOMER_INFO;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white py-32">
-      <div className="max-w-6xl mx-auto px-4">
+    <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white pt-24 pb-12 sm:py-32">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2">
-            <Card className="p-8">
+            <Card className="p-4 sm:p-8">
               <h1 className="text-3xl font-bold text-brand-dark-blue mb-6 font-tango-sans">
                 <User className="inline-block w-8 h-8 mr-2 mb-1" />
                 {currentStep === CheckoutStep.PAYMENT ? 'Payment' : 'Customer Information'}

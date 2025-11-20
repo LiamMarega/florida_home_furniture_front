@@ -90,11 +90,11 @@ export function ProductCard({
   return (
     <motion.div
       whileHover={hoverAnimation ? { y: -8, transition: { duration: 0.3 } } : undefined}
-      className="group bg-white rounded-xl sm:rounded-2xl overflow-hidden shadow-md hover:shadow-brand transition-all duration-300 h-full flex flex-col"
+      className="group bg-white rounded-xl sm:rounded-2xl overflow-hidden shadow-md hover:shadow-brand transition-all duration-300 h-full flex flex-col relative"
     >
-      <Link href={`/product/${slug}`} className="flex flex-col h-full" prefetch={true}>
-        {/* Product Image - Fixed height */}
-        <div className="relative h-40 sm:h-56 md:h-64 lg:h-72 xl:h-80 overflow-hidden bg-brand-cream flex-shrink-0">
+      {/* Product Image - Fixed height */}
+      <div className="relative h-40 sm:h-56 md:h-64 lg:h-72 xl:h-80 overflow-hidden bg-brand-cream flex-shrink-0">
+        <Link href={`/product/${slug}`} className="block w-full h-full" tabIndex={-1}>
           {featuredAsset?.preview ? (
             <LazyLoadImage
               src={getFullImageUrl(featuredAsset.source || '', featuredAsset.preview)}
@@ -116,57 +116,69 @@ export function ProductCard({
               />
             </div>
           )}
+        </Link>
 
-          {/* Quick View Badge */}
-          <div className="absolute top-2 right-2 sm:top-4 sm:right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-            <div className="bg-white/90 backdrop-blur-sm rounded-full p-1.5 sm:p-2 shadow-lg">
-              <Eye className="w-3 h-3 sm:w-4 sm:h-4 text-brand-dark-blue" />
-            </div>
+        {/* Quick View Badge */}
+        <div className="absolute top-2 right-2 sm:top-4 sm:right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
+          <div className="bg-white/90 backdrop-blur-sm rounded-full p-1.5 sm:p-2 shadow-lg">
+            <Eye className="w-3 h-3 sm:w-4 sm:h-4 text-brand-dark-blue" />
           </div>
         </div>
+      </div>
 
-        {/* Product Info - Flex grow to fill remaining space */}
-        <div className="p-2.5 sm:p-4 md:p-6 flex flex-col flex-grow">
-          <h3 className="font-bold text-brand-dark-blue text-sm sm:text-base md:text-lg mb-1.5 sm:mb-2 line-clamp-2 font-tango-sans group-hover:text-brand-primary transition-colors min-h-[2.5rem] sm:min-h-[3rem] md:min-h-[3.5rem] flex items-start">
+      {/* Product Info - Flex grow to fill remaining space */}
+      <div className="p-2.5 sm:p-4 md:p-6 flex flex-col flex-grow">
+        <Link href={`/product/${slug}`} className="block group-hover:text-brand-primary transition-colors">
+          <h3 className="font-bold text-brand-dark-blue text-sm sm:text-base md:text-lg mb-1.5 sm:mb-2 line-clamp-2 font-tango-sans min-h-[2.5rem] sm:min-h-[3rem] md:min-h-[3.5rem] flex items-start">
             {name}
           </h3>
+        </Link>
 
-          {description && (
-            <p className="text-[10px] sm:text-xs md:text-sm text-brand-dark-blue/70 mb-2 sm:mb-3 line-clamp-2 min-h-[2rem] sm:min-h-[2.5rem] md:min-h-[3rem] overflow-hidden text-ellipsis">
-              {description}
-            </p>
+        {description && (
+          <p className="text-[10px] sm:text-xs md:text-sm text-brand-dark-blue/70 mb-2 sm:mb-3 line-clamp-2 min-h-[2rem] sm:min-h-[2.5rem] md:min-h-[3rem] overflow-hidden text-ellipsis">
+            {description}
+          </p>
+        )}
+
+        {/* Price and Button - Always at bottom */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between mt-auto pt-1.5 sm:pt-2 gap-1.5 sm:gap-2">
+          {(displayPrice && displayPrice > 0) ? (
+            <div className="flex-shrink-0 min-w-0">
+              <div className="text-[10px] sm:text-xs text-brand-dark-blue/60 mb-0.5 sm:mb-1">Starting at</div>
+              <div className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-brand-dark-blue">
+                {formatPrice(displayPrice)}
+              </div>
+            </div>
+          ) : (
+            <div className="flex-shrink-0 min-w-0">
+              <Link href={`/product/${slug}`} className="text-xs sm:text-sm text-brand-dark-blue/70 hover:text-brand-primary underline">
+                View details
+              </Link>
+            </div>
           )}
 
-          {/* Price and Button - Always at bottom */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between mt-auto pt-1.5 sm:pt-2 gap-1.5 sm:gap-2">
-            {(displayPrice && displayPrice > 0) ? (
-              <div className="flex-shrink-0 min-w-0">
-                <div className="text-[10px] sm:text-xs text-brand-dark-blue/60 mb-0.5 sm:mb-1">Starting at</div>
-                <div className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-brand-dark-blue">
-                  {formatPrice(displayPrice)}
-                </div>
-              </div>
-            ) : (
-              <div className="flex-shrink-0 min-w-0">
-                <div className="text-xs sm:text-sm text-brand-dark-blue/70">View details</div>
-              </div>
-            )}
-
-            {showQuickAdd && defaultVariantId && displayPrice > 0 && (
-              <Button
-                size="sm"
-                className="gap-0.5 sm:gap-1 md:gap-2 bg-brand-primary hover:bg-brand-primary/90 text-white text-[10px] sm:text-xs md:text-sm px-1.5 sm:px-2 md:px-4 flex-shrink-0 h-7 sm:h-8 md:h-9 w-full sm:w-auto"
-                onClick={handleAddToCart}
-                disabled={isAddingToCart}
-              >
-                <ShoppingCart className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-4 md:h-4" />
-                <span className="hidden sm:inline">{isAddingToCart ? 'Adding...' : 'Add to Cart'}</span>
-                <span className="sm:hidden">{isAddingToCart ? '...' : 'Add'}</span>
-              </Button>
-            )}
-          </div>
+          {showQuickAdd && defaultVariantId && displayPrice > 0 && (
+            <Button
+              size="sm"
+              className="gap-0.5 sm:gap-1 md:gap-2 bg-brand-primary hover:bg-brand-primary/90 text-white text-[10px] sm:text-xs md:text-sm px-1.5 sm:px-2 md:px-4 flex-shrink-0 h-7 sm:h-8 md:h-9 w-full sm:w-auto z-20 relative"
+              onClick={handleAddToCart}
+              disabled={isAddingToCart}
+              aria-label={`Add ${name} to cart`}
+            >
+              <ShoppingCart className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-4 md:h-4" />
+              <span className="hidden sm:inline">{isAddingToCart ? 'Adding...' : 'Add to Cart'}</span>
+              <span className="sm:hidden">{isAddingToCart ? '...' : 'Add'}</span>
+            </Button>
+          )}
         </div>
-      </Link>
+      </div>
+      {/* Full card link overlay for better UX without nesting issues - hidden to screen readers to avoid double links */}
+      <Link 
+        href={`/product/${slug}`} 
+        className="absolute inset-0 z-0" 
+        aria-hidden="true" 
+        tabIndex={-1}
+      />
     </motion.div>
   );
 }

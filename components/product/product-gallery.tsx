@@ -78,9 +78,9 @@ export function ProductGallery({ product }: ProductGalleryProps) {
             }}
             className="w-full"
           >
-            <CarouselContent className="-ml-2 md:-ml-4 p-6 sm:p-10">
+            <CarouselContent className="-ml-2 md:-ml-4 p-2 sm:p-6 md:p-10">
               {allImages.map((image, index) => (
-                <CarouselItem key={image.id} className="pl-2 md:pl-4 basis-1/4">
+                <CarouselItem key={image.id} className="pl-2 md:pl-4 basis-1/4 sm:basis-1/5 md:basis-1/4">
                   <motion.div
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
