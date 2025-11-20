@@ -147,12 +147,21 @@ export function ProductDetails({ product }: ProductDetailsProps) {
             {product.variants.map((variant) => (
               <div
                 key={variant.id}
-                className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-300 ${
+                role="radio"
+                aria-checked={selectedVariant === variant.id}
+                tabIndex={0}
+                className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-brand-primary ${
                   selectedVariant === variant.id
                     ? 'border-brand-primary bg-brand-primary/5'
                     : 'border-brand-cream hover:border-brand-primary/50'
                 }`}
                 onClick={() => setSelectedVariant(variant.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedVariant(variant.id);
+                  }
+                }}
               >
                 <div className="flex justify-between items-center">
                   <div>

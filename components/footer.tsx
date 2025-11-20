@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Twitter, Instagram, Hash } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
+import Image from 'next/image';
 
 export function Footer() {
   const [email, setEmail] = useState('');
@@ -141,6 +142,15 @@ export function Footer() {
           </a>
         </p>
       </div>
+
+      {/* Decorative Illustration */}
+      <Image
+        src="/images/illustrations/8.png"
+        alt="Decorative illustration"
+        width={120}
+        height={120}
+        className="absolute top-0 right-20 w-22 h-2w-22 object-contain opacity-10 z-0 scale-x-[-1]"
+      />
     </footer>
   );
 }

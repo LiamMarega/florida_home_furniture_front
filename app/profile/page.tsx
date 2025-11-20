@@ -48,6 +48,7 @@ export default function ProfilePage() {
           <Skeleton className="h-16 w-64 mb-8" />
           <Skeleton className="h-10 w-48 mb-6" />
           <Skeleton className="h-64" />
+          <div className="sr-only">Checking authentication...</div>
         </div>
       </div>
     );

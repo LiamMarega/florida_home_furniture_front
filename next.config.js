@@ -16,6 +16,9 @@ const nextConfig = {
   // ESLint
   eslint: {
     ignoreDuringBuilds: true,
+    rules: {
+      '@next/next/no-img-element': 'off',
+    },
   },
 
   // Configuración de imágenes optimizadas

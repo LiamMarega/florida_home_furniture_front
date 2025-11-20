@@ -116,7 +116,8 @@ export function CartDrawerItem({ item, currencyCode }: CartDrawerItemProps) {
               size="icon"
               onClick={() => handleQuantityChange(item.quantity - 1)}
               disabled={isUpdating || item.quantity <= 1}
-              className="h-8 w-8 rounded-full hover:bg-white"
+              className="h-8 w-8 sm:h-9 sm:w-9 rounded-full hover:bg-white touch-manipulation"
+              aria-label="Decrease quantity"
             >
               {isUpdating ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -134,7 +135,8 @@ export function CartDrawerItem({ item, currencyCode }: CartDrawerItemProps) {
               size="icon"
               onClick={() => handleQuantityChange(item.quantity + 1)}
               disabled={isUpdating}
-              className="h-8 w-8 rounded-full hover:bg-white"
+              className="h-8 w-8 sm:h-9 sm:w-9 rounded-full hover:bg-white touch-manipulation"
+              aria-label="Increase quantity"
             >
               {isUpdating ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -150,7 +152,8 @@ export function CartDrawerItem({ item, currencyCode }: CartDrawerItemProps) {
             size="icon"
             onClick={handleRemove}
             disabled={isUpdating}
-            className="h-9 w-9 rounded-full text-red-500 hover:text-red-600 hover:bg-red-50"
+            className="h-9 w-9 rounded-full text-red-500 hover:text-red-600 hover:bg-red-50 touch-manipulation"
+            aria-label="Remove item"
           >
             {isUpdating ? (
               <Loader2 className="h-4 w-4 animate-spin" />

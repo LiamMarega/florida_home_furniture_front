@@ -65,7 +65,7 @@ export default async function Home() {
   const { products, totalItems, totalPages, collections } = await getInitialData();
 
   return (
-    <main className="w-full">
+    <main id="main-content" className="w-full">
       <HeroNew />
 
       <PremiumCollection initialCollections={collections} />
