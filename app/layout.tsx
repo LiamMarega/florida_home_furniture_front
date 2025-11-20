@@ -12,6 +12,7 @@ import AuthModal from '@/components/auth/auth-modal';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Footer } from '@/components/footer';
+import Script from 'next/script';
 
 
 
@@ -66,6 +67,9 @@ export const metadata: Metadata = {
   authors: [{ name: 'Florida Home Furniture' }],
   creator: 'Florida Home Furniture',
   publisher: 'Florida Home Furniture',
+  alternates: {
+    canonical: '/',
+  },
   robots: {
     index: true,
     follow: true,
@@ -121,6 +125,52 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${creatoDisplay.variable} ${tangoSans.variable} font-creato-display`}>
+        <Script
+          id="organization-schema"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'FurnitureStore',
+              name: 'Florida Home Furniture',
+              url: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001',
+              logo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'}/images/logos/logo_compacto.png`,
+              address: {
+                '@type': 'PostalAddress',
+                streetAddress: '4055 NW 17th Ave',
+                addressLocality: 'Miami',
+                addressRegion: 'FL',
+                postalCode: '33142',
+                addressCountry: 'US'
+              },
+              geo: {
+                '@type': 'GeoCoordinates',
+                latitude: 25.8108, 
+                longitude: -80.2235 
+              },
+              telephone: '+13059240685',
+              openingHoursSpecification: [
+                {
+                  '@type': 'OpeningHoursSpecification',
+                  dayOfWeek: [
+                    'Monday',
+                    'Tuesday',
+                    'Wednesday',
+                    'Thursday',
+                    'Friday'
+                  ],
+                  opens: '09:00',
+                  closes: '18:00'
+                }
+              ],
+              sameAs: [
+                'https://twitter.com/floridahome',
+                'https://www.instagram.com/floridahome',
+                'https://www.facebook.com/floridahome'
+              ]
+            })
+          }}
+        />
       <Analytics />
       <SpeedInsights />
         <QueryProvider>
@@ -141,3 +191,4 @@ export default function RootLayout({
     </html>
   );
 }
+

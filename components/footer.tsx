@@ -49,6 +49,7 @@ export function Footer() {
       <div
         className="pointer-events-none absolute -bottom-4 left-6 text-[96px] md:text-[140px] font-black tracking-tight select-none"
         style={{ color: 'rgba(35, 68, 101, 0.05)' }}
+        aria-hidden="true"
       >
         Florida Home
       </div>
@@ -88,6 +89,7 @@ export function Footer() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter email address"
+              aria-label="Email address for newsletter"
               className="h-10 flex-1 rounded-lg border border-brand-cream px-4 text-[12px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2"
               required
               disabled={isSubmitting}
@@ -101,24 +103,33 @@ export function Footer() {
 
       <div className="relative z-10 flex flex-col md:flex-row items-center justify-between pt-6 border-t border-brand-cream gap-4">
         <div className="flex gap-4">
-          <button
-            aria-label="Twitter"
+          <a
+            href="#"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Follow us on Twitter"
             className="text-brand-dark-blue/70 hover:text-brand-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 rounded"
           >
             <Twitter className="w-5 h-5" />
-          </button>
-          <button
-            aria-label="Instagram"
+          </a>
+          <a
+            href="#"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Follow us on Instagram"
             className="text-brand-dark-blue/70 hover:text-brand-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 rounded"
           >
             <Instagram className="w-5 h-5" />
-          </button>
-          <button
-            aria-label="Pinterest"
+          </a>
+          <a
+            href="#"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Follow us on Pinterest"
             className="text-brand-dark-blue/70 hover:text-brand-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 rounded"
           >
             <Hash className="w-5 h-5" />
-          </button>
+          </a>
         </div>
 
         <p className="text-[12px] text-brand-dark-blue/70">
