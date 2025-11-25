@@ -51,7 +51,8 @@ export function ProductCard({
 
   // Get the first variant ID (most products have a default variant)
   const defaultVariantId = variants[0]?.id;
-  const displayPrice = priceWithTax || price || variants[0]?.priceWithTax || variants[0]?.price ; 
+  // Only show price without tax in product cards - tax is shown only in checkout
+  const displayPrice = price || variants[0]?.price; 
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
