@@ -12,7 +12,9 @@ export const checkoutKeys = {
 // Types
 interface PaymentIntentData {
   clientSecret: string;
-  paymentIntentId?: string;
+  orderCode: string;
+  amount?: number;
+  currency?: string;
 }
 
 // API functions
@@ -124,7 +126,7 @@ export function useCheckoutProcess() {
   const queryClient = useQueryClient();
   const { openAuthModal, isAuthenticated } = useAuth();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [orderCode, setOrderCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const setCustomerMutation = useMutation({
@@ -196,7 +198,7 @@ export function useCheckoutProcess() {
         // Create payment intent
         const paymentIntent = await createPaymentIntentMutation.mutateAsync();
         setClientSecret(paymentIntent.clientSecret);
-        setPaymentIntentId(paymentIntent.paymentIntentId || null);
+        setOrderCode(paymentIntent.orderCode);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An error occurred during checkout';
         setError(errorMessage);
@@ -208,13 +210,13 @@ export function useCheckoutProcess() {
 
   const resetCheckout = useCallback(() => {
     setClientSecret(null);
-    setPaymentIntentId(null);
+    setOrderCode(null);
     setError(null);
   }, []);
 
   return {
     clientSecret,
-    paymentIntentId,
+    orderCode,
     isProcessing:
       setCustomerMutation.isPending ||
       setShippingAddressMutation.isPending ||

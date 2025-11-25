@@ -42,6 +42,7 @@ export default function CheckoutPage() {
 
   const {
     clientSecret,
+    orderCode,
     isProcessing,
     error: checkoutError,
     processCheckout,
@@ -161,9 +162,9 @@ export default function CheckoutPage() {
                 </form>
               ) : (
                 /* Payment Step */
-                clientSecret && typeof clientSecret === 'string' && clientSecret.trim() !== '' ? (
+                clientSecret && orderCode && typeof clientSecret === 'string' && clientSecret.trim() !== '' ? (
                   <Elements stripe={stripePromise} options={{ clientSecret }}>
-                    <PaymentStep clientSecret={clientSecret} onPaid={handlePaid} onBack={handleBack} />
+                    <PaymentStep clientSecret={clientSecret} orderCode={orderCode} onPaid={handlePaid} onBack={handleBack} />
                   </Elements>
                 ) : (
                   <div className="text-center py-8">
