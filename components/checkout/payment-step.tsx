@@ -5,20 +5,19 @@ import { PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js'
 import { Button } from '@/components/ui/button';
 import { CreditCard } from 'lucide-react';
 import { PaymentStepProps } from '@/lib/checkout/types';
-import { useCart } from '@/contexts/cart-context';
 
-export function PaymentStep({ clientSecret, onPaid, onBack }: PaymentStepProps) {
+export function PaymentStep({ clientSecret, orderCode, onPaid, onBack }: PaymentStepProps) {
   const stripe = useStripe();
   const elements = useElements();
-  const { clearCart } = useCart();
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Validate clientSecret before rendering PaymentElement
+  // Validate clientSecret and orderCode before rendering PaymentElement
   const isValidClientSecret = clientSecret && typeof clientSecret === 'string' && clientSecret.trim() !== '';
+  const isValidOrderCode = orderCode && typeof orderCode === 'string' && orderCode.trim() !== '';
 
   const handlePay = async () => {
-    if (!stripe || !elements) return;
+    if (!stripe || !elements || !isValidOrderCode) return;
     
     setPaying(true);
     setError(null);
@@ -32,54 +31,32 @@ export function PaymentStep({ clientSecret, onPaid, onBack }: PaymentStepProps) 
         return;
       }
 
-      // Confirm payment intent
-      const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
+      // Confirm payment with Stripe
+      // El webhook de Vendure (/payments/stripe) manejará la confirmación del pago automáticamente
+      const { error: confirmError } = await stripe.confirmPayment({
         elements,
-        clientSecret,
-        redirect: 'if_required',
+        confirmParams: {
+          return_url: `${window.location.origin}/checkout/confirmation/${orderCode}`,
+        },
       });
 
+      // Si hay error, mostrarlo (Stripe solo llama al callback si NO redirige)
       if (confirmError) {
         setError(confirmError.message || 'Payment failed');
         setPaying(false);
         return;
       }
 
-      if (paymentIntent?.status === 'succeeded' || paymentIntent?.status === 'requires_capture') {
-        // Complete the order in Vendure
-        const completeRes = await fetch('/api/checkout/payment-intent', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ paymentIntentId: paymentIntent.id }),
-        });
-        const complete = await completeRes.json();
-
-        if (complete.result?.__typename === 'Order') {
-          // Limpiar el carrito usando el contexto después del pago exitoso
-          try {
-            await clearCart();
-            console.log('✅ Cart cleared via context after successful payment');
-          } catch (cartError) {
-            console.warn('⚠️ Failed to clear cart via context, but payment was successful:', cartError);
-            // No bloquear el flujo si falla el clear del carrito
-          }
-          
-          onPaid(complete.result.code);
-          return;
-        }
-        setError(complete.errors?.[0]?.message || 'Failed to complete order');
-      } else {
-        setError(`Unexpected intent status: ${paymentIntent?.status ?? 'unknown'}`);
-      }
+      // Si llegamos aquí sin error y sin redirección, el pago fue exitoso
+      // (esto puede pasar con algunos métodos de pago que no requieren redirección)
+      onPaid(orderCode);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Payment error');
-    } finally {
       setPaying(false);
     }
   };
 
-  if (!isValidClientSecret) {
+  if (!isValidClientSecret || !isValidOrderCode) {
     return (
       <div className="space-y-4">
         <div className="text-center py-8">
@@ -94,19 +71,33 @@ export function PaymentStep({ clientSecret, onPaid, onBack }: PaymentStepProps) 
 
   return (
     <div className="space-y-4">
-      {isValidClientSecret && <PaymentElement />}
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      <PaymentElement />
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-600 text-sm">{error}</p>
+        </div>
+      )}
       <div className="flex gap-3">
-        <Button type="button" variant="outline" onClick={onBack}>
+        <Button type="button" variant="outline" onClick={onBack} disabled={paying}>
           Back
         </Button>
         <Button 
           type="button" 
           onClick={handlePay} 
-          disabled={!stripe || !elements || paying || !isValidClientSecret}
+          disabled={!stripe || !elements || paying}
+          className="flex-1"
         >
-          {paying ? 'Processing...' : 'Pay now'}
-          <CreditCard className="w-5 h-5 ml-2" />
+          {paying ? (
+            <>
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+              Processing Payment...
+            </>
+          ) : (
+            <>
+              Pay now
+              <CreditCard className="w-5 h-5 ml-2" />
+            </>
+          )}
         </Button>
       </div>
     </div>

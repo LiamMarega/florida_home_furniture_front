@@ -286,3 +286,9 @@ export const TRANSITION_TO_ADDING = gql`
   }
 `;
 
+export const CREATE_STRIPE_PAYMENT_INTENT = gql`
+  mutation CreateStripePaymentIntent {
+    createStripePaymentIntent
+  }
+`;
+

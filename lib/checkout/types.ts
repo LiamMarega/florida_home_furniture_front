@@ -45,6 +45,7 @@ export interface ShippingMethod {
 // Payment step props
 export interface PaymentStepProps {
   clientSecret: string;
+  orderCode: string;
   onPaid: (orderCode: string) => void;
   onBack: () => void;
 }
