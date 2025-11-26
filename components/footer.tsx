@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Twitter, Instagram, Hash } from 'lucide-react';
+import { Facebook, Instagram, Hash } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import Image from 'next/image';
@@ -12,7 +12,7 @@ export function Footer() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (isSubmitting) return;
 
     setIsSubmitting(true);
@@ -105,16 +105,16 @@ export function Footer() {
       <div className="relative z-10 flex flex-col md:flex-row items-center justify-between pt-6 border-t border-brand-cream gap-4">
         <div className="flex gap-4">
           <a
-            href="#"
+            href="https://www.facebook.com/FloridaHomeF"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Follow us on Twitter"
+            aria-label="Follow us on Facebook"
             className="text-brand-dark-blue/70 hover:text-brand-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 rounded"
           >
-            <Twitter className="w-5 h-5" />
+            <Facebook className="w-5 h-5" />
           </a>
           <a
-            href="#"
+            href="https://www.instagram.com/floridahome.fl"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Follow us on Instagram"

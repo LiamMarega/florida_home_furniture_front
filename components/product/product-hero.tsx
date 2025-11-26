@@ -24,7 +24,8 @@ export function ProductHero({ product }: ProductHeroProps) {
   };
 
   const mainVariant = product.variants?.[0];
-  const price = mainVariant?.priceWithTax;
+  // Only show price without tax - tax is shown only in checkout
+  const price = mainVariant?.price;
   const currencyCode = mainVariant?.currencyCode || 'USD';
   const stockLevel = mainVariant?.stockLevel;
 
@@ -133,9 +134,6 @@ export function ProductHero({ product }: ProductHeroProps) {
               <div className="mb-8">
                 <span className="text-3xl sm:text-4xl font-bold text-brand-primary">
                   {formatPrice(price, currencyCode)}
-                </span>
-                <span className="text-sm text-brand-dark-blue/60 ml-2">
-                  (including tax)
                 </span>
               </div>
             )}

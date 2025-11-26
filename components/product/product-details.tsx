@@ -48,7 +48,8 @@ export function ProductDetails({ product }: ProductDetailsProps) {
   };
 
   const mainVariant = product.variants?.find(v => v.id === selectedVariant) || product.variants?.[0];
-  const price = mainVariant?.priceWithTax;
+  // Only show price without tax - tax is shown only in checkout
+  const price = mainVariant?.price;
   const currencyCode = mainVariant?.currencyCode || 'USD';
   const stockLevel = mainVariant?.stockLevel;
 
@@ -123,9 +124,6 @@ export function ProductDetails({ product }: ProductDetailsProps) {
             <span className="text-2xl sm:text-3xl font-bold text-brand-primary">
               {formatPrice(price, currencyCode)}
             </span>
-            <span className="text-xs sm:text-sm text-brand-dark-blue/60">
-              (including tax)
-            </span>
           </div>
         )}
 
@@ -169,7 +167,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                     <p className="text-sm text-brand-dark-blue/70">SKU: {variant.sku}</p>
                   </div>
                   <span className="font-semibold text-brand-primary">
-                    {formatPrice(variant.priceWithTax, variant.currencyCode)}
+                    {formatPrice(variant.price, variant.currencyCode)}
                   </span>
                 </div>
               </div>
