@@ -52,7 +52,7 @@ export function ProductCard({
   // Get the first variant ID (most products have a default variant)
   const defaultVariantId = variants[0]?.id;
   // Only show price without tax in product cards - tax is shown only in checkout
-  const displayPrice = price || variants[0]?.price; 
+  const displayPrice = price || variants[0]?.price;
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -174,10 +174,10 @@ export function ProductCard({
         </div>
       </div>
       {/* Full card link overlay for better UX without nesting issues - hidden to screen readers to avoid double links */}
-      <Link 
-        href={`/product/${slug}`} 
-        className="absolute inset-0 z-0" 
-        aria-hidden="true" 
+      <Link
+        href={`/product/${slug}`}
+        className="absolute inset-0 z-0"
+        aria-hidden="true"
         tabIndex={-1}
       />
     </motion.div>
