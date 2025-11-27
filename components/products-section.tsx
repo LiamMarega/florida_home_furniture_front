@@ -11,6 +11,7 @@ const products = [
     price: '£450',
     image: 'https://images.pexels.com/photos/1350789/pexels-photo-1350789.jpeg?auto=compress&cs=tinysrgb&w=600',
     slug: 'walnutgrace-chair',
+    href: '/product/walnutgrace-chair',
   },
   {
     id: '2',
@@ -19,6 +20,7 @@ const products = [
     price: '£2350',
     image: 'https://images.pexels.com/photos/1866149/pexels-photo-1866149.jpeg?auto=compress&cs=tinysrgb&w=600',
     slug: 'minimalist-luxe-storage-buffet',
+    href: '/product/minimalist-luxe-storage-buffet',
   },
   {
     id: '3',
@@ -27,6 +29,7 @@ const products = [
     price: '£2350',
     image: 'https://images.pexels.com/photos/6585756/pexels-photo-6585756.jpeg?auto=compress&cs=tinysrgb&w=600',
     slug: 'classic-harmony-sideboard',
+    href: '/product/classic-harmony-sideboard',
   },
   {
     id: '4',
@@ -35,6 +38,7 @@ const products = [
     price: '£1450',
     image: 'https://images.pexels.com/photos/1866149/pexels-photo-1866149.jpeg?auto=compress&cs=tinysrgb&w=600',
     slug: 'chichaven-couch',
+    href: '/product/chichaven-couch',
   },
 ];
 
