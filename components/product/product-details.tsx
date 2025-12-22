@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import DOMPurify from 'isomorphic-dompurify';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -99,6 +100,12 @@ export function ProductDetails({ product }: ProductDetailsProps) {
     { label: 'Warranty', value: '2 Years' },
   ];
 
+  const sanitizedDescription = useMemo(() => {
+    return DOMPurify.sanitize(
+      product.description || 'This beautifully crafted piece combines modern design with timeless elegance. Made from premium materials and finished with attention to detail, it will enhance any space in your home.'
+    );
+  }, [product.description]);
+
   return (
     <motion.div
       initial="hidden"
@@ -118,7 +125,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-brand-dark-blue mb-4 font-tango-sans leading-tight">
           {product.name}
         </h1>
-        
+
         {price !== null && price !== undefined && price > 0 && (
           <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3 mb-4">
             <span className="text-2xl sm:text-3xl font-bold text-brand-primary">
@@ -132,9 +139,10 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       {/* Product Description */}
       <div>
         <h3 className="text-lg sm:text-xl font-semibold text-brand-dark-blue mb-3">Description</h3>
-        <p className="text-sm sm:text-base text-brand-dark-blue/80 leading-relaxed">
-          {product.description || 'This beautifully crafted piece combines modern design with timeless elegance. Made from premium materials and finished with attention to detail, it will enhance any space in your home.'}
-        </p>
+        <div
+          className="text-sm sm:text-base text-brand-dark-blue/80 leading-relaxed product-description-html"
+          dangerouslySetInnerHTML={{ __html: sanitizedDescription }}
+        />
       </div>
 
       {/* Variant Selection */}
@@ -148,11 +156,10 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                 role="radio"
                 aria-checked={selectedVariant === variant.id}
                 tabIndex={0}
-                className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-brand-primary ${
-                  selectedVariant === variant.id
-                    ? 'border-brand-primary bg-brand-primary/5'
-                    : 'border-brand-cream hover:border-brand-primary/50'
-                }`}
+                className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-brand-primary ${selectedVariant === variant.id
+                  ? 'border-brand-primary bg-brand-primary/5'
+                  : 'border-brand-cream hover:border-brand-primary/50'
+                  }`}
                 onClick={() => setSelectedVariant(variant.id)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
@@ -224,7 +231,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
             className="w-full h-12 sm:h-12 text-base sm:text-lg font-semibold touch-manipulation"
           />
         )}
-        
+
         <div className="flex flex-col sm:flex-row gap-3">
           {!hasValidPrice && (
             <Button

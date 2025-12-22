@@ -13,6 +13,7 @@ import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import { Footer } from '@/components/footer';
 import Script from 'next/script';
+import { ConditionalBack } from '@/components/conditional-back';
 
 
 
@@ -148,8 +149,8 @@ export default function RootLayout({
               },
               geo: {
                 '@type': 'GeoCoordinates',
-                latitude: 25.8108, 
-                longitude: -80.2235 
+                latitude: 25.8108,
+                longitude: -80.2235
               },
               telephone: '+13059240685',
               openingHoursSpecification: [
@@ -168,23 +169,24 @@ export default function RootLayout({
               ],
               sameAs: [
                 'https://twitter.com/floridahome',
-                'https://www.instagram.com/floridahome',
-                'https://www.facebook.com/floridahome'
+                'https://www.instagram.com/floridahome.fl',
+                'https://www.facebook.com/FloridaHomeF'
               ]
             })
           }}
         />
-      <Analytics />
-      <SpeedInsights />
+        <Analytics />
+        <SpeedInsights />
         <QueryProvider>
           <AuthProvider>
             <CartProvider>
               <SearchProvider>
                 <ConditionalHeader />
+                <ConditionalBack />
                 {children}
                 <AuthModal />
                 <Toaster position="bottom-right" />
-          
+
                 <Footer />
               </SearchProvider>
             </CartProvider>
