@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import DOMPurify from 'isomorphic-dompurify';
+// import DOMPurify from 'isomorphic-dompurify'; // Moved to client-side only to avoid SSR errors
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -29,6 +29,17 @@ type AddToCartForm = z.infer<typeof addToCartSchema>;
 export function ProductDetails({ product }: ProductDetailsProps) {
   const [selectedVariant, setSelectedVariant] = useState(product.variants?.[0]?.id || '');
   const [quantity, setQuantity] = useState(1);
+  const [sanitizedDescription, setSanitizedDescription] = useState(product.description || '');
+
+  // Sanitize on the client side only to avoid jsdom/parse5 issues on the server
+  useEffect(() => {
+    if (product.description) {
+      const DOMPurify = require('isomorphic-dompurify');
+      setSanitizedDescription(DOMPurify.sanitize(product.description));
+    } else {
+      setSanitizedDescription('This beautifully crafted piece combines modern design with timeless elegance. Made from premium materials and finished with attention to detail, it will enhance any space in your home.');
+    }
+  }, [product.description]);
 
   const {
     handleSubmit,
@@ -99,13 +110,6 @@ export function ProductDetails({ product }: ProductDetailsProps) {
     { label: 'Assembly', value: 'Required' },
     { label: 'Warranty', value: '2 Years' },
   ];
-
-  const sanitizedDescription = useMemo(() => {
-    return DOMPurify.sanitize(
-      product.description || 'This beautifully crafted piece combines modern design with timeless elegance. Made from premium materials and finished with attention to detail, it will enhance any space in your home.'
-    );
-  }, [product.description]);
-
   return (
     <motion.div
       initial="hidden"
