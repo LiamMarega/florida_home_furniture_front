@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/contexts/cart-context';
-import { ShoppingCart, Loader2 } from 'lucide-react';
+import { ShoppingCart, Loader2, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface AddToCartButtonProps {
@@ -24,10 +25,12 @@ export function AddToCartButton({
   variant = 'default',
 }: AddToCartButtonProps) {
   const [isAdding, setIsAdding] = useState(false);
-  const { addItem, isUpdating } = useCart();
+  const { addItem, isUpdating, isInCart } = useCart();
+
+  const alreadyInCart = isInCart(productVariantId);
 
   const handleAddToCart = async () => {
-    if (isAdding || isUpdating) return;
+    if (isAdding || isUpdating || alreadyInCart) return;
 
     try {
       setIsAdding(true);
@@ -41,27 +44,55 @@ export function AddToCartButton({
     }
   };
 
-  const isLoading = isAdding || isUpdating;
+  const isLoading = isAdding;
 
   return (
     <Button
-      onClick={handleAddToCart}
+      onClick={alreadyInCart ? undefined : handleAddToCart}
       disabled={disabled || isLoading}
       size={size}
-      variant={variant}
-      className={className}
+      variant={alreadyInCart ? 'outline' : variant}
+      className={`${className || ''} ${alreadyInCart ? 'border-green-500 text-green-600 hover:bg-green-50 cursor-default' : ''}`}
     >
-      {isLoading ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Adding...
-        </>
-      ) : (
-        <>
-          <ShoppingCart className="mr-2 h-4 w-4" />
-          Add to cart
-        </>
-      )}
+      <AnimatePresence mode="wait" initial={false}>
+        {isLoading ? (
+          <motion.span
+            key="loading"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.15 }}
+            className="flex items-center"
+          >
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Adding...
+          </motion.span>
+        ) : alreadyInCart ? (
+          <motion.span
+            key="in-cart"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.2 }}
+            className="flex items-center"
+          >
+            <Check className="mr-2 h-4 w-4" />
+            In Cart
+          </motion.span>
+        ) : (
+          <motion.span
+            key="add"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.15 }}
+            className="flex items-center"
+          >
+            <ShoppingCart className="mr-2 h-4 w-4" />
+            Add to cart
+          </motion.span>
+        )}
+      </AnimatePresence>
     </Button>
   );
 }

@@ -6,7 +6,19 @@ import Image from 'next/image';
 import { Button } from './ui/button';
 import { fadeInUp, fadeIn, slideInLeft } from '@/lib/animations';
 
-export function HeroNew() {
+interface HeroNewProps {
+  config?: {
+    heroImage?: {
+      id: string;
+      preview: string;
+      source: string;
+    } | null;
+  } | null;
+}
+
+export function HeroNew({ config }: HeroNewProps) {
+  const heroImageSrc = config?.heroImage?.preview || '/images/furniture-background_hd.jpg';
+
   const scrollToProducts = () => {
     const productsSection = document.getElementById('products-section');
     if (productsSection) {
@@ -20,13 +32,14 @@ export function HeroNew() {
       // Use 90dvh for better mobile and desktop support, as per prompt
     >
       <Image
-        src="/images/furniture-background_hd.jpg"
+        src={heroImageSrc}
         alt="Modern furniture background"
         fill
         priority
         className="object-cover object-center opacity-100 pointer-events-none"
         sizes="100vw"
         quality={90}
+        {...(config?.heroImage?.preview ? { unoptimized: false } : {})}
       />
       <div className="absolute inset-0 bg-gradient-to-r from-brand-dark-blue/60 via-brand-dark-blue/50 to-transparent z-0"></div>
 

@@ -67,22 +67,41 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
         </SheetHeader>
 
         {isLoading ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="animate-spin rounded-md h-8 w-8 border-b-2 border-brand-primary" />
+          <div className="flex-1 px-6 py-4 space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex gap-4 animate-pulse">
+                <div className="w-20 h-20 bg-gray-200 rounded-lg flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-3/4" />
+                  <div className="h-3 bg-gray-200 rounded w-1/2" />
+                  <div className="h-4 bg-gray-200 rounded w-1/4 mt-2" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : !hasItems ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-6">
-            <ShoppingCart className="h-24 w-24 text-gray-300 mb-4" />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="flex-1 flex flex-col items-center justify-center p-6"
+          >
+            <div className="w-24 h-24 rounded-full bg-brand-cream/50 flex items-center justify-center mb-5">
+              <ShoppingCart className="h-12 w-12 text-brand-dark-blue/30" />
+            </div>
             <h3 className="text-xl font-semibold text-brand-dark-blue mb-2">
               Your cart is empty
             </h3>
-            <p className="text-brand-dark-blue/70 mb-6 text-center">
-              Add some products to get started
+            <p className="text-brand-dark-blue/60 mb-6 text-center max-w-xs">
+              Discover our curated collection of premium furniture for your home.
             </p>
-            <Button onClick={onClose} className="rounded-md px-8">
-              Continue Shopping
+            <Button
+              onClick={onClose}
+              className="rounded-md px-8 bg-brand-primary hover:bg-brand-primary/90"
+            >
+              Browse Products
             </Button>
-          </div>
+          </motion.div>
         ) : (
           <>
             {/* Free Shipping Progress */}

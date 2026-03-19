@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ShoppingCart, Eye } from 'lucide-react';
+import { ShoppingCart, Eye, Check } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { LazyLoadImage } from 'react-lazy-load-image-component';
@@ -47,10 +47,11 @@ export function ProductCard({
   imageAspectRatio = 'square',
 }: ProductCardProps) {
   const [isAddingToCart, setIsAddingToCart] = useState(false);
-  const { addItem } = useCart();
+  const { addItem, isInCart } = useCart();
 
   // Get the first variant ID (most products have a default variant)
   const defaultVariantId = variants[0]?.id;
+  const defaultVariantInCart = defaultVariantId ? isInCart(defaultVariantId) : false;
   // Only show price without tax in product cards - tax is shown only in checkout
   const displayPrice = price || variants[0]?.price;
 
@@ -58,10 +59,7 @@ export function ProductCard({
     e.preventDefault();
     e.stopPropagation();
 
-    if (!defaultVariantId) {
-      toast.error('Product variant not available');
-      return;
-    }
+    if (!defaultVariantId || defaultVariantInCart) return;
 
     setIsAddingToCart(true);
     try {
@@ -161,14 +159,28 @@ export function ProductCard({
           {showQuickAdd && defaultVariantId && displayPrice > 0 && (
             <Button
               size="sm"
-              className="gap-0.5 sm:gap-1 md:gap-2 bg-brand-primary hover:bg-brand-primary/90 text-white text-[10px] sm:text-xs md:text-sm px-1.5 sm:px-2 md:px-4 flex-shrink-0 h-7 sm:h-8 md:h-9 w-full sm:w-auto z-20 relative"
-              onClick={handleAddToCart}
+              className={`gap-0.5 sm:gap-1 md:gap-2 text-[10px] sm:text-xs md:text-sm px-1.5 sm:px-2 md:px-4 flex-shrink-0 h-7 sm:h-8 md:h-9 w-full sm:w-auto z-20 relative ${
+                defaultVariantInCart
+                  ? 'bg-green-50 border border-green-500 text-green-600 hover:bg-green-50 cursor-default'
+                  : 'bg-brand-primary hover:bg-brand-primary/90 text-white'
+              }`}
+              onClick={defaultVariantInCart ? undefined : handleAddToCart}
               disabled={isAddingToCart}
-              aria-label={`Add ${name} to cart`}
+              aria-label={defaultVariantInCart ? `${name} is in cart` : `Add ${name} to cart`}
             >
-              <ShoppingCart className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-4 md:h-4" />
-              <span className="hidden sm:inline">{isAddingToCart ? 'Adding...' : 'Add to Cart'}</span>
-              <span className="sm:hidden">{isAddingToCart ? '...' : 'Add'}</span>
+              {defaultVariantInCart ? (
+                <>
+                  <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-4 md:h-4" />
+                  <span className="hidden sm:inline">In Cart</span>
+                  <span className="sm:hidden">Added</span>
+                </>
+              ) : (
+                <>
+                  <ShoppingCart className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-4 md:h-4" />
+                  <span className="hidden sm:inline">{isAddingToCart ? 'Adding...' : 'Add to Cart'}</span>
+                  <span className="sm:hidden">{isAddingToCart ? '...' : 'Add'}</span>
+                </>
+              )}
             </Button>
           )}
         </div>

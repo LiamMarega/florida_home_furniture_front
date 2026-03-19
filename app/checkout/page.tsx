@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
+import { toast } from 'sonner';
 
 // Components
 import { Button } from '@/components/ui/button';
@@ -20,10 +21,13 @@ import { CustomerInfoSection } from '@/components/checkout/customer-info-section
 import { ShippingAddressSection } from '@/components/checkout/shipping-address-section';
 import { BillingAddressSection } from '@/components/checkout/billing-address-section';
 import { ShippingMethodsSection } from '@/components/checkout/shipping-methods-section';
+import { AddressSelectorWithModal } from '@/components/checkout/address-selector';
 
 // Hooks and types
 import { useShippingMethods, useCheckoutProcess } from '@/hooks/use-checkout';
 import { customerSchema, CustomerFormData, CheckoutStep } from '@/lib/checkout/types';
+import { useSavedAddresses, addressToFormData, formDataToAddress } from '@/hooks/use-saved-addresses';
+import { UserAddress } from '@/app/profile/types';
 
 // Stripe configuration
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
@@ -49,6 +53,19 @@ export default function CheckoutPage() {
     resetCheckout,
   } = useCheckoutProcess();
 
+  // Address persistence
+  const {
+    addresses: savedAddresses,
+    isLoading: isLoadingAddresses,
+    createAddress,
+    updateAddress,
+    deleteAddress,
+    canAddMore,
+  } = useSavedAddresses();
+
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+
   // Form setup
   const {
     register,
@@ -65,6 +82,15 @@ export default function CheckoutPage() {
     },
   });
 
+  // Auto-select default address on load
+  useEffect(() => {
+    if (savedAddresses.length > 0 && !selectedAddressId && !showAddressForm) {
+      const defaultAddr = savedAddresses.find(a => a.isDefault) || savedAddresses[0];
+      handleSelectAddress(defaultAddr);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedAddresses]);
+
   // Initialize selected shipping method when data loads
   useEffect(() => {
     if (shippingData?.selectedShippingMethod && !selectedShippingMethod) {
@@ -79,9 +105,50 @@ export default function CheckoutPage() {
     }
   }, [selectedShippingMethod, setValue]);
 
+  // Handle address selection
+  const handleSelectAddress = useCallback((address: UserAddress) => {
+    setSelectedAddressId(address.id);
+    setShowAddressForm(false);
+
+    // Auto-populate form fields
+    const formData = addressToFormData(address);
+    Object.entries(formData).forEach(([key, value]) => {
+      if (value !== undefined) {
+        setValue(key as keyof CustomerFormData, value as string);
+      }
+    });
+  }, [setValue]);
+
+  // Handle "add new address" — show empty form
+  const handleAddNewAddress = useCallback(() => {
+    setSelectedAddressId(null);
+    setShowAddressForm(true);
+
+    // Clear shipping fields
+    setValue('shippingFullName', '');
+    setValue('shippingStreetLine1', '');
+    setValue('shippingStreetLine2', '');
+    setValue('shippingCity', '');
+    setValue('shippingProvince', '');
+    setValue('shippingPostalCode', '');
+    setValue('shippingCountry', 'US');
+    setValue('shippingPhoneNumber', '');
+  }, [setValue]);
+
   // Handle form submission
   const onSubmit = async (data: CustomerFormData) => {
     await processCheckout(data, selectedShippingMethod);
+
+    // Auto-save address if it's a new one and there's room
+    if (!selectedAddressId && canAddMore) {
+      try {
+        const addressData = formDataToAddress(data);
+        await createAddress(addressData);
+        toast.success('Address saved for next time');
+      } catch {
+        // Non-critical — don't block checkout
+      }
+    }
   };
 
   // Handle successful payment
@@ -97,8 +164,12 @@ export default function CheckoutPage() {
   // Determine current step
   const currentStep = clientSecret ? CheckoutStep.PAYMENT : CheckoutStep.CUSTOMER_INFO;
 
+  // Whether to show the address form (always show if no saved addresses)
+  const hasAddresses = savedAddresses.length > 0;
+  const shouldShowForm = !hasAddresses || showAddressForm || selectedAddressId !== null;
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white pt-24 pb-12 sm:py-32">
+    <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white pt-24 pb-12 sm:py-18">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Content */}
@@ -123,9 +194,39 @@ export default function CheckoutPage() {
 
                   <Separator />
 
-                  <ShippingAddressSection register={register} errors={errors} />
+                  {/* Address Selector (only shown when user has saved addresses) */}
+                  {hasAddresses && (
+                    <>
+                      <AddressSelectorWithModal
+                        addresses={savedAddresses}
+                        selectedAddressId={selectedAddressId}
+                        onSelect={handleSelectAddress}
+                        onCreateAddress={async (addr) => {
+                          const result = await createAddress(addr);
+                          return result;
+                        }}
+                        onUpdateAddress={updateAddress}
+                        onDeleteAddress={async (id) => {
+                          await deleteAddress(id);
+                          if (selectedAddressId === id) {
+                            setSelectedAddressId(null);
+                            setShowAddressForm(true);
+                          }
+                        }}
+                        isLoading={isLoadingAddresses}
+                        canAddMore={canAddMore}
+                      />
+                      <Separator />
+                    </>
+                  )}
 
-                  <Separator />
+                  {/* Shipping Address Form */}
+                  {shouldShowForm && (
+                    <>
+                      <ShippingAddressSection register={register} errors={errors} />
+                      <Separator />
+                    </>
+                  )}
 
                   <BillingAddressSection
                     register={register}

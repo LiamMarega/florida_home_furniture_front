@@ -26,9 +26,21 @@ export function ShippingMethodsSection({
       </h2>
 
       {isLoadingShippingMethods ? (
-        <div className="text-center py-4">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand-primary mx-auto mb-2"></div>
-          <p className="text-brand-dark-blue/70">Loading shipping methods...</p>
+        <div className="space-y-3">
+          {[1, 2].map((i) => (
+            <div key={i} className="border rounded-lg p-4 animate-pulse">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-4 h-4 bg-gray-200 rounded-full" />
+                  <div className="space-y-2">
+                    <div className="h-4 bg-gray-200 rounded w-32" />
+                    <div className="h-3 bg-gray-200 rounded w-24" />
+                  </div>
+                </div>
+                <div className="h-4 bg-gray-200 rounded w-16" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : shippingMethods.length > 0 ? (
         <div className="space-y-3">

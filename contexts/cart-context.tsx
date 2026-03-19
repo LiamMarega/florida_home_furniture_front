@@ -19,7 +19,9 @@ interface CartContextType {
   removeItem: (orderLineId: string) => Promise<void>;
   updateQuantity: (orderLineId: string, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
-  resetSession: () => Promise<void>; // 🆕 Para limpiar sesión completa
+  resetSession: () => Promise<void>;
+  isInCart: (productVariantId: string) => boolean;
+  getCartItemByVariant: (productVariantId: string) => OrderLine | undefined;
   isLoading: boolean;
   isUpdating: boolean;
   error: string | null;
@@ -58,34 +60,36 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                clearCartMutation.error?.message || 
                null;
 
-  // 🆕 Wrapper mejorado con auto-recovery
+  // Check if a product variant is already in the cart
+  const isInCart = (productVariantId: string): boolean => {
+    return items.some((item: OrderLine) => item.productVariant.id === productVariantId);
+  };
+
+  // Get a cart item by its product variant ID
+  const getCartItemByVariant = (productVariantId: string): OrderLine | undefined => {
+    return items.find((item: OrderLine) => item.productVariant.id === productVariantId);
+  };
+
+  // Add item with auto-recovery for invalid order states
   const addItem = async (productVariantId: string, quantity = 1) => {
     try {
       await addToCartMutation.mutateAsync({ productVariantId, quantity });
     } catch (error: any) {
-      
-      // 🔄 Si el error es por estado inválido de la orden, intentar recuperar
+      // If the error is due to an invalid order state, attempt recovery
       if (
-        error?.message?.includes('state') || 
+        error?.message?.includes('state') ||
         error?.message?.includes('AddingItems') ||
         error?.message?.includes('requiresClearCart')
       ) {
-        
         try {
-          // Limpiar el carrito
           await clearCartMutation.mutateAsync();
-          
-          // Reintentar agregar el producto
           await addToCartMutation.mutateAsync({ productVariantId, quantity });
-          
-          return; // Éxito después de recovery
+          return;
         } catch (retryError) {
-          console.error('❌ Auto-recovery failed:', retryError);
+          console.error('Auto-recovery failed:', retryError);
           throw new Error('Cart was in an invalid state. Please refresh the page and try again.');
         }
       }
-      
-      // Si no es un error de estado, propagar el error original
       throw error;
     }
   };
@@ -115,31 +119,27 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clearCart = async () => {
     try {
-      console.log('🧹 Clearing cart...');
       await clearCartMutation.mutateAsync();
-      console.log('✅ Cart cleared');
     } catch (error) {
       console.error('Error clearing cart:', error);
       throw error;
     }
   };
 
-  // 🆕 Reset completo de la sesión (para casos extremos)
+  // Full session reset (for extreme cases)
   const resetSession = async () => {
     try {
-      console.log('🔄 Resetting session...');
-      
-      // 1. Limpiar carrito en el servidor
+      // Clear cart on server
       try {
         await clearCartMutation.mutateAsync();
       } catch (e) {
-        console.log('Cart already empty or error clearing:', e);
+        // Cart may already be empty
       }
-      
-      // 2. Limpiar cache de React Query
+
+      // Clear React Query cache
       queryClient.clear();
-      
-      // 3. Limpiar cookies del cliente (solo las que podemos acceder)
+
+      // Clear accessible client cookies
       if (typeof document !== 'undefined') {
         document.cookie.split(";").forEach((c) => {
           document.cookie = c
@@ -147,11 +147,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
         });
       }
-      
-      // 4. Refetch para crear nueva sesión
+
+      // Refetch to create a new session
       await refetch();
-      
-      console.log('✅ Session reset complete');
     } catch (error) {
       console.error('Error resetting session:', error);
       throw error;
@@ -172,7 +170,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         removeItem,
         updateQuantity,
         clearCart,
-        resetSession, // 🆕
+        resetSession,
+        isInCart,
+        getCartItemByVariant,
         isLoading,
         isUpdating,
         error,

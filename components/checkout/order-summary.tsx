@@ -17,9 +17,33 @@ export function OrderSummary() {
 
   if (!order) {
     return (
-      <Card className="p-6">
+      <Card className="p-6 sticky top-24">
         <h3 className="text-lg font-semibold text-brand-dark-blue mb-4">Order Summary</h3>
-        <p className="text-brand-dark-blue/70">Loading order details...</p>
+        <div className="space-y-3 animate-pulse">
+          {[1, 2].map((i) => (
+            <div key={i} className="flex gap-3">
+              <div className="w-12 h-12 bg-gray-200 rounded" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 bg-gray-200 rounded w-3/4" />
+                <div className="h-3 bg-gray-200 rounded w-1/2" />
+              </div>
+            </div>
+          ))}
+          <div className="border-t pt-3 mt-3 space-y-2">
+            <div className="flex justify-between">
+              <div className="h-3 bg-gray-200 rounded w-20" />
+              <div className="h-3 bg-gray-200 rounded w-16" />
+            </div>
+            <div className="flex justify-between">
+              <div className="h-3 bg-gray-200 rounded w-16" />
+              <div className="h-3 bg-gray-200 rounded w-12" />
+            </div>
+            <div className="flex justify-between pt-2">
+              <div className="h-5 bg-gray-200 rounded w-14" />
+              <div className="h-5 bg-gray-200 rounded w-20" />
+            </div>
+          </div>
+        </div>
       </Card>
     );
   }

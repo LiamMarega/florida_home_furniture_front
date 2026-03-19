@@ -532,3 +532,15 @@ export const GET_ACTIVE_ORDER_STATE = gql`
     }
   }
 `;
+
+export const GET_STOREFRONT_CONFIG = gql`
+  query GetStorefrontConfig {
+    storefrontConfig {
+      heroImage {
+        id
+        preview
+        source
+      }
+    }
+  }
+`;

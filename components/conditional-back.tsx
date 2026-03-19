@@ -14,7 +14,7 @@ export function ConditionalBack() {
   }
 
   return (
-    <div className="w-full bg-white/50 backdrop-blur-sm relative z-40 border-b border-brand-cream/20 mt-[72px] lg:mt-[88px]">
+    <div className="w-full backdrop-blur-sm relative z-40 border-b border-brand-cream/20 mt-[72px] lg:mt-[88px]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: -10 }}

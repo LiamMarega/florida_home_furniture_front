@@ -81,10 +81,10 @@ export function ProductDetails({ product }: ProductDetailsProps) {
     try {
       const currentUrl = window.location.href;
       await navigator.clipboard.writeText(currentUrl);
-      toast.success('Enlace copiado');
+      toast.success('Link copied to clipboard');
     } catch (error) {
       console.error('Error copying URL:', error);
-      toast.error('Error al copiar enlace');
+      toast.error('Failed to copy link');
     }
   };
 

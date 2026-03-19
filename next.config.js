@@ -40,11 +40,14 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'vendure-server-production-60d5.up.railway.app',
       },
-      // Agregar tu dominio de Vendure cuando esté en producción
-      // {
-      //   protocol: 'https',
-      //   hostname: 'tu-vendure-domain.com',
-      // },
+      {
+        protocol: 'https',
+        hostname: 'admin.floridahomefurniture.com',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+      },
     ],
   },
 
