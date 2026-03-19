@@ -30,7 +30,7 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
 
 export default function CheckoutPage() {
   const router = useRouter();
-  
+
   // Custom hooks for state management
   const {
     data: shippingData,
@@ -120,21 +120,21 @@ export default function CheckoutPage() {
                 /* Customer Information Form */
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                   <CustomerInfoSection register={register} errors={errors} />
-                  
+
                   <Separator />
-                  
+
                   <ShippingAddressSection register={register} errors={errors} />
-                  
+
                   <Separator />
-                  
-                  <BillingAddressSection 
-                    register={register} 
-                    errors={errors} 
-                    watch={watch} 
+
+                  <BillingAddressSection
+                    register={register}
+                    errors={errors}
+                    watch={watch}
                   />
-                  
+
                   <Separator />
-                  
+
                   <ShippingMethodsSection
                     shippingMethods={shippingMethods}
                     selectedShippingMethod={selectedShippingMethod}
@@ -142,9 +142,9 @@ export default function CheckoutPage() {
                     onShippingMethodSelect={setSelectedShippingMethod}
                   />
 
-                  <Button 
-                    type="submit" 
-                    className="w-full h-12 text-lg font-semibold" 
+                  <Button
+                    type="submit"
+                    className="w-full h-12 text-lg font-semibold"
                     disabled={isSubmitting || isProcessing}
                   >
                     {isSubmitting || isProcessing ? (
