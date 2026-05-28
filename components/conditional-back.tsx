@@ -9,7 +9,7 @@ export function ConditionalBack() {
   const pathname = usePathname();
 
   // Don't show on the main page or special pages like coming-soon
-  if (pathname === '/' || pathname === '/coming-soon') {
+  if (pathname === '/' || pathname === '/coming-soon' || pathname === '/contact') {
     return null;
   }
 

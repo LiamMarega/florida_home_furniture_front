@@ -111,6 +111,15 @@ export function MobileMenuDrawer({ isOpen, onClose }: MobileMenuDrawerProps) {
                   </motion.div>
                 ))}
               </AnimatePresence>
+
+              <button
+                onClick={() => handleCategoryClick('/contact')}
+                className="mt-4 w-full text-left px-4 py-3 rounded-md border border-brand-primary/20 bg-brand-primary/5 hover:bg-brand-primary/10 transition-colors"
+              >
+                <span className="text-base font-semibold text-brand-primary">
+                  Contact
+                </span>
+              </button>
             </nav>
           </div>
         )}

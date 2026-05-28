@@ -179,7 +179,7 @@ export function Header() {
             )}
           </AnimatePresence>
 
-          <nav className="hidden lg:flex gap-8">
+          <nav className="hidden lg:flex items-center gap-8">
             {categories.map((item) => (
               <Link
                 key={item.name}
@@ -201,7 +201,13 @@ export function Header() {
              </button>
             )}
 
-        
+            <Link
+              href="/contact"
+              aria-label="Go to contact page"
+              className="inline-flex items-center gap-1.5 rounded-pill border border-white/30 bg-white/10 px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-accent hover:border-brand-accent hover:text-brand-dark-blue transition-colors backdrop-blur-sm"
+            >
+              Contact
+            </Link>
           </nav>
 
           <div className="flex gap-3 lg:gap-4 items-center text-white flex-shrink-0 ml-auto lg:ml-0 lg:flex-initial">

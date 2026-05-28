@@ -4,7 +4,6 @@ const nextConfig = {
   
   // Optimizaciones de rendimiento
   reactStrictMode: true,
-  swcMinify: true,
   
   // Optimización de compilación
   compiler: {
@@ -13,13 +12,7 @@ const nextConfig = {
     } : false,
   },
 
-  // ESLint
-  eslint: {
-    ignoreDuringBuilds: true,
-    rules: {
-      '@next/next/no-img-element': 'off',
-    },
-  },
+  // ESLint — moved to eslint.config.* (flat config) in Next.js 16
 
   // Configuración de imágenes optimizadas
   images: {
@@ -29,6 +22,7 @@ const nextConfig = {
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
     minimumCacheTTL: 60,
+    qualities: [75, 90],
     remotePatterns: [
       {
         protocol: 'https',

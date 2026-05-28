@@ -7,17 +7,18 @@ import { GET_ALL_PRODUCTS, GET_PRODUCT_BY_SLUG } from '@/lib/graphql/queries';
 import Script from 'next/script';
 
 interface ProductPageProps {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 }
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
+  const { slug } = await params;
   try {
     const result = await fetchGraphQL({
       query: GET_PRODUCT_BY_SLUG,
       variables: {
-        slug: params.slug,
+        slug,
       },
     });
 
@@ -50,7 +51,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
       openGraph: {
         type: 'website',
         locale: 'en_US',
-        url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'}/product/${params.slug}`,
+        url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001'}/product/${slug}`,
         siteName: 'Florida Home Furniture',
         title: `${product.name} | Florida Home Furniture`,
         description,
@@ -72,7 +73,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
         creator: '@FloridaHomeFurniture',
       },
       alternates: {
-        canonical: `/product/${params.slug}`,
+        canonical: `/product/${slug}`,
       },
       robots: {
         index: true,
@@ -128,18 +129,19 @@ export async function generateStaticParams() {
 }
 
 export default async function ProductPageRoute({ params }: ProductPageProps) {
+  const { slug } = await params;
   try {
     const result = await fetchGraphQL({
       query: GET_PRODUCT_BY_SLUG,
       variables: {
-        slug: params.slug,
+        slug,
       },
     });
 
     if (!result.data?.product) {
       // During build time, log but don't throw to prevent build failures
       if (process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE === 'phase-production-build') {
-        console.warn(`Product not found during build: ${params.slug}`);
+        console.warn(`Product not found during build: ${slug}`);
         // Return a minimal page or throw notFound() - Next.js will handle it
       }
       notFound();
@@ -164,7 +166,7 @@ export default async function ProductPageRoute({ params }: ProductPageProps) {
     const currencyCode = variant?.currencyCode || 'USD';
     const imageUrl = product.featuredAsset?.preview || '';
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
-    const productUrl = `${siteUrl}/product/${params.slug}`;
+    const productUrl = `${siteUrl}/product/${slug}`;
 
     // Generate structured data (JSON-LD) for SEO
     const structuredData = {
