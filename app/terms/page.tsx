@@ -16,7 +16,7 @@ export default function TermsPage() {
           <div className="absolute -bottom-20 right-0 w-96 h-96 rounded-pill bg-brand-accent/20 blur-3xl" />
         </div>
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-8">
-          <h1 className="text-3xl md:text-4xl font-bold">Terms &amp; Conditions</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-brand-accent">Terms &amp; Conditions</h1>
           <p className="mt-2 text-white/60 text-sm">Last updated: May 2025</p>
         </div>
       </section>

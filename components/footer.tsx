@@ -133,14 +133,21 @@ export function Footer() {
           </a>
         </div>
 
-        <p className="text-[12px] text-brand-dark-blue/70">
+        <div className="flex items-center gap-3 text-[12px] text-brand-dark-blue/70">
           <a
             href="/terms"
             className="hover:text-brand-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 rounded"
           >
             Terms & Conditions
           </a>
-        </p>
+          <span aria-hidden="true">·</span>
+          <a
+            href="/privacy"
+            className="hover:text-brand-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2 rounded"
+          >
+            Privacy Policy
+          </a>
+        </div>
       </div>
 
       {/* Decorative Illustration */}

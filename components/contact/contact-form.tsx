@@ -195,7 +195,7 @@ export function ContactForm() {
 
             <div className="flex flex-col-reverse md:flex-row md:items-center md:justify-between gap-4 pt-2">
               <div className="text-xs text-brand-dark-blue/70">
-                <Link href="/terms" className="underline hover:text-brand-primary">
+                <Link href="/privacy" className="underline hover:text-brand-primary">
                   Privacy Policy
                 </Link>
                 <span className="mx-2">|</span>
