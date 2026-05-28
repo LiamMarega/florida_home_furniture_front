@@ -4,9 +4,9 @@ import { GET_ORDER_BY_CODE, GET_ACTIVE_ORDER } from '@/lib/graphql/queries';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { orderCode: string } }
+  { params }: { params: Promise<{ orderCode: string }> }
 ) {
-  const { orderCode } = params;
+  const { orderCode } = await params;
 
   if (!orderCode) {
     return NextResponse.json(

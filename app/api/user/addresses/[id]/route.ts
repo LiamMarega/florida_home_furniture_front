@@ -7,10 +7,10 @@ import { UserAddress } from '@/app/profile/types';
 // PUT - Update address
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await req.json();
     const {
       nickname,
@@ -106,10 +106,10 @@ export async function PUT(
 // DELETE - Delete address
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     const result = await fetchGraphQL(
       {

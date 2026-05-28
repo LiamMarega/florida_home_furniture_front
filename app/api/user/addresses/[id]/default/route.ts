@@ -7,10 +7,10 @@ import { UserAddress } from '@/app/profile/types';
 // PATCH - Set address as default
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // First, get the address to update it
     const customerResult = await fetchGraphQL(
