@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { BackToHome } from '@/components/ui/back-to-home';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy | Florida Home Furniture',
@@ -9,19 +10,20 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <main id="main-content" className="relative min-h-screen bg-brand-cream/40">
+    <main id="main-content" className="min-h-screen bg-brand-cream/40">
       <section className="relative bg-brand-dark-blue text-white pt-32 pb-40 overflow-hidden">
         <div className="pointer-events-none absolute inset-0 -z-0 opacity-40 mix-blend-screen">
           <div className="absolute top-10 left-10 w-72 h-72 rounded-pill bg-brand-primary/30 blur-3xl" />
           <div className="absolute -bottom-20 right-0 w-96 h-96 rounded-pill bg-brand-accent/20 blur-3xl" />
         </div>
-        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-brand-accent">Privacy Policy</h1>
+        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-8 pt-4">
+          <BackToHome />
+          <h1 className="mt-6 text-3xl md:text-4xl font-bold text-brand-accent">Privacy Policy</h1>
           <p className="mt-2 text-white/60 text-sm">Last updated: May 2025</p>
         </div>
       </section>
 
-      <div className="relative -mt-24 pb-24">
+      <div className="relative z-10 -mt-24 pb-24">
         <div className="max-w-4xl mx-auto px-6 lg:px-8">
           <div className="bg-white rounded-xl shadow-elevated p-8 md:p-12 space-y-8 text-brand-dark-blue/80 text-[14px] leading-7">
 

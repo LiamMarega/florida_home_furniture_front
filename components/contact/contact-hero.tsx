@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { Mail, MapPin, Phone, Sparkles } from 'lucide-react';
+// BackToHome used from contact page directly
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
