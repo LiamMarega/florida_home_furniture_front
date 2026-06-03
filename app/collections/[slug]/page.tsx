@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { ProductsGrid } from '@/components/products-grid';
 
 interface CollectionInfo {
@@ -72,13 +73,13 @@ export default function CollectionPage() {
         <div className="text-center px-4 sm:px-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-brand-dark-blue mb-4">Collection Not Found</h1>
           <p className="text-brand-dark-blue/60 text-base sm:text-lg mb-8">{error || 'The collection you are looking for does not exist.'}</p>
-          <a
+          <Link
             href="/collections"
             className="inline-block px-6 py-3 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 transition-colors touch-manipulation h-12 flex items-center justify-center"
             aria-label="Go to collections page"
           >
             View All Collections
-          </a>
+          </Link>
         </div>
       </div>
     );

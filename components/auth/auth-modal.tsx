@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/auth-context';
@@ -9,17 +9,12 @@ import RegisterForm from './register-form';
 
 const AuthModal: React.FC = () => {
   const { authModalOpen, closeAuthModal, authModalView, openAuthModal } = useAuth();
-  const [activeTab, setActiveTab] = React.useState<'login' | 'register'>(authModalView);
-
-  // Update tab when authModalView changes
-  useEffect(() => {
-    setActiveTab(authModalView);
-  }, [authModalView]);
+  // authModalView (from context) is the single source of truth — no local mirror needed.
+  const activeTab = authModalView;
 
   const handleTabChange = (value: string) => {
     if (value === 'login' || value === 'register') {
       openAuthModal(value);
-      setActiveTab(value);
     }
   };
 

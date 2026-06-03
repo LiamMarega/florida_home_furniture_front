@@ -131,6 +131,9 @@ export function TestimonialsSection() {
               <div className="flex items-center gap-4 mb-4 relative z-10">
                 <div className="w-14 h-14 rounded-full bg-gradient-to-br from-brand-primary to-brand-accent flex items-center justify-center text-white font-bold text-xl overflow-hidden">
                   {review.customer_avatar ? (
+                    // Avatar URLs come from arbitrary external domains (backend reviews);
+                    // next/image can't whitelist unknown remote hosts, so a plain img is correct here.
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={review.customer_avatar}
                       alt={review.customer_name}

@@ -14,6 +14,7 @@ import { ContactConsent } from './contact-consent';
 import {
   contactFormSchema,
   type ContactFormValues,
+  type ContactFormInput,
 } from '@/lib/validators/contact';
 
 const defaultValues: ContactFormValues = {
@@ -35,7 +36,7 @@ export function ContactForm() {
     control,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<ContactFormValues>({
+  } = useForm<ContactFormInput, unknown, ContactFormValues>({
     resolver: zodResolver(contactFormSchema),
     defaultValues,
     mode: 'onBlur',

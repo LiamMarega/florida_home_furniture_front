@@ -82,17 +82,21 @@ export function TrustSection() {
           className="mt-16 text-center"
         >
           <div className="inline-flex items-center gap-8 flex-wrap justify-center">
+            {/* Static external payment-brand logos (Wikimedia CDN), decorative; next/image adds no value here. */}
             <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/2560px-Visa_Inc._logo.svg.png"
                 alt="Visa"
                 className="h-8 grayscale opacity-50 hover:opacity-100 hover:grayscale-0 transition-all"
               />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/1280px-Mastercard-logo.svg.png"
                 alt="Mastercard"
                 className="h-8 grayscale opacity-50 hover:opacity-100 hover:grayscale-0 transition-all"
               />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/PayPal.svg/2560px-PayPal.svg.png"
                 alt="PayPal"

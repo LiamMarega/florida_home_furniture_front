@@ -12,10 +12,10 @@ export const customerSchema = z.object({
   shippingCity: z.string().min(2, 'City is required'),
   shippingProvince: z.string().min(2, 'State/Province is required'),
   shippingPostalCode: z.string().min(3, 'Postal code is required'),
-  shippingCountry: z.string().default('US'),
+  shippingCountry: z.string(),
   shippingPhoneNumber: z.string().min(10, 'Phone number is required'),
 
-  billingSameAsShipping: z.boolean().default(true),
+  billingSameAsShipping: z.boolean(),
   billingFullName: z.string().optional(),
   billingStreetLine1: z.string().optional(),
   billingStreetLine2: z.string().optional(),

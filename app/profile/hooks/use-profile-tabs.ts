@@ -11,6 +11,8 @@ export function useProfileTabs() {
     // Load from localStorage to persist tab selection
     const savedTab = localStorage.getItem('profile-active-tab') as ProfileTab | null;
     if (savedTab && (savedTab === 'addresses' || savedTab === 'orders')) {
+      // Reading localStorage on mount is SSR-safe here; deriving in render would cause a hydration mismatch.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveTab(savedTab);
     }
   }, []);

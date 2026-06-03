@@ -8,7 +8,7 @@ export default function NotFound() {
       <h1 className="text-9xl font-black text-brand-cream mb-4 font-tango-sans">404</h1>
       <h2 className="text-3xl font-bold text-brand-dark-blue mb-4">Page Not Found</h2>
       <p className="text-brand-dark-blue/70 mb-8 max-w-md mx-auto">
-        Sorry, we couldn't find the page you're looking for. It might have been moved or deleted.
+        Sorry, we couldn&apos;t find the page you&apos;re looking for. It might have been moved or deleted.
       </p>
       
       <Button asChild className="bg-brand-primary hover:bg-brand-primary/90">

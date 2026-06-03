@@ -16,3 +16,4 @@ export const contactFormSchema = z.object({
 });
 
 export type ContactFormValues = z.infer<typeof contactFormSchema>;
+export type ContactFormInput = z.input<typeof contactFormSchema>;
