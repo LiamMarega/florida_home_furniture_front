@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Facebook, Instagram, Hash } from 'lucide-react';
+import { Hash } from 'lucide-react';
+import { Facebook, Instagram } from './icons/social';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import Image from 'next/image';

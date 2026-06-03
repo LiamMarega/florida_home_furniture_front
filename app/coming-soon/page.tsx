@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import { Instagram, Facebook } from 'lucide-react';
+import { Instagram, Facebook } from '@/components/icons/social';
 
 export default function ComingSoon() {
   return (
