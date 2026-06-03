@@ -43,6 +43,8 @@ export function AddressFormModal({
     isDefault: false,
   });
 
+  // Populate/reset the form when the edited address (or open state) changes — standard form-sync effect.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (address) {
       setFormData({
@@ -72,6 +74,7 @@ export function AddressFormModal({
       });
     }
   }, [address, open]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

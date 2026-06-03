@@ -56,10 +56,12 @@ export function useProductsGrid({
   const [currentPage, setCurrentPage] = useState(1);
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  // Sync local search query with context
+  // Mirror external context search into the locally-editable query (two-way; not pure derived state).
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setSearchQuery(contextSearchQuery);
   }, [contextSearchQuery]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Debounce search query
   useEffect(() => {

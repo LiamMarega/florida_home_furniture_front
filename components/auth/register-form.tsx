@@ -42,13 +42,15 @@ const RegisterForm: React.FC = () => {
     resolver: zodResolver(registerSchema),
   });
 
-  // Reset success message when modal closes or view changes
+  // Reset transient success UI when the modal closes (external open state, not derivable in render).
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!authModalOpen) {
       setShowSuccess(false);
       setRegisteredEmail(null);
     }
   }, [authModalOpen]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const onSubmit = async (data: RegisterFormData) => {
     setIsLoading(true);

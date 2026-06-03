@@ -31,7 +31,9 @@ export function ProductDetails({ product }: ProductDetailsProps) {
   const [quantity, setQuantity] = useState(1);
   const [sanitizedDescription, setSanitizedDescription] = useState(product.description || '');
 
-  // Sanitize on the client side only to avoid jsdom/parse5 issues on the server
+  // Sanitize on the client side only to avoid jsdom/parse5 issues on the server.
+  // DOMPurify cannot run during SSR, so this must stay in an effect (not derived in render).
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (product.description) {
       const DOMPurify = require('isomorphic-dompurify');
@@ -40,6 +42,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       setSanitizedDescription('This beautifully crafted piece combines modern design with timeless elegance. Made from premium materials and finished with attention to detail, it will enhance any space in your home.');
     }
   }, [product.description]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const {
     handleSubmit,

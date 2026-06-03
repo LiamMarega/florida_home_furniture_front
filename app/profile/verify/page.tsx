@@ -58,6 +58,8 @@ function VerifyEmailContent() {
     },
   });
 
+  // Mount-time verification kickoff; the early-return setState is initial status, not derived state.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!token) {
       setVerificationStatus('error');
@@ -68,6 +70,7 @@ function VerifyEmailContent() {
     // Ejecutar verificación cuando el componente se monta
     verifyMutation.mutate(token);
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (verificationStatus === 'loading') {
     return (

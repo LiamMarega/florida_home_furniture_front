@@ -82,30 +82,7 @@ export default function CheckoutPage() {
     },
   });
 
-  // Auto-select default address on load
-  useEffect(() => {
-    if (savedAddresses.length > 0 && !selectedAddressId && !showAddressForm) {
-      const defaultAddr = savedAddresses.find(a => a.isDefault) || savedAddresses[0];
-      handleSelectAddress(defaultAddr);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [savedAddresses]);
-
-  // Initialize selected shipping method when data loads
-  useEffect(() => {
-    if (shippingData?.selectedShippingMethod && !selectedShippingMethod) {
-      setSelectedShippingMethod(shippingData.selectedShippingMethod);
-    }
-  }, [shippingData?.selectedShippingMethod, selectedShippingMethod]);
-
-  // Update form when shipping method changes
-  useEffect(() => {
-    if (selectedShippingMethod) {
-      setValue('shippingMethodId', selectedShippingMethod);
-    }
-  }, [selectedShippingMethod, setValue]);
-
-  // Handle address selection
+  // Handle address selection — declared before the effect below that calls it.
   const handleSelectAddress = useCallback((address: UserAddress) => {
     setSelectedAddressId(address.id);
     setShowAddressForm(false);
@@ -118,6 +95,33 @@ export default function CheckoutPage() {
       }
     });
   }, [setValue]);
+
+  // Auto-select default address once saved addresses load (one-time init, not derivable in render).
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (savedAddresses.length > 0 && !selectedAddressId && !showAddressForm) {
+      const defaultAddr = savedAddresses.find(a => a.isDefault) || savedAddresses[0];
+      handleSelectAddress(defaultAddr);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedAddresses]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Initialize selected shipping method once async shipping data loads (not derivable in render).
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (shippingData?.selectedShippingMethod && !selectedShippingMethod) {
+      setSelectedShippingMethod(shippingData.selectedShippingMethod);
+    }
+  }, [shippingData?.selectedShippingMethod, selectedShippingMethod]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Update form when shipping method changes
+  useEffect(() => {
+    if (selectedShippingMethod) {
+      setValue('shippingMethodId', selectedShippingMethod);
+    }
+  }, [selectedShippingMethod, setValue]);
 
   // Handle "add new address" — show empty form
   const handleAddNewAddress = useCallback(() => {

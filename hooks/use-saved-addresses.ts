@@ -68,13 +68,15 @@ export function useSavedAddresses() {
   const [guestAddresses, setGuestAddresses] = useState<UserAddress[]>([]);
   const [guestLoading, setGuestLoading] = useState(true);
 
-  // Load guest addresses on mount
+  // Load guest addresses from localStorage on mount (external store; SSR-safe, not derivable in render).
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!isAuthenticated) {
       setGuestAddresses(getGuestAddresses());
     }
     setGuestLoading(false);
   }, [isAuthenticated]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Guest CRUD operations
   const createGuestAddress = useCallback(async (address: Omit<UserAddress, 'id'>) => {

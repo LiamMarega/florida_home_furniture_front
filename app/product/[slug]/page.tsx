@@ -130,6 +130,10 @@ export async function generateStaticParams() {
 
 export default async function ProductPageRoute({ params }: ProductPageProps) {
   const { slug } = await params;
+
+  // Only the data fetch belongs in try/catch — building/returning JSX inside it would not
+  // catch render errors anyway (React renders the returned tree later, outside this scope).
+  let product;
   try {
     const result = await fetchGraphQL({
       query: GET_PRODUCT_BY_SLUG,
@@ -158,9 +162,14 @@ export default async function ProductPageRoute({ params }: ProductPageProps) {
       },
     });
 
-    const product = result.data.product;
+    product = result.data.product;
+  } catch (error) {
+    console.error('Error fetching product:', error);
+    notFound();
+  }
+
     const variant = product.variants?.[0];
-    const price = variant?.priceWithTax 
+    const price = variant?.priceWithTax
       ? variant.priceWithTax / 100
       : null;
     const currencyCode = variant?.currencyCode || 'USD';
@@ -275,11 +284,7 @@ export default async function ProductPageRoute({ params }: ProductPageProps) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbData) }}
         />
         <ProductPage product={product} relatedProducts={[]} />
-        
+
       </>
     );
-  } catch (error) {
-    console.error('Error fetching product:', error);
-    notFound();
-  }
 }
