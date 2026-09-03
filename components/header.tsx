@@ -30,9 +30,15 @@ export function Header() {
   const { searchQuery, setSearchQuery, clearSearch } = useSearch();
   const searchInputRef = useRef<HTMLInputElement>(null);
   
+  // ponytail: usePathname() is unreliable during runtime ISR regeneration, and
+  // React's production hydration keeps the stale server classes. Treat the header
+  // as an internal page until mounted, then recompute with the real pathname.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   // Detectar si estamos en páginas de productos o páginas internas
   const isProductPage = pathname?.startsWith('/product/') && pathname !== '/product';
-  const isInternalPage = pathname !== '/' || scrolled;
+  const isInternalPage = !mounted || pathname !== '/' || scrolled;
   const shouldBeFixed = isProductPage || isInternalPage;
 
   useEffect(() => {

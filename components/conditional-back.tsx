@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
@@ -7,9 +8,16 @@ import { motion } from 'framer-motion';
 
 export function ConditionalBack() {
   const pathname = usePathname();
+  // ponytail: usePathname() is unreliable during runtime ISR regeneration, so the
+  // server can render this bar on routes it should be hidden on (e.g. "/"), and
+  // React's production hydration never removes that stale markup. Render only
+  // after mount so the decision is always made with the real client pathname.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   // Don't show on the main page or special pages like coming-soon
   if (
+    !mounted ||
     pathname === '/' ||
     pathname === '/coming-soon' ||
     pathname?.startsWith('/contact') ||
