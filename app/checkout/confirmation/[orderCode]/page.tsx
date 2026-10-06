@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,12 @@ const SUCCESS_STATES = ['PaymentAuthorized', 'PaymentSettled', 'Shipped', 'Parti
 const PENDING_STATES = ['ArrangingPayment', 'AddingItems'];
 // Order states that indicate cancelled/failed
 const FAILED_STATES = ['Cancelled'];
+
+// The backend settles the order once the Stripe webhook (or the reconciliation task) lands.
+// While the payment is still processing, re-check the order on this interval, a bounded
+// number of times: 40 attempts x 3 s = about 2 minutes.
+const POLL_INTERVAL_MS = 3000;
+const MAX_POLL_ATTEMPTS = 40;
 
 interface OrderData {
   id: string;
@@ -31,6 +37,30 @@ interface OrderData {
   }>;
 }
 
+type OrderResult = { order: OrderData } | { error: string };
+
+async function requestOrder(orderCode: string): Promise<OrderResult> {
+  try {
+    const response = await fetch(`/api/orders/${orderCode}`, {
+      credentials: 'include',
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      // If order requires auth, show a specific message
+      if (data.requiresAuth) {
+        return { error: 'Order completed successfully. Please check your email for confirmation details.' };
+      }
+      throw new Error(data.error || 'Failed to fetch order');
+    }
+
+    return { order: data.order };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Failed to fetch order' };
+  }
+}
+
 export default function ConfirmationPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -43,39 +73,38 @@ export default function ConfirmationPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [pollAttempts, setPollAttempts] = useState(0);
+
+  // Only the initial load and manual retries show the full-page loader (handleRetry turns it on),
+  // so background re-checks refresh the order without swapping out the current view.
+  const applyOrderResult = useCallback((result: OrderResult) => {
+    if ('order' in result) {
+      setOrder(result.order);
+      setError(null);
+    } else {
+      setError(result.error);
+    }
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
+    let ignore = false;
+
     const fetchOrder = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`/api/orders/${orderCode}`, {
-          credentials: 'include',
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          // If order requires auth, show a specific message
-          if (data.requiresAuth) {
-            setError('Order completed successfully. Please check your email for confirmation details.');
-            return;
-          }
-          throw new Error(data.error || 'Failed to fetch order');
-        }
-
-        setOrder(data.order);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch order');
-      } finally {
-        setLoading(false);
+      const result = await requestOrder(orderCode);
+      if (!ignore) {
+        applyOrderResult(result);
       }
     };
 
     if (orderCode) {
       fetchOrder();
     }
-  }, [orderCode, retryCount]);
+
+    return () => {
+      ignore = true;
+    };
+  }, [orderCode, retryCount, applyOrderResult]);
 
   // Determine the display status based on order state and Stripe redirect status
   const getDisplayStatus = () => {
@@ -116,8 +145,33 @@ export default function ConfirmationPage() {
   };
 
   const displayStatus = getDisplayStatus();
+  const shouldPoll = !loading && displayStatus === 'processing' && pollAttempts < MAX_POLL_ATTEMPTS;
+
+  // While the payment is processing, re-check the order until it reaches a final state or the
+  // attempts run out. Each check is scheduled only after the previous one finished, so requests
+  // never overlap. On unmount or a manual retry the pending timer is cleared and any in-flight
+  // result is dropped.
+  useEffect(() => {
+    if (!shouldPoll) return;
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const result = await requestOrder(orderCode);
+      if (!cancelled) {
+        applyOrderResult(result);
+        setPollAttempts(prev => prev + 1);
+      }
+    }, POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [shouldPoll, pollAttempts, orderCode, applyOrderResult]);
 
   const handleRetry = () => {
+    setLoading(true);
+    setPollAttempts(0);
     setRetryCount(prev => prev + 1);
   };
 
