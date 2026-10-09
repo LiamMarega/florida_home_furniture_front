@@ -30,6 +30,11 @@ interface AuthContextType {
   authModalOpen: boolean;
   authModalView: 'login' | 'register';
   refetchAuth: () => void;
+  /**
+   * Refetches the session after a flow that may have signed the user in
+   * (verify, reset password) and resolves to whether they are now signed in.
+   */
+  syncSession: () => Promise<boolean>;
 }
 
 interface RegisterInput {
@@ -259,6 +264,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     refetch();
   };
 
+  const syncSession = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['auth-status'] }),
+      queryClient.invalidateQueries({ queryKey: ['active-order'] }),
+      queryClient.invalidateQueries({ queryKey: ['cart'] }),
+    ]);
+    return queryClient.getQueryData<AuthStatusResponse>(['auth-status'])?.isAuthenticated === true;
+  };
+
   const user = authData?.user || null;
   const customer = authData?.customer || null;
   const isAuthenticated = authData?.isAuthenticated || false;
@@ -277,6 +291,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     authModalOpen,
     authModalView,
     refetchAuth,
+    syncSession,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

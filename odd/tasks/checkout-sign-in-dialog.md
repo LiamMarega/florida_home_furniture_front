@@ -27,7 +27,7 @@ The user wants a polished, in-checkout recovery: "terminar el sign in sin salir 
 
 ## Tasks
 - [x] T1 Auth API: `refreshCustomerVerification` in resend-verification; `request-password-reset` + `reset-password` routes and mutations; `login()` in auth-context also returns `code`. Route: delegated (writer, 2+ non-trivial files).
-- [ ] T2 Reset page + return-to-checkout: `/profile/password-reset` page; `lib/checkout/return-to.ts`; verify page redirects to `/checkout` when flagged. Route: delegated (same writer).
+- [x] T2 Reset page + return-to-checkout: `/profile/password-reset` page; `lib/checkout/return-to.ts`; verify page redirects to `/checkout` when flagged. Route: delegated (same writer).
 - [ ] T3 Checkout dialog: conflict-aware `setCustomer`/`processCheckout`; `CheckoutSignInDialog`; page integration (auto-resume, dismissed notice, "Not you?" focuses email, address-overwrite guard); flow assert check. Route: delegated (same writer).
 - [ ] T4 Verify: lint, tsc, build, flow check; visual pass on dialog states.
 
@@ -50,7 +50,8 @@ The user wants a polished, in-checkout recovery: "terminar el sign in sin salir 
 
 ## Progress
 - 2026-10-09: flow mapped by an explorer (checkout, session, auth routes, UI kit, tokens); backend email URLs verified in florida-home-back.
-- 2026-10-09: T1 done (commit `feat(auth): real verification resend and password reset API`). resend-verification calls `refreshCustomerVerification`; new `request-password-reset` and `reset-password` routes (reset forwards the session cookie, surfaces `validationErrorMessage` for `PASSWORD_VALIDATION_ERROR`); `login()` returns `code`. `/api/auth/verify` already forwarded cookies, unchanged. Checks: `npx tsc --noEmit` exit 0; `npm run lint` exit 1 with only the 2 pre-existing `react-hooks/set-state-in-effect` errors in `components/conditional-back.tsx` and `components/header.tsx` (not touched).
+- 2026-10-09: T1 done (commit `8f9ff1f` `feat(auth): real verification resend and password reset API`). resend-verification calls `refreshCustomerVerification`; new `request-password-reset` and `reset-password` routes (reset forwards the session cookie, surfaces `validationErrorMessage` for `PASSWORD_VALIDATION_ERROR`); `login()` returns `code`. `/api/auth/verify` already forwarded cookies, unchanged. Checks: `npx tsc --noEmit` exit 0; `npm run lint` exit 1 with only the 2 pre-existing `react-hooks/set-state-in-effect` errors in `components/conditional-back.tsx` and `components/header.tsx` (not touched).
+- 2026-10-09: T2 done (commit `feat(auth): password reset page and return to checkout`). `lib/checkout/return-to.ts` (mark/consume/clear, 2h TTL, guarded storage); auth context `syncSession()` awaits the auth-status refetch (plus cart/order invalidation) and returns signed-in state; verify page returns to `/checkout` when flagged and only opens the login modal when not signed in; new `/profile/password-reset` page (form, expired/invalid with new-link request, validation error inline, generic error). Checks: `npx tsc --noEmit` exit 0; `npx eslint` on touched dirs exit 0.
 
 ## Next step
-T2.
+T3.
