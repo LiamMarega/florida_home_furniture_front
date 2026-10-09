@@ -17,6 +17,23 @@ interface PaymentIntentData {
   currency?: string;
 }
 
+/** Error from a checkout API route that keeps the route's `code`. */
+export class CheckoutApiError extends Error {
+  code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'CheckoutApiError';
+    this.code = code;
+  }
+}
+
+export type CheckoutResult =
+  | { ok: true }
+  | { ok: false; reason: 'email-conflict' | 'error' };
+
+const EMAIL_CONFLICT_CODE = 'EMAIL_ADDRESS_CONFLICT_ERROR';
+
 // API functions
 async function fetchShippingMethods(): Promise<{ eligibleShippingMethods: ShippingMethod[] }> {
   const response = await fetch('/api/checkout/shipping-methods', {
@@ -45,10 +62,10 @@ async function setCustomer(customerData: {
     body: JSON.stringify(customerData),
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data.error || 'Failed to set customer');
+    throw new CheckoutApiError(data.message || data.error || 'Failed to set customer', data.code);
   }
 
   return data;
@@ -124,10 +141,12 @@ export function useShippingMethods() {
 
 export function useCheckoutProcess() {
   const queryClient = useQueryClient();
-  const { openAuthModal, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderCode, setOrderCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Email that already has an account; the page offers sign-in instead of an error.
+  const [emailConflict, setEmailConflict] = useState<string | null>(null);
 
   const setCustomerMutation = useMutation({
     mutationFn: setCustomer,
@@ -155,35 +174,26 @@ export function useCheckoutProcess() {
   });
 
   const processCheckout = useCallback(
-    async (data: CustomerFormData, selectedShippingMethod: string) => {
+    async (data: CustomerFormData, selectedShippingMethod: string): Promise<CheckoutResult> => {
       setError(null);
+      setEmailConflict(null);
 
       try {
         // Set customer information only if user is not authenticated
         if (!isAuthenticated) {
-          const setCustomerData = await setCustomerMutation.mutateAsync({
-            firstName: data.firstName,
-            lastName: data.lastName,
-            emailAddress: data.emailAddress,
-            phoneNumber: data.shippingPhoneNumber,
-          });
-
-          // Check for EMAIL_ADDRESS_CONFLICT_ERROR
-          if (
-            setCustomerData?.setCustomerForOrder?.errorCode === 'EMAIL_ADDRESS_CONFLICT_ERROR' ||
-            setCustomerData?.errors?.some(
-              (e: any) =>
-                e.extensions?.code === 'EMAIL_ADDRESS_CONFLICT_ERROR' ||
-                e.message?.includes('EMAIL_ADDRESS_CONFLICT_ERROR')
-            )
-          ) {
-            const errorMessage =
-              setCustomerData?.setCustomerForOrder?.message ||
-              setCustomerData?.errors?.[0]?.message ||
-              'This email address is already registered. Please login to continue.';
-            setError(errorMessage);
-            openAuthModal('login');
-            return;
+          try {
+            await setCustomerMutation.mutateAsync({
+              firstName: data.firstName,
+              lastName: data.lastName,
+              emailAddress: data.emailAddress,
+              phoneNumber: data.shippingPhoneNumber,
+            });
+          } catch (err) {
+            if (err instanceof CheckoutApiError && err.code === EMAIL_CONFLICT_CODE) {
+              setEmailConflict(data.emailAddress.trim());
+              return { ok: false, reason: 'email-conflict' };
+            }
+            throw err;
           }
         }
 
@@ -199,19 +209,24 @@ export function useCheckoutProcess() {
         const paymentIntent = await createPaymentIntentMutation.mutateAsync();
         setClientSecret(paymentIntent.clientSecret);
         setOrderCode(paymentIntent.orderCode);
+        return { ok: true };
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An error occurred during checkout';
         setError(errorMessage);
-        throw err;
+        return { ok: false, reason: 'error' };
       }
     },
-    [setCustomerMutation, setShippingAddressMutation, setShippingMethodMutation, createPaymentIntentMutation, openAuthModal, isAuthenticated]
+    [setCustomerMutation, setShippingAddressMutation, setShippingMethodMutation, createPaymentIntentMutation, isAuthenticated]
   );
 
   const resetCheckout = useCallback(() => {
     setClientSecret(null);
     setOrderCode(null);
     setError(null);
+  }, []);
+
+  const clearEmailConflict = useCallback(() => {
+    setEmailConflict(null);
   }, []);
 
   return {
@@ -223,6 +238,8 @@ export function useCheckoutProcess() {
       setShippingMethodMutation.isPending ||
       createPaymentIntentMutation.isPending,
     error,
+    emailConflict,
+    clearEmailConflict,
     processCheckout,
     resetCheckout,
     setError,

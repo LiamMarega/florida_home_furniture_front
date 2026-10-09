@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { useForm } from 'react-hook-form';
+import { useEffect, useEffectEvent, useRef, useState, useCallback } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
 import { loadStripe } from '@stripe/stripe-js';
@@ -22,18 +22,23 @@ import { ShippingAddressSection } from '@/components/checkout/shipping-address-s
 import { BillingAddressSection } from '@/components/checkout/billing-address-section';
 import { ShippingMethodsSection } from '@/components/checkout/shipping-methods-section';
 import { AddressSelectorWithModal } from '@/components/checkout/address-selector';
+import { CheckoutSignInDialog } from '@/components/checkout/checkout-sign-in-dialog';
 
 // Hooks and types
 import { useShippingMethods, useCheckoutProcess } from '@/hooks/use-checkout';
 import { customerSchema, CustomerFormData, CheckoutStep } from '@/lib/checkout/types';
 import { useSavedAddresses, addressToFormData, formDataToAddress } from '@/hooks/use-saved-addresses';
 import { UserAddress } from '@/app/profile/types';
+import { useAuth } from '@/contexts/auth-context';
 
 // Stripe configuration
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
+const normalizeEmail = (value?: string | null) => (value ?? '').trim().toLowerCase();
+
 export default function CheckoutPage() {
   const router = useRouter();
+  const { isAuthenticated, customer } = useAuth();
 
   // Custom hooks for state management
   const {
@@ -49,6 +54,8 @@ export default function CheckoutPage() {
     orderCode,
     isProcessing,
     error: checkoutError,
+    emailConflict,
+    clearEmailConflict,
     processCheckout,
     resetCheckout,
   } = useCheckoutProcess();
@@ -72,6 +79,9 @@ export default function CheckoutPage() {
     handleSubmit,
     watch,
     setValue,
+    getValues,
+    setFocus,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
@@ -81,6 +91,20 @@ export default function CheckoutPage() {
       shippingMethodId: '',
     },
   });
+
+  // Existing-account email: offer sign-in instead of failing checkout.
+  const watchedEmail = useWatch({ control, name: 'emailAddress' });
+  const [dialogEmail, setDialogEmail] = useState<string | null>(null);
+  const [dialogSession, setDialogSession] = useState(0);
+  const [conflictDismissed, setConflictDismissed] = useState(false);
+  const [resumeAfterSignIn, setResumeAfterSignIn] = useState(false);
+  const focusAfterDialog = useRef<'email' | 'notice' | null>(null);
+  const noticeSignInRef = useRef<HTMLButtonElement>(null);
+
+  // Editing the email to another address clears the conflict.
+  const conflictEmail =
+    emailConflict && normalizeEmail(watchedEmail) === normalizeEmail(emailConflict) ? emailConflict : null;
+  const signInDialogOpen = conflictEmail !== null && !conflictDismissed;
 
   // Handle address selection — declared before the effect below that calls it.
   const handleSelectAddress = useCallback((address: UserAddress) => {
@@ -100,6 +124,11 @@ export default function CheckoutPage() {
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (savedAddresses.length > 0 && !selectedAddressId && !showAddressForm) {
+      // Signing in mid-checkout loads saved addresses: keep an address the shopper already typed.
+      if (getValues('shippingStreetLine1')?.trim()) {
+        setShowAddressForm(true);
+        return;
+      }
       const defaultAddr = savedAddresses.find(a => a.isDefault) || savedAddresses[0];
       handleSelectAddress(defaultAddr);
     }
@@ -141,7 +170,17 @@ export default function CheckoutPage() {
 
   // Handle form submission
   const onSubmit = async (data: CustomerFormData) => {
-    await processCheckout(data, selectedShippingMethod);
+    setResumeAfterSignIn(false);
+    const result = await processCheckout(data, selectedShippingMethod);
+
+    if (!result.ok) {
+      if (result.reason === 'email-conflict') {
+        setDialogEmail(data.emailAddress.trim());
+        setDialogSession((session) => session + 1);
+        setConflictDismissed(false);
+      }
+      return;
+    }
 
     // Auto-save address if it's a new one and there's room
     if (!selectedAddressId && canAddMore) {
@@ -154,6 +193,47 @@ export default function CheckoutPage() {
       }
     }
   };
+
+  const handleSignedIn = () => {
+    if (!conflictEmail) return;
+    focusAfterDialog.current = null;
+    clearEmailConflict();
+    setConflictDismissed(false);
+    toast.success(`Signed in as ${customer?.firstName || conflictEmail}`);
+    setResumeAfterSignIn(true);
+  };
+
+  const handleUseDifferentEmail = () => {
+    focusAfterDialog.current = 'email';
+    clearEmailConflict();
+  };
+
+  const handleSignInDialogOpenChange = (open: boolean) => {
+    focusAfterDialog.current = open ? null : 'notice';
+    setConflictDismissed(!open);
+  };
+
+  const handleSignInDialogCloseAutoFocus = (event: Event) => {
+    event.preventDefault();
+    const target = focusAfterDialog.current;
+    focusAfterDialog.current = null;
+    if (target === 'email') {
+      setFocus('emailAddress', { shouldSelect: true });
+    } else if (target === 'notice') {
+      noticeSignInRef.current?.focus();
+    }
+  };
+
+  // After signing in, continue to payment without a second click.
+  const resumeCheckout = useEffectEvent(() => {
+    void handleSubmit(onSubmit, () => setResumeAfterSignIn(false))();
+  });
+
+  useEffect(() => {
+    if (resumeAfterSignIn && isAuthenticated) {
+      resumeCheckout();
+    }
+  }, [resumeAfterSignIn, isAuthenticated]);
 
   // Handle successful payment
   const handlePaid = (orderCode: string) => {
@@ -194,6 +274,24 @@ export default function CheckoutPage() {
               {currentStep === CheckoutStep.CUSTOMER_INFO ? (
                 /* Customer Information Form */
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                  {conflictEmail && conflictDismissed && (
+                    <div
+                      role="status"
+                      className="rounded-lg border border-brand-cream bg-brand-cream/30 px-4 py-3 text-sm leading-relaxed text-brand-dark-blue"
+                    >
+                      <span className="font-medium break-all">{conflictEmail}</span> already has an account.{' '}
+                      <button
+                        ref={noticeSignInRef}
+                        type="button"
+                        onClick={() => handleSignInDialogOpenChange(true)}
+                        className="rounded-sm font-semibold underline underline-offset-4 hover:text-brand-dark-blue/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2"
+                      >
+                        Sign in
+                      </button>{' '}
+                      or use a different email.
+                    </div>
+                  )}
+
                   <CustomerInfoSection register={register} errors={errors} />
 
                   <Separator />
@@ -286,6 +384,18 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+
+      {dialogEmail && (
+        <CheckoutSignInDialog
+          key={dialogSession}
+          open={signInDialogOpen}
+          email={dialogEmail}
+          onOpenChange={handleSignInDialogOpenChange}
+          onSignedIn={handleSignedIn}
+          onUseDifferentEmail={handleUseDifferentEmail}
+          onCloseAutoFocus={handleSignInDialogCloseAutoFocus}
+        />
+      )}
     </div>
   );
 }
