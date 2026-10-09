@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -34,16 +34,21 @@ const EXPIRED_CODES = new Set([
 ]);
 
 const GENERIC_ERROR = 'Something went wrong. Try again.';
+const SEND_ERROR = "We couldn't send the email. Try again in a moment.";
 
 const primaryButtonClass =
   'h-11 w-full rounded-lg bg-brand-primary text-white font-semibold hover:bg-brand-primary/90 transition-transform duration-150 ease-out active:scale-[0.97]';
 const iconClass = 'h-[22px] w-[22px] text-brand-dark-blue/80';
-const titleClass = 'font-tango-sans text-2xl font-semibold tracking-tight text-brand-dark-blue';
+const titleClass = 'font-tango-sans text-2xl font-semibold tracking-tight text-brand-dark-blue outline-none';
 const bodyClass = 'text-[15px] leading-relaxed text-brand-dark-blue/75';
 
-function PageShell({ children }: { children: React.ReactNode }) {
+// Every step renders inside the same shell, so the live region stays mounted across steps.
+function PageShell({ liveMessage, children }: { liveMessage: string; children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-brand-cream/20 pt-20 pb-12">
+    <div className="min-h-screen flex items-start sm:items-center justify-center bg-gradient-to-b from-white to-brand-cream/20 pt-24 sm:pt-20 pb-12">
+      <p aria-live="polite" aria-atomic="true" className="sr-only">
+        {liveMessage}
+      </p>
       <div className="max-w-md w-full px-6">
         <div className="rounded-2xl border border-brand-cream bg-white p-6 sm:p-8 shadow-sm font-creato-display">
           {children}
@@ -64,6 +69,29 @@ function PasswordResetContent() {
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [sentTo, setSentTo] = useState('');
+  const [liveMessage, setLiveMessage] = useState('');
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const isFirstStep = useRef(true);
+
+  // Move focus to the new heading whenever the step changes (not on first render).
+  useEffect(() => {
+    if (isFirstStep.current) {
+      isFirstStep.current = false;
+      return;
+    }
+    headingRef.current?.focus();
+  }, [step]);
+
+  // Clear first so repeating the same message is announced again.
+  const announce = (message: string) => {
+    setLiveMessage('');
+    if (message) window.setTimeout(() => setLiveMessage(message), 60);
+  };
+
+  const showFormError = (message: string) => {
+    setFormError(message);
+    announce(message);
+  };
 
   const passwordForm = useForm<PasswordFormData>({
     resolver: zodResolver(passwordSchema),
@@ -92,26 +120,26 @@ function PasswordResetContent() {
           return;
         }
         if (data.code === 'PASSWORD_VALIDATION_ERROR') {
-          passwordForm.setError('password', {
-            message: data.message || 'Choose a stronger password',
-          });
+          const message = data.message || 'Choose a stronger password';
+          passwordForm.setError('password', { message }, { shouldFocus: true });
+          announce(message);
           return;
         }
-        setFormError(GENERIC_ERROR);
+        showFormError(GENERIC_ERROR);
         return;
       }
 
       // Vendure signs the user in with the new password; sync before navigating.
       const isSignedIn = await syncSession();
       const backToCheckout = consumeCheckoutReturn();
+      const message = backToCheckout
+        ? 'Password updated. Taking you back to checkout…'
+        : isSignedIn
+          ? "Password updated. You're signed in."
+          : 'Password updated. You can sign in with it now.';
 
-      setSuccessMessage(
-        backToCheckout
-          ? 'Password updated. Taking you back to checkout…'
-          : isSignedIn
-            ? "Password updated. You're signed in."
-            : 'Password updated. You can sign in with it now.'
-      );
+      setSuccessMessage(message);
+      announce(message);
       setStep('success');
 
       setTimeout(() => {
@@ -125,7 +153,7 @@ function PasswordResetContent() {
         }
       }, 1200);
     } catch {
-      setFormError(GENERIC_ERROR);
+      showFormError(GENERIC_ERROR);
     }
   };
 
@@ -139,21 +167,22 @@ function PasswordResetContent() {
         body: JSON.stringify({ email }),
       });
       if (!response.ok) {
-        setFormError("We couldn't send the email. Try again in a moment.");
+        showFormError(SEND_ERROR);
         return;
       }
       setSentTo(email);
+      announce(`If ${email} has an account, a new reset link is on its way.`);
       setStep('link-sent');
     } catch {
-      setFormError("We couldn't send the email. Try again in a moment.");
+      showFormError(SEND_ERROR);
     }
   };
 
   if (!token) {
     return (
-      <PageShell>
+      <PageShell liveMessage={liveMessage}>
         <Unlink className={iconClass} strokeWidth={1.75} aria-hidden="true" />
-        <h1 className={cn(titleClass, 'mt-4')}>This reset link is incomplete</h1>
+        <h1 ref={headingRef} tabIndex={-1} className={cn(titleClass, 'mt-4')}>This reset link is incomplete</h1>
         <p className={cn(bodyClass, 'mt-2')}>
           Open the link from your email again. If it still doesn&apos;t work, request a new one when you sign in.
         </p>
@@ -166,12 +195,10 @@ function PasswordResetContent() {
 
   if (step === 'success') {
     return (
-      <PageShell>
+      <PageShell liveMessage={liveMessage}>
         <CircleCheck className={iconClass} strokeWidth={1.75} aria-hidden="true" />
-        <h1 className={cn(titleClass, 'mt-4')}>All set</h1>
-        <p className={cn(bodyClass, 'mt-2')} role="status">
-          {successMessage}
-        </p>
+        <h1 ref={headingRef} tabIndex={-1} className={cn(titleClass, 'mt-4')}>All set</h1>
+        <p className={cn(bodyClass, 'mt-2')}>{successMessage}</p>
         <Loader2 className="mt-6 h-5 w-5 animate-spin text-brand-primary" aria-hidden="true" />
       </PageShell>
     );
@@ -179,12 +206,12 @@ function PasswordResetContent() {
 
   if (step === 'link-sent') {
     return (
-      <PageShell>
+      <PageShell liveMessage={liveMessage}>
         <MailCheck className={iconClass} strokeWidth={1.75} aria-hidden="true" />
-        <h1 className={cn(titleClass, 'mt-4')}>Check your inbox</h1>
-        <p className={cn(bodyClass, 'mt-2')} role="status">
-          If <span className="font-medium text-brand-dark-blue break-all">{sentTo}</span> has an account,
-          a new reset link is on its way.
+        <h1 ref={headingRef} tabIndex={-1} className={cn(titleClass, 'mt-4')}>Check your inbox</h1>
+        <p className={cn(bodyClass, 'mt-2')}>
+          If <span className="font-medium text-brand-dark-blue break-words">{sentTo}</span>
+          {' '}has an account, a new reset link is on its way.
         </p>
         <p className="mt-4 text-sm text-brand-dark-blue/75">
           Can&apos;t find it? Check your spam or promotions folder.
@@ -196,13 +223,17 @@ function PasswordResetContent() {
   if (step === 'expired') {
     const emailError = emailForm.formState.errors.email?.message;
     return (
-      <PageShell>
+      <PageShell liveMessage={liveMessage}>
         <KeyRound className={iconClass} strokeWidth={1.75} aria-hidden="true" />
-        <h1 className={cn(titleClass, 'mt-4')}>This link has expired</h1>
+        <h1 ref={headingRef} tabIndex={-1} className={cn(titleClass, 'mt-4')}>This link has expired</h1>
         <p className={cn(bodyClass, 'mt-2')}>
           Reset links only work once and for a limited time. Enter your email and we&apos;ll send a fresh one.
         </p>
-        <form onSubmit={emailForm.handleSubmit(onSubmitEmail)} className="mt-8 space-y-4" noValidate>
+        <form
+          onSubmit={emailForm.handleSubmit(onSubmitEmail, (errors) => announce(errors.email?.message ?? ''))}
+          className="mt-8 space-y-4"
+          noValidate
+        >
           <div className="space-y-2">
             <Label htmlFor="reset-email" className="text-brand-dark-blue">
               Email
@@ -217,13 +248,13 @@ function PasswordResetContent() {
               {...emailForm.register('email')}
             />
             {emailError && (
-              <p id="reset-email-error" role="alert" className="text-sm text-red-700">
+              <p id="reset-email-error" className="text-sm text-red-700">
                 {emailError}
               </p>
             )}
           </div>
           {formError && (
-            <p role="alert" className="text-sm text-red-700">
+            <p className="text-sm text-red-700">
               {formError}
             </p>
           )}
@@ -246,11 +277,15 @@ function PasswordResetContent() {
   const isSaving = passwordForm.formState.isSubmitting;
 
   return (
-    <PageShell>
+    <PageShell liveMessage={liveMessage}>
       <KeyRound className={iconClass} strokeWidth={1.75} aria-hidden="true" />
-      <h1 className={cn(titleClass, 'mt-4')}>Choose a new password</h1>
+      <h1 ref={headingRef} tabIndex={-1} className={cn(titleClass, 'mt-4')}>Choose a new password</h1>
       <p className={cn(bodyClass, 'mt-2')}>Pick something you&apos;ll remember. You&apos;ll be signed in right after.</p>
-      <form onSubmit={passwordForm.handleSubmit(onSubmitPassword)} className="mt-8 space-y-4" noValidate>
+      <form
+        onSubmit={passwordForm.handleSubmit(onSubmitPassword, (errors) => announce(errors.password?.message ?? ''))}
+        className="mt-8 space-y-4"
+        noValidate
+      >
         <div className="space-y-2">
           <Label htmlFor="new-password" className="text-brand-dark-blue">
             New password
@@ -284,13 +319,13 @@ function PasswordResetContent() {
             At least 6 characters.
           </p>
           {passwordError && (
-            <p id="new-password-error" role="alert" className="text-sm text-red-700">
+            <p id="new-password-error" className="text-sm text-red-700">
               {passwordError}
             </p>
           )}
         </div>
         {formError && (
-          <p role="alert" className="text-sm text-red-700">
+          <p className="text-sm text-red-700">
             {formError}
           </p>
         )}

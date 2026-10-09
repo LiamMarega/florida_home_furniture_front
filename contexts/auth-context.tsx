@@ -105,6 +105,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       queryClient.invalidateQueries({ queryKey: ['auth-status'] });
       queryClient.invalidateQueries({ queryKey: ['active-order'] });
       queryClient.invalidateQueries({ queryKey: ['cart'] });
+      queryClient.invalidateQueries({ queryKey: ['addresses'] });
       refetch();
       // Delay closing modal to allow success message to be displayed
       setTimeout(() => {
@@ -269,6 +270,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       queryClient.invalidateQueries({ queryKey: ['auth-status'] }),
       queryClient.invalidateQueries({ queryKey: ['active-order'] }),
       queryClient.invalidateQueries({ queryKey: ['cart'] }),
+      queryClient.invalidateQueries({ queryKey: ['addresses'] }),
     ]);
     return queryClient.getQueryData<AuthStatusResponse>(['auth-status'])?.isAuthenticated === true;
   };

@@ -3,9 +3,42 @@ import { fetchGraphQL } from '@/lib/vendure-server';
 import { RESET_PASSWORD_MUTATION } from '@/lib/graphql/mutations';
 import { createErrorResponse, forwardCookies, validateRequiredFields, HTTP_STATUS, ERROR_CODES } from '@/lib/api-utils';
 
+const UNSUPPORTED_MEDIA_TYPE = 415;
+
+// Only JSON bodies: a cross-site HTML form cannot send application/json.
+function isJsonRequest(req: NextRequest): boolean {
+  const contentType = req.headers.get('content-type') ?? '';
+  return contentType.split(';')[0].trim().toLowerCase() === 'application/json';
+}
+
+async function readJsonObject(req: NextRequest): Promise<Record<string, unknown> | null> {
+  const body: unknown = await req.json().catch(() => null);
+  return body !== null && typeof body === 'object' && !Array.isArray(body)
+    ? (body as Record<string, unknown>)
+    : null;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
+    if (!isJsonRequest(req)) {
+      return createErrorResponse(
+        'Unsupported media type',
+        'Requests must be sent as application/json',
+        UNSUPPORTED_MEDIA_TYPE,
+        'UNSUPPORTED_MEDIA_TYPE'
+      );
+    }
+
+    const body = await readJsonObject(req);
+    if (!body) {
+      return createErrorResponse(
+        'Invalid request body',
+        'The request body must be a JSON object',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
+
     const { token, password } = body;
 
     const validation = validateRequiredFields(body, ['token', 'password']);

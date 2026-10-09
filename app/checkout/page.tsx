@@ -4,6 +4,7 @@ import { useEffect, useEffectEvent, useRef, useState, useCallback } from 'react'
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { toast } from 'sonner';
@@ -26,6 +27,7 @@ import { CheckoutSignInDialog } from '@/components/checkout/checkout-sign-in-dia
 
 // Hooks and types
 import { useShippingMethods, useCheckoutProcess } from '@/hooks/use-checkout';
+import { cartKeys } from '@/hooks/use-cart';
 import { customerSchema, CustomerFormData, CheckoutStep } from '@/lib/checkout/types';
 import { useSavedAddresses, addressToFormData, formDataToAddress } from '@/hooks/use-saved-addresses';
 import { UserAddress } from '@/app/profile/types';
@@ -36,9 +38,44 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
 
 const normalizeEmail = (value?: string | null) => (value ?? '').trim().toLowerCase();
 
+// Minimal shapes of the cached auth-status and active-cart responses read after sign-in.
+interface SessionSnapshot {
+  user?: { identifier?: string } | null;
+  customer?: { firstName?: string; emailAddress?: string } | null;
+}
+
+interface CartSnapshot {
+  activeOrder?: {
+    totalWithTax?: number;
+    lines?: Array<{ quantity: number; productVariant?: { id: string } }>;
+  } | null;
+}
+
+interface CartSignature {
+  lines: string[];
+  total: number;
+}
+
+function cartSignature(data: CartSnapshot | undefined): CartSignature {
+  const order = data?.activeOrder;
+  return {
+    lines: (order?.lines ?? []).map((line) => `${line.productVariant?.id ?? '?'}x${line.quantity}`).sort(),
+    total: order?.totalWithTax ?? 0,
+  };
+}
+
+const sameCart = (a: CartSignature, b: CartSignature) =>
+  a.total === b.total && a.lines.join(',') === b.lines.join(',');
+
+const CART_NOTICE = {
+  merged: 'We added items saved in your account to this order. Review your cart, then continue to payment.',
+  changed: 'Your cart changed when you signed in. Review it before continuing.',
+} as const;
+
 export default function CheckoutPage() {
   const router = useRouter();
-  const { isAuthenticated, customer } = useAuth();
+  const queryClient = useQueryClient();
+  const { isAuthenticated, syncSession } = useAuth();
 
   // Custom hooks for state management
   const {
@@ -98,8 +135,14 @@ export default function CheckoutPage() {
   const [dialogSession, setDialogSession] = useState(0);
   const [conflictDismissed, setConflictDismissed] = useState(false);
   const [resumeAfterSignIn, setResumeAfterSignIn] = useState(false);
+  // Signing in can merge the account's saved cart into this order (Vendure merge strategy).
+  const [conflictCart, setConflictCart] = useState<CartSignature | null>(null);
+  const [cartNotice, setCartNotice] = useState<keyof typeof CART_NOTICE | null>(null);
+  const [focusPaymentHeading, setFocusPaymentHeading] = useState(false);
   const focusAfterDialog = useRef<'email' | 'notice' | null>(null);
   const noticeSignInRef = useRef<HTMLButtonElement>(null);
+  const paymentHeadingRef = useRef<HTMLHeadingElement>(null);
+  const cartNoticeRef = useRef<HTMLDivElement>(null);
 
   // Editing the email to another address clears the conflict.
   const conflictEmail =
@@ -170,11 +213,15 @@ export default function CheckoutPage() {
 
   // Handle form submission
   const onSubmit = async (data: CustomerFormData) => {
+    const isResumedSubmit = resumeAfterSignIn;
     setResumeAfterSignIn(false);
+    setCartNotice(null);
+    setFocusPaymentHeading(isResumedSubmit);
     const result = await processCheckout(data, selectedShippingMethod);
 
     if (!result.ok) {
       if (result.reason === 'email-conflict') {
+        setConflictCart(cartSignature(queryClient.getQueryData<CartSnapshot>(cartKeys.active())));
         setDialogEmail(data.emailAddress.trim());
         setDialogSession((session) => session + 1);
         setConflictDismissed(false);
@@ -182,8 +229,9 @@ export default function CheckoutPage() {
       return;
     }
 
-    // Auto-save address if it's a new one and there's room
-    if (!selectedAddressId && canAddMore) {
+    // Auto-save address if it's a new one and there's room. Skipped right after
+    // signing in: the saved-address list may still be stale (duplicates, over the limit).
+    if (!isResumedSubmit && !selectedAddressId && canAddMore) {
       try {
         const addressData = formDataToAddress(data);
         await createAddress(addressData);
@@ -194,12 +242,35 @@ export default function CheckoutPage() {
     }
   };
 
-  const handleSignedIn = () => {
+  const handleSignedIn = async () => {
     if (!conflictEmail) return;
+    const expectedEmail = conflictEmail;
+    const cartBefore = conflictCart;
     focusAfterDialog.current = null;
     clearEmailConflict();
     setConflictDismissed(false);
-    toast.success(`Signed in as ${customer?.firstName || conflictEmail}`);
+
+    // Fresh session, cart and addresses (awaited), never the pre-sign-in cache.
+    const signedIn = await syncSession();
+    if (!signedIn) return;
+
+    const session = queryClient.getQueryData<SessionSnapshot>(['auth-status']);
+    const accountEmail = session?.customer?.emailAddress || session?.user?.identifier;
+    toast.success(`Signed in as ${session?.customer?.firstName || accountEmail || expectedEmail}`);
+
+    // Signed in to a different account: close and let the shopper review.
+    if (normalizeEmail(accountEmail) !== normalizeEmail(expectedEmail)) return;
+
+    const cartAfter = cartSignature(queryClient.getQueryData<CartSnapshot>(cartKeys.active()));
+    if (!cartBefore || !sameCart(cartBefore, cartAfter)) {
+      const itemsAdded =
+        !!cartBefore &&
+        cartAfter.lines.length > cartBefore.lines.length &&
+        cartBefore.lines.every((line) => cartAfter.lines.includes(line));
+      setCartNotice(itemsAdded ? 'merged' : 'changed');
+      return;
+    }
+
     setResumeAfterSignIn(true);
   };
 
@@ -226,6 +297,8 @@ export default function CheckoutPage() {
 
   // After signing in, continue to payment without a second click.
   const resumeCheckout = useEffectEvent(() => {
+    // The shopper may have continued manually while the session was syncing.
+    if (clientSecret || isProcessing || isSubmitting) return;
     void handleSubmit(onSubmit, () => setResumeAfterSignIn(false))();
   });
 
@@ -248,6 +321,18 @@ export default function CheckoutPage() {
   // Determine current step
   const currentStep = clientSecret ? CheckoutStep.PAYMENT : CheckoutStep.CUSTOMER_INFO;
 
+  // The dialog has just closed when the cart notice appears: give focus a home there.
+  useEffect(() => {
+    if (cartNotice) cartNoticeRef.current?.focus();
+  }, [cartNotice]);
+
+  // After a resumed submit lands on payment, keyboard and screen-reader focus follows.
+  useEffect(() => {
+    if (currentStep === CheckoutStep.PAYMENT && focusPaymentHeading) {
+      paymentHeadingRef.current?.focus();
+    }
+  }, [currentStep, focusPaymentHeading]);
+
   // Whether to show the address form (always show if no saved addresses)
   const hasAddresses = savedAddresses.length > 0;
   const shouldShowForm = !hasAddresses || showAddressForm || selectedAddressId !== null;
@@ -259,7 +344,11 @@ export default function CheckoutPage() {
           {/* Main Content */}
           <div className="lg:col-span-2">
             <Card className="p-4 sm:p-8">
-              <h1 className="text-3xl font-bold text-brand-dark-blue mb-6 font-tango-sans">
+              <h1
+                ref={paymentHeadingRef}
+                tabIndex={-1}
+                className="text-3xl font-bold text-brand-dark-blue mb-6 font-tango-sans outline-none"
+              >
                 <User className="inline-block w-8 h-8 mr-2 mb-1" />
                 {currentStep === CheckoutStep.PAYMENT ? 'Payment' : 'Customer Information'}
               </h1>
@@ -279,7 +368,7 @@ export default function CheckoutPage() {
                       role="status"
                       className="rounded-lg border border-brand-cream bg-brand-cream/30 px-4 py-3 text-sm leading-relaxed text-brand-dark-blue"
                     >
-                      <span className="font-medium break-all">{conflictEmail}</span> already has an account.{' '}
+                      <span className="font-medium break-words">{conflictEmail}</span> already has an account.{' '}
                       <button
                         ref={noticeSignInRef}
                         type="button"
@@ -289,6 +378,17 @@ export default function CheckoutPage() {
                         Sign in
                       </button>{' '}
                       or use a different email.
+                    </div>
+                  )}
+
+                  {cartNotice && (
+                    <div
+                      ref={cartNoticeRef}
+                      role="status"
+                      tabIndex={-1}
+                      className="outline-none rounded-lg border border-brand-cream bg-brand-cream/30 px-4 py-3 text-sm leading-relaxed text-brand-dark-blue"
+                    >
+                      {CART_NOTICE[cartNotice]}
                     </div>
                   )}
 

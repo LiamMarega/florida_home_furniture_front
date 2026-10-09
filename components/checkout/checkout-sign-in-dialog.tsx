@@ -104,7 +104,7 @@ function focusStepTarget(container: HTMLElement | null, step: SignInStep) {
 }
 
 function EmailText({ email }: { email: string }) {
-  return <span className="font-medium text-brand-dark-blue break-all">{email}</span>;
+  return <span className="font-medium text-brand-dark-blue break-words">{email}</span>;
 }
 
 function StepHeader({
@@ -233,7 +233,9 @@ export function CheckoutSignInDialog({
   const [sendFailed, setSendFailed] = useState(false);
   const [retryFailed, setRetryFailed] = useState(false);
   const [notConfirmedYet, setNotConfirmedYet] = useState(false);
-  const [announcement, setAnnouncement] = useState('');
+  // One always-mounted live region: text set later is announced reliably.
+  const [liveMessage, setLiveMessage] = useState('');
+  const [linkResent, setLinkResent] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [height, setHeight] = useState<number | 'auto'>('auto');
 
@@ -246,6 +248,7 @@ export function CheckoutSignInDialog({
 
   const busy = pending !== null || phase !== 'idle';
   const coolingDown = secondsLeft > 0;
+  const resendBlocked = busy || coolingDown;
 
   // Sign-in finished here (after the "Signed in" beat) or in another tab: tell the page once.
   const notifySignedIn = useEffectEvent(() => {
@@ -316,8 +319,14 @@ export function CheckoutSignInDialog({
     setSendFailed(false);
     setRetryFailed(false);
     setNotConfirmedYet(false);
-    setAnnouncement('');
+    setLinkResent(false);
     focusOnStepChange.current = true;
+  };
+
+  // Clear first so repeating the same message is announced again.
+  const announce = (message: string) => {
+    setLiveMessage('');
+    window.setTimeout(() => setLiveMessage(message), 60);
   };
 
   const shakePassword = () => {
@@ -347,8 +356,12 @@ export function CheckoutSignInDialog({
     }
 
     if (outcome.kind === 'step') {
-      if (mode === 'retry') setNotConfirmedYet(true);
-      else goTo(outcome.step);
+      if (mode === 'retry') {
+        setNotConfirmedYet(true);
+        announce(COPY.notConfirmed);
+      } else {
+        goTo(outcome.step);
+      }
       return;
     }
 
@@ -360,6 +373,7 @@ export function CheckoutSignInDialog({
         return;
       }
       shakePassword();
+      announce(COPY.invalid);
       passwordRef.current?.focus();
       passwordRef.current?.select();
       return;
@@ -367,13 +381,15 @@ export function CheckoutSignInDialog({
 
     if (mode === 'retry') setRetryFailed(true);
     else setLoginError('generic');
+    announce(COPY.generic);
   };
 
   const sendLink = async (kind: 'verification' | 'reset', mode: 'send' | 'resend') => {
-    if (busy) return;
+    // The resend button stays focusable during the cooldown (aria-disabled), so guard here.
+    if (busy || (mode === 'resend' && coolingDown)) return;
     setPending(mode);
     setSendFailed(false);
-    if (mode === 'resend') setAnnouncement('');
+    setLinkResent(false);
 
     try {
       const response = await fetch(
@@ -393,10 +409,12 @@ export function CheckoutSignInDialog({
       if (mode === 'send') {
         goTo(kind === 'verification' ? 'verification-sent' : 'reset-sent');
       } else {
-        setAnnouncement('New link sent');
+        setLinkResent(true);
+        announce('New link sent');
       }
     } catch {
       setSendFailed(true);
+      announce(COPY.sendFailed);
     } finally {
       setPending(null);
     }
@@ -410,22 +428,17 @@ export function CheckoutSignInDialog({
   const resendLabel = (kind: 'verification' | 'reset') => (
     <TextButton
       onClick={() => sendLink(kind, 'resend')}
-      disabled={busy || coolingDown}
+      aria-disabled={resendBlocked || undefined}
+      className={cn(resendBlocked && 'cursor-not-allowed text-brand-dark-blue/60 hover:no-underline')}
     >
       {pending === 'resend' ? 'Sending…' : coolingDown ? `Resend in ${secondsLeft}s` : 'Resend link'}
     </TextButton>
   );
 
-  const sendError = sendFailed && (
-    <p role="alert" className="mt-4 text-sm text-red-700">
-      {COPY.sendFailed}
-    </p>
-  );
+  const sendError = sendFailed && <p className="mt-4 text-sm text-red-700">{COPY.sendFailed}</p>;
 
-  const liveRegion = (
-    <p aria-live="polite" className={cn('text-center text-sm text-brand-dark-blue/75', announcement && 'mt-3')}>
-      {announcement}
-    </p>
+  const resentNote = linkResent && (
+    <p className="mt-3 text-center text-sm text-brand-dark-blue/75">New link sent</p>
   );
 
   const spamHint = <p className="mt-6 text-center text-sm text-brand-dark-blue/75">{COPY.spamHint}</p>;
@@ -443,14 +456,16 @@ export function CheckoutSignInDialog({
             }}
           >
             <StepHeader icon={LockKeyhole} title="Welcome back" descriptionId={descriptionId('signin')}>
-              There&apos;s already an account for <EmailText email={email} />. Sign in to finish your order. Your
-              cart stays just as it is.
+              There&apos;s already an account with this email. Sign in to finish your order.
             </StepHeader>
 
-            <div className="mt-6 flex items-center gap-3 rounded-lg border border-brand-cream bg-brand-cream/30 px-4 py-3">
-              <Mail className="h-4 w-4 shrink-0 text-brand-dark-blue/80" strokeWidth={1.75} aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate text-sm font-medium text-brand-dark-blue">{email}</span>
-              <TextButton onClick={onUseDifferentEmail} disabled={busy} className="shrink-0">
+            {/* Wraps "Not you?" onto its own line instead of splitting the email when space runs out. */}
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-brand-cream bg-brand-cream/30 px-4 py-3">
+              <span className="flex min-w-0 items-center gap-3">
+                <Mail className="h-4 w-4 shrink-0 text-brand-dark-blue/80" strokeWidth={1.75} aria-hidden="true" />
+                <span className="min-w-0 break-words text-sm font-medium text-brand-dark-blue">{email}</span>
+              </span>
+              <TextButton onClick={onUseDifferentEmail} disabled={busy} className="ml-auto shrink-0">
                 Not you?
               </TextButton>
             </div>
@@ -519,7 +534,7 @@ export function CheckoutSignInDialog({
                 </p>
               )}
               {loginError && (
-                <p id={passwordErrorId} role="alert" className="mt-2 text-sm text-red-700">
+                <p id={passwordErrorId} className="mt-2 text-sm text-red-700">
                   {loginError === 'invalid' ? COPY.invalid : COPY.generic}
                 </p>
               )}
@@ -547,8 +562,9 @@ export function CheckoutSignInDialog({
         return (
           <>
             <StepHeader icon={MailWarning} title="Confirm your email first" descriptionId={descriptionId('unverified')}>
-              The account for <EmailText email={email} /> hasn&apos;t been confirmed yet. We&apos;ll send a fresh
-              confirmation link so you can finish signing in.
+              The account for <EmailText email={email} />
+              {' '}hasn&apos;t been confirmed yet. We&apos;ll send a fresh confirmation link so you can finish
+              signing in.
             </StepHeader>
             {sendError}
             <PrimaryButton
@@ -572,19 +588,11 @@ export function CheckoutSignInDialog({
         return (
           <>
             <StepHeader icon={MailCheck} title="Check your inbox" descriptionId={descriptionId('verification-sent')}>
-              We sent a confirmation link to <EmailText email={email} />. Open it on this device and you&apos;ll be
-              signed in here automatically.
+              We sent a confirmation link to <EmailText email={email} />
+              {'. '}Open it on this device and you&apos;ll be signed in here automatically.
             </StepHeader>
-            {notConfirmedYet && (
-              <p role="status" className="mt-4 text-sm text-brand-dark-blue">
-                {COPY.notConfirmed}
-              </p>
-            )}
-            {retryFailed && (
-              <p role="alert" className="mt-4 text-sm text-red-700">
-                {COPY.generic}
-              </p>
-            )}
+            {notConfirmedYet && <p className="mt-4 text-sm text-brand-dark-blue">{COPY.notConfirmed}</p>}
+            {retryFailed && <p className="mt-4 text-sm text-red-700">{COPY.generic}</p>}
             {sendError}
             <PrimaryButton
               type="button"
@@ -602,7 +610,7 @@ export function CheckoutSignInDialog({
                 Back to sign in
               </TextButton>
             </div>
-            {liveRegion}
+            {resentNote}
             {spamHint}
           </>
         );
@@ -611,7 +619,8 @@ export function CheckoutSignInDialog({
         return (
           <>
             <StepHeader icon={KeyRound} title="Reset your password" descriptionId={descriptionId('forgot')}>
-              We&apos;ll email a link to <EmailText email={email} /> so you can choose a new password.
+              We&apos;ll email a link to <EmailText email={email} />
+              {' '}so you can choose a new password.
             </StepHeader>
             {sendError}
             <PrimaryButton
@@ -640,8 +649,9 @@ export function CheckoutSignInDialog({
               descriptionId={descriptionId('reset-sent')}
               focusTitle
             >
-              If <EmailText email={email} /> has an account, a reset link is on its way. Open it on this device,
-              choose a new password, and you&apos;ll come right back to checkout, signed in.
+              If <EmailText email={email} />
+              {' '}has an account, a reset link is on its way. Open it on this device, choose a new password, and
+              you&apos;ll come right back to checkout, signed in.
             </StepHeader>
             {sendError}
             <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
@@ -650,7 +660,7 @@ export function CheckoutSignInDialog({
                 Back to sign in
               </TextButton>
             </div>
-            {liveRegion}
+            {resentNote}
             {spamHint}
           </>
         );
@@ -667,6 +677,9 @@ export function CheckoutSignInDialog({
         }}
         onCloseAutoFocus={onCloseAutoFocus}
       >
+        <p aria-live="polite" aria-atomic="true" className="sr-only">
+          {liveMessage}
+        </p>
         <motion.div
           className="overflow-hidden"
           initial={false}
