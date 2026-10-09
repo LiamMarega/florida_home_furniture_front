@@ -1,26 +1,94 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createErrorResponse, validateRequiredFields, HTTP_STATUS, ERROR_CODES } from '@/lib/api-utils';
+import { fetchGraphQL } from '@/lib/vendure-server';
+import { REFRESH_CUSTOMER_VERIFICATION_MUTATION } from '@/lib/graphql/mutations';
+import { createErrorResponse, forwardCookies, HTTP_STATUS, ERROR_CODES } from '@/lib/api-utils';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const UNSUPPORTED_MEDIA_TYPE = 415;
+
+// Only JSON bodies: a cross-site HTML form cannot send application/json.
+function isJsonRequest(req: NextRequest): boolean {
+  const contentType = req.headers.get('content-type') ?? '';
+  return contentType.split(';')[0].trim().toLowerCase() === 'application/json';
+}
+
+async function readJsonObject(req: NextRequest): Promise<Record<string, unknown> | null> {
+  const body: unknown = await req.json().catch(() => null);
+  return body !== null && typeof body === 'object' && !Array.isArray(body)
+    ? (body as Record<string, unknown>)
+    : null;
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const { email } = body;
-
-    const validation = validateRequiredFields(body, ['email']);
-    if (!validation.isValid) {
+    if (!isJsonRequest(req)) {
       return createErrorResponse(
-        'Email required',
-        'Email address is required',
+        'Unsupported media type',
+        'Requests must be sent as application/json',
+        UNSUPPORTED_MEDIA_TYPE,
+        'UNSUPPORTED_MEDIA_TYPE'
+      );
+    }
+
+    const body = await readJsonObject(req);
+    if (!body) {
+      return createErrorResponse(
+        'Invalid request body',
+        'The request body must be a JSON object',
         HTTP_STATUS.BAD_REQUEST,
         ERROR_CODES.VALIDATION_ERROR
       );
     }
 
-    return NextResponse.json({
-      success: true,
-      message:
-        'If your account exists and is not verified, please try registering again with the same email. Vendure will resend the verification email.',
-    });
+    const email = typeof body.email === 'string' ? body.email.trim() : '';
+
+    if (!email || !EMAIL_PATTERN.test(email)) {
+      return createErrorResponse(
+        'Invalid email',
+        'Please provide a valid email address',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR
+      );
+    }
+
+    const result = await fetchGraphQL(
+      {
+        query: REFRESH_CUSTOMER_VERIFICATION_MUTATION,
+        variables: { emailAddress: email },
+      },
+      { req }
+    );
+
+    if (result.errors?.length) {
+      return createErrorResponse(
+        'Failed to send verification email',
+        result.errors[0]?.message || 'Unable to send the verification email',
+        HTTP_STATUS.BAD_REQUEST,
+        ERROR_CODES.VALIDATION_ERROR,
+        result.errors
+      );
+    }
+
+    const data = result.data?.refreshCustomerVerification;
+
+    // Vendure answers Success for unknown or already verified emails too,
+    // so the response never reveals whether an account exists.
+    if (data?.__typename === 'Success') {
+      const response = NextResponse.json({
+        success: true,
+        message: 'We sent a new confirmation link. Check your inbox.',
+      });
+      forwardCookies(response, result);
+      return response;
+    }
+
+    return createErrorResponse(
+      'Failed to send verification email',
+      data?.message || 'Unable to send the verification email',
+      HTTP_STATUS.BAD_REQUEST,
+      data?.errorCode || ERROR_CODES.VALIDATION_ERROR
+    );
   } catch (error) {
     return createErrorResponse(
       'Internal server error',
@@ -30,4 +98,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
