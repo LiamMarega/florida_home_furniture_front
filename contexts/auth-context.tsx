@@ -21,7 +21,7 @@ interface AuthContextType {
   customer: Customer | null;
   loading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; code?: string }>;
   register: (input: RegisterInput) => Promise<{ success: boolean; error?: string; errorCode?: string; message?: string }>;
   verifyEmail: (token: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
@@ -30,6 +30,11 @@ interface AuthContextType {
   authModalOpen: boolean;
   authModalView: 'login' | 'register';
   refetchAuth: () => void;
+  /**
+   * Refetches the session after a flow that may have signed the user in
+   * (verify, reset password) and resolves to whether they are now signed in.
+   */
+  syncSession: () => Promise<boolean>;
 }
 
 interface RegisterInput {
@@ -84,9 +89,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({}));
         const errorMessage = error.message || error.error?.message || error.error || 'Login failed';
-        throw new Error(errorMessage);
+        const errorWithCode = new Error(errorMessage) as Error & { code?: string };
+        if (typeof error.code === 'string') {
+          errorWithCode.code = error.code;
+        }
+        throw errorWithCode;
       }
 
       return response.json();
@@ -96,6 +105,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       queryClient.invalidateQueries({ queryKey: ['auth-status'] });
       queryClient.invalidateQueries({ queryKey: ['active-order'] });
       queryClient.invalidateQueries({ queryKey: ['cart'] });
+      queryClient.invalidateQueries({ queryKey: ['addresses'] });
       refetch();
       // Delay closing modal to allow success message to be displayed
       setTimeout(() => {
@@ -171,6 +181,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Login failed',
+        code: (error as Error & { code?: string })?.code,
       };
     }
   };
@@ -254,6 +265,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     refetch();
   };
 
+  const syncSession = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['auth-status'] }),
+      queryClient.invalidateQueries({ queryKey: ['active-order'] }),
+      queryClient.invalidateQueries({ queryKey: ['cart'] }),
+      queryClient.invalidateQueries({ queryKey: ['addresses'] }),
+    ]);
+    return queryClient.getQueryData<AuthStatusResponse>(['auth-status'])?.isAuthenticated === true;
+  };
+
   const user = authData?.user || null;
   const customer = authData?.customer || null;
   const isAuthenticated = authData?.isAuthenticated || false;
@@ -272,6 +293,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     authModalOpen,
     authModalView,
     refetchAuth,
+    syncSession,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

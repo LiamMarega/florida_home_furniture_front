@@ -25,15 +25,15 @@ export const ResendVerification: React.FC<ResendVerificationProps> = ({ email })
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to resend verification email');
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || error.error || 'Failed to resend verification email');
       }
 
       return response.json();
     },
     onSuccess: (data) => {
       setIsSent(true);
-      setMessage(data.message || 'Verification email sent successfully!');
+      setMessage(data.message || 'We sent a new confirmation link. Check your inbox.');
     },
     onError: (error: Error) => {
       setMessage(error.message || 'Failed to resend verification email');

@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
-import { REFRESH_CUSTOMER_VERIFICATION_MUTATION } from '@/lib/graphql/mutations';
-import { createErrorResponse, forwardCookies, HTTP_STATUS, ERROR_CODES } from '@/lib/api-utils';
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { RESET_PASSWORD_MUTATION } from '@/lib/graphql/mutations';
+import { createErrorResponse, forwardCookies, validateRequiredFields, HTTP_STATUS, ERROR_CODES } from '@/lib/api-utils';
 
 const UNSUPPORTED_MEDIA_TYPE = 415;
 
@@ -41,12 +39,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const email = typeof body.email === 'string' ? body.email.trim() : '';
+    const { token, password } = body;
 
-    if (!email || !EMAIL_PATTERN.test(email)) {
+    const validation = validateRequiredFields(body, ['token', 'password']);
+    if (!validation.isValid || typeof token !== 'string' || typeof password !== 'string') {
       return createErrorResponse(
-        'Invalid email',
-        'Please provide a valid email address',
+        'Missing fields',
+        'Please provide both the reset token and a new password',
         HTTP_STATUS.BAD_REQUEST,
         ERROR_CODES.VALIDATION_ERROR
       );
@@ -54,45 +53,53 @@ export async function POST(req: NextRequest) {
 
     const result = await fetchGraphQL(
       {
-        query: REFRESH_CUSTOMER_VERIFICATION_MUTATION,
-        variables: { emailAddress: email },
+        query: RESET_PASSWORD_MUTATION,
+        variables: { token, password },
       },
       { req }
     );
 
     if (result.errors?.length) {
       return createErrorResponse(
-        'Failed to send verification email',
-        result.errors[0]?.message || 'Unable to send the verification email',
+        'Password reset failed',
+        result.errors[0]?.message || 'Unable to reset the password',
         HTTP_STATUS.BAD_REQUEST,
         ERROR_CODES.VALIDATION_ERROR,
         result.errors
       );
     }
 
-    const data = result.data?.refreshCustomerVerification;
+    const resetData = result.data?.resetPassword;
 
-    // Vendure answers Success for unknown or already verified emails too,
-    // so the response never reveals whether an account exists.
-    if (data?.__typename === 'Success') {
+    if (resetData?.__typename === 'CurrentUser') {
+      // Vendure signs the user in (and marks the account verified), so the
+      // session cookie must reach the browser.
       const response = NextResponse.json({
         success: true,
-        message: 'We sent a new confirmation link. Check your inbox.',
+        user: { id: resetData.id, identifier: resetData.identifier },
+        message: 'Password updated',
       });
       forwardCookies(response, result);
       return response;
     }
 
+    // PASSWORD_RESET_TOKEN_INVALID_ERROR, PASSWORD_RESET_TOKEN_EXPIRED_ERROR,
+    // PASSWORD_VALIDATION_ERROR, NOT_VERIFIED_ERROR, NATIVE_AUTH_STRATEGY_ERROR
+    const message =
+      resetData?.__typename === 'PasswordValidationError' && resetData.validationErrorMessage
+        ? resetData.validationErrorMessage
+        : resetData?.message || 'Unable to reset the password';
+
     return createErrorResponse(
-      'Failed to send verification email',
-      data?.message || 'Unable to send the verification email',
+      'Password reset failed',
+      message,
       HTTP_STATUS.BAD_REQUEST,
-      data?.errorCode || ERROR_CODES.VALIDATION_ERROR
+      resetData?.errorCode || ERROR_CODES.VALIDATION_ERROR
     );
   } catch (error) {
     return createErrorResponse(
       'Internal server error',
-      error instanceof Error ? error.message : 'Failed to process request',
+      error instanceof Error ? error.message : 'Failed to process password reset',
       HTTP_STATUS.INTERNAL_ERROR,
       ERROR_CODES.INTERNAL_ERROR
     );

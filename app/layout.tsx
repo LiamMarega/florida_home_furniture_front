@@ -9,8 +9,7 @@ import { Toaster } from '@/components/ui/sonner';
 import localFont from 'next/font/local';
 import { ConditionalHeader } from '@/components/conditional-header';
 import AuthModal from '@/components/auth/auth-modal';
-import { Analytics } from '@vercel/analytics/next';
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import { VercelAnalytics } from '@/components/vercel-analytics';
 import { Footer } from '@/components/footer';
 import Script from 'next/script';
 import { ConditionalBack } from '@/components/conditional-back';
@@ -175,8 +174,7 @@ export default function RootLayout({
             })
           }}
         />
-        <Analytics />
-        <SpeedInsights />
+        <VercelAnalytics />
         <QueryProvider>
           <AuthProvider>
             <CartProvider>

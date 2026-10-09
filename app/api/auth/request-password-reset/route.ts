@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
-import { REFRESH_CUSTOMER_VERIFICATION_MUTATION } from '@/lib/graphql/mutations';
+import { REQUEST_PASSWORD_RESET_MUTATION } from '@/lib/graphql/mutations';
 import { createErrorResponse, forwardCookies, HTTP_STATUS, ERROR_CODES } from '@/lib/api-utils';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
 
     const result = await fetchGraphQL(
       {
-        query: REFRESH_CUSTOMER_VERIFICATION_MUTATION,
+        query: REQUEST_PASSWORD_RESET_MUTATION,
         variables: { emailAddress: email },
       },
       { req }
@@ -62,30 +62,29 @@ export async function POST(req: NextRequest) {
 
     if (result.errors?.length) {
       return createErrorResponse(
-        'Failed to send verification email',
-        result.errors[0]?.message || 'Unable to send the verification email',
+        'Failed to request password reset',
+        result.errors[0]?.message || 'Unable to send the password reset email',
         HTTP_STATUS.BAD_REQUEST,
         ERROR_CODES.VALIDATION_ERROR,
         result.errors
       );
     }
 
-    const data = result.data?.refreshCustomerVerification;
+    const data = result.data?.requestPasswordReset;
 
-    // Vendure answers Success for unknown or already verified emails too,
-    // so the response never reveals whether an account exists.
+    // Vendure answers Success for unknown emails too (no account enumeration).
     if (data?.__typename === 'Success') {
       const response = NextResponse.json({
         success: true,
-        message: 'We sent a new confirmation link. Check your inbox.',
+        message: 'If an account exists for this email, a reset link is on its way.',
       });
       forwardCookies(response, result);
       return response;
     }
 
     return createErrorResponse(
-      'Failed to send verification email',
-      data?.message || 'Unable to send the verification email',
+      'Failed to request password reset',
+      data?.message || 'Unable to send the password reset email',
       HTTP_STATUS.BAD_REQUEST,
       data?.errorCode || ERROR_CODES.VALIDATION_ERROR
     );
