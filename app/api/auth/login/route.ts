@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
 import { LOGIN_MUTATION } from '@/lib/graphql/mutations';
-import { AUTH_STATE_QUERY } from '@/lib/graphql/queries';
 import { createErrorResponse, forwardCookies, validateRequiredFields, HTTP_STATUS, ERROR_CODES } from '@/lib/api-utils';
 
 export async function POST(req: NextRequest) {
@@ -66,20 +65,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const authStateResult = await fetchGraphQL(
-      { query: AUTH_STATE_QUERY },
-      { req }
-    );
-
+    // Forward only the login result's cookies. Vendure replaces the guest session on
+    // login, so any follow-up query sent with the request's (guest) cookie would open a
+    // new anonymous session whose cookie would overwrite the signed-in one.
+    // Clients read the session from /api/auth/status after signing in.
     const response = NextResponse.json({
       success: true,
       user: loginData,
-      auth: authStateResult.data,
       message: 'Login successful',
     });
 
     forwardCookies(response, loginResult);
-    forwardCookies(response, authStateResult);
 
     return response;
   } catch (error) {

@@ -21,7 +21,7 @@ interface AuthContextType {
   customer: Customer | null;
   loading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; code?: string }>;
   register: (input: RegisterInput) => Promise<{ success: boolean; error?: string; errorCode?: string; message?: string }>;
   verifyEmail: (token: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
@@ -84,9 +84,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({}));
         const errorMessage = error.message || error.error?.message || error.error || 'Login failed';
-        throw new Error(errorMessage);
+        // `status` lets the global mutation retry policy skip 4xx (wrong password, unverified).
+        throw Object.assign(new Error(errorMessage), {
+          status: response.status,
+          code: typeof error.code === 'string' ? error.code : undefined,
+        });
       }
 
       return response.json();
@@ -171,6 +175,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Login failed',
+        code: (error as Error & { code?: string })?.code,
       };
     }
   };
