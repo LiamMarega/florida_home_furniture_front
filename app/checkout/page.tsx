@@ -26,7 +26,13 @@ import { AddressSelectorWithModal } from '@/components/checkout/address-selector
 import { CheckoutSignInDialog } from '@/components/checkout/checkout-sign-in-dialog';
 
 // Hooks and types
-import { useShippingMethods, useCheckoutProcess } from '@/hooks/use-checkout';
+import { addCartLines, useShippingMethods, useCheckoutProcess } from '@/hooks/use-checkout';
+import {
+  missingGuestLines,
+  reviewCartAfterSignIn,
+  type CartReview,
+  type CartState,
+} from '@/lib/checkout/sign-in-flow';
 import { cartKeys } from '@/hooks/use-cart';
 import { customerSchema, CustomerFormData, CheckoutStep } from '@/lib/checkout/types';
 import { useSavedAddresses, addressToFormData, formDataToAddress } from '@/hooks/use-saved-addresses';
@@ -51,26 +57,21 @@ interface CartSnapshot {
   } | null;
 }
 
-interface CartSignature {
-  lines: string[];
-  total: number;
-}
-
-function cartSignature(data: CartSnapshot | undefined): CartSignature {
+function toCartState(data: CartSnapshot | undefined): CartState {
   const order = data?.activeOrder;
   return {
-    lines: (order?.lines ?? []).map((line) => `${line.productVariant?.id ?? '?'}x${line.quantity}`).sort(),
+    lines: (order?.lines ?? []).flatMap((line) =>
+      line.productVariant?.id ? [{ variantId: line.productVariant.id, quantity: line.quantity }] : []
+    ),
     total: order?.totalWithTax ?? 0,
   };
 }
 
-const sameCart = (a: CartSignature, b: CartSignature) =>
-  a.total === b.total && a.lines.join(',') === b.lines.join(',');
-
-const CART_NOTICE = {
+const CART_NOTICE: Record<Exclude<CartReview, 'resume'>, string> = {
   merged: 'We added items saved in your account to this order. Review your cart, then continue to payment.',
+  partial: "Some items from your cart couldn't be kept when you signed in. Review your cart before continuing.",
   changed: 'Your cart changed when you signed in. Review it before continuing.',
-} as const;
+};
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -136,13 +137,16 @@ export default function CheckoutPage() {
   const [conflictDismissed, setConflictDismissed] = useState(false);
   const [resumeAfterSignIn, setResumeAfterSignIn] = useState(false);
   // Signing in can merge the account's saved cart into this order (Vendure merge strategy).
-  const [conflictCart, setConflictCart] = useState<CartSignature | null>(null);
-  const [cartNotice, setCartNotice] = useState<keyof typeof CART_NOTICE | null>(null);
+  const [conflictCart, setConflictCart] = useState<CartState | null>(null);
+  const [cartNotice, setCartNotice] = useState<Exclude<CartReview, 'resume'> | null>(null);
+  // Set when a different account signed in (e.g. in another tab) during the conflict.
+  const [signedInAsOther, setSignedInAsOther] = useState<string | null>(null);
   const [focusPaymentHeading, setFocusPaymentHeading] = useState(false);
   const focusAfterDialog = useRef<'email' | 'notice' | null>(null);
   const noticeSignInRef = useRef<HTMLButtonElement>(null);
   const paymentHeadingRef = useRef<HTMLHeadingElement>(null);
   const cartNoticeRef = useRef<HTMLDivElement>(null);
+  const accountNoticeRef = useRef<HTMLDivElement>(null);
 
   // Editing the email to another address clears the conflict.
   const conflictEmail =
@@ -216,12 +220,13 @@ export default function CheckoutPage() {
     const isResumedSubmit = resumeAfterSignIn;
     setResumeAfterSignIn(false);
     setCartNotice(null);
+    setSignedInAsOther(null);
     setFocusPaymentHeading(isResumedSubmit);
     const result = await processCheckout(data, selectedShippingMethod);
 
     if (!result.ok) {
       if (result.reason === 'email-conflict') {
-        setConflictCart(cartSignature(queryClient.getQueryData<CartSnapshot>(cartKeys.active())));
+        setConflictCart(toCartState(queryClient.getQueryData<CartSnapshot>(cartKeys.active())));
         setDialogEmail(data.emailAddress.trim());
         setDialogSession((session) => session + 1);
         setConflictDismissed(false);
@@ -242,6 +247,21 @@ export default function CheckoutPage() {
     }
   };
 
+  // Vendure's MergeOrdersStrategy can drop guest lines (e.g. the account's saved order is
+  // locked in ArrangingPayment). Add the missing quantities back, then review the fresh cart.
+  const restoreGuestCart = async (guestCart: CartState): Promise<CartReview> => {
+    const readCart = () => toCartState(queryClient.getQueryData<CartSnapshot>(cartKeys.active()));
+    const missing = missingGuestLines(guestCart.lines, readCart().lines);
+    if (missing.length > 0) {
+      await addCartLines(missing);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: cartKeys.all }),
+        queryClient.invalidateQueries({ queryKey: ['active-order'] }),
+      ]);
+    }
+    return reviewCartAfterSignIn(guestCart, readCart());
+  };
+
   const handleSignedIn = async () => {
     if (!conflictEmail) return;
     const expectedEmail = conflictEmail;
@@ -255,23 +275,26 @@ export default function CheckoutPage() {
     if (!signedIn) return;
 
     const session = queryClient.getQueryData<SessionSnapshot>(['auth-status']);
-    const accountEmail = session?.customer?.emailAddress || session?.user?.identifier;
-    toast.success(`Signed in as ${session?.customer?.firstName || accountEmail || expectedEmail}`);
+    const accountEmail = session?.customer?.emailAddress || session?.user?.identifier || '';
+    const review = cartBefore ? await restoreGuestCart(cartBefore) : 'changed';
 
-    // Signed in to a different account: close and let the shopper review.
-    if (normalizeEmail(accountEmail) !== normalizeEmail(expectedEmail)) return;
-
-    const cartAfter = cartSignature(queryClient.getQueryData<CartSnapshot>(cartKeys.active()));
-    if (!cartBefore || !sameCart(cartBefore, cartAfter)) {
-      const itemsAdded =
-        !!cartBefore &&
-        cartAfter.lines.length > cartBefore.lines.length &&
-        cartBefore.lines.every((line) => cartAfter.lines.includes(line));
-      setCartNotice(itemsAdded ? 'merged' : 'changed');
+    // A different account signed in (e.g. in another tab): the order now belongs to it.
+    if (normalizeEmail(accountEmail) !== normalizeEmail(expectedEmail)) {
+      if (accountEmail) {
+        setValue('emailAddress', accountEmail, { shouldDirty: true });
+        setSignedInAsOther(accountEmail);
+      }
+      if (review !== 'resume') setCartNotice(review);
       return;
     }
 
-    setResumeAfterSignIn(true);
+    toast.success(`Signed in as ${session?.customer?.firstName || accountEmail || expectedEmail}`);
+    if (review === 'resume') {
+      setResumeAfterSignIn(true);
+      return;
+    }
+    // Never auto-resume when the cart differs from what the shopper had as a guest.
+    setCartNotice(review);
   };
 
   const handleUseDifferentEmail = () => {
@@ -321,10 +344,10 @@ export default function CheckoutPage() {
   // Determine current step
   const currentStep = clientSecret ? CheckoutStep.PAYMENT : CheckoutStep.CUSTOMER_INFO;
 
-  // The dialog has just closed when the cart notice appears: give focus a home there.
+  // The dialog has just closed when a notice appears: give focus a home there.
   useEffect(() => {
-    if (cartNotice) cartNoticeRef.current?.focus();
-  }, [cartNotice]);
+    (accountNoticeRef.current ?? cartNoticeRef.current)?.focus();
+  }, [signedInAsOther, cartNotice]);
 
   // After a resumed submit lands on payment, keyboard and screen-reader focus follows.
   useEffect(() => {
@@ -378,6 +401,18 @@ export default function CheckoutPage() {
                         Sign in
                       </button>{' '}
                       or use a different email.
+                    </div>
+                  )}
+
+                  {signedInAsOther && (
+                    <div
+                      ref={accountNoticeRef}
+                      role="status"
+                      tabIndex={-1}
+                      className="outline-none rounded-lg border border-brand-cream bg-brand-cream/30 px-4 py-3 text-sm leading-relaxed text-brand-dark-blue"
+                    >
+                      You&apos;re signed in as <span className="font-medium break-words">{signedInAsOther}</span>
+                      {'. '}This order will be placed with that account.
                     </div>
                   )}
 

@@ -320,6 +320,8 @@ export function CheckoutSignInDialog({
     setRetryFailed(false);
     setNotConfirmedYet(false);
     setLinkResent(false);
+    // Drop the previous step's announcement (e.g. a wrong-password message).
+    setLiveMessage('');
     focusOnStepChange.current = true;
   };
 

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { CustomerFormData, ShippingMethod } from '@/lib/checkout/types';
+import type { CartLine } from '@/lib/checkout/sign-in-flow';
 
 // Query keys
 export const checkoutKeys = {
@@ -17,16 +18,23 @@ interface PaymentIntentData {
   currency?: string;
 }
 
-/** Error from a checkout API route that keeps the route's `code`. */
+/**
+ * Error from a checkout API route that keeps the route's `code` and HTTP `status`
+ * (the global React Query retry policy skips 4xx based on `status`).
+ */
 export class CheckoutApiError extends Error {
   code?: string;
+  status?: number;
 
-  constructor(message: string, code?: string) {
+  constructor(message: string, code?: string, status?: number) {
     super(message);
     this.name = 'CheckoutApiError';
     this.code = code;
+    this.status = status;
   }
 }
+
+const PAYMENT_START_ERROR = "We couldn't start the payment. Try again.";
 
 export type CheckoutResult =
   | { ok: true }
@@ -42,8 +50,8 @@ async function fetchShippingMethods(): Promise<{ eligibleShippingMethods: Shippi
   });
 
   if (!response.ok) {
-    const data = await response.json();
-    throw new Error(data.error || 'Failed to load shipping methods');
+    const data = await response.json().catch(() => ({}));
+    throw new CheckoutApiError(data.error || 'Failed to load shipping methods', data.code, response.status);
   }
 
   return response.json();
@@ -65,7 +73,7 @@ async function setCustomer(customerData: {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new CheckoutApiError(data.message || data.error || 'Failed to set customer', data.code);
+    throw new CheckoutApiError(data.message || data.error || 'Failed to set customer', data.code, response.status);
   }
 
   return data;
@@ -79,10 +87,10 @@ async function setShippingAddress(addressData: CustomerFormData): Promise<any> {
     body: JSON.stringify(addressData),
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data.error || 'Failed to set shipping address');
+    throw new CheckoutApiError(data.error || 'Failed to set shipping address', data.code, response.status);
   }
 
   return data;
@@ -96,10 +104,10 @@ async function setShippingMethod(shippingMethodId: string): Promise<any> {
     body: JSON.stringify({ shippingMethodIds: [shippingMethodId] }),
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data.error || 'Failed to set shipping method');
+    throw new CheckoutApiError(data.error || 'Failed to set shipping method', data.code, response.status);
   }
 
   return data;
@@ -112,18 +120,38 @@ async function createPaymentIntent(): Promise<PaymentIntentData> {
     headers: { 'Content-Type': 'application/json' },
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    const errorMsg = data.details || data.error || 'Failed to create payment intent';
-    throw new Error(errorMsg);
+    // `details` can be an array of GraphQL errors; only show a readable string.
+    const message = typeof data.message === 'string' && data.message.trim() ? data.message : PAYMENT_START_ERROR;
+    throw new CheckoutApiError(message, data.code, response.status);
   }
 
   if (!data.clientSecret) {
-    throw new Error('No client secret received');
+    throw new CheckoutApiError(PAYMENT_START_ERROR);
   }
 
   return data;
+}
+
+/**
+ * Adds cart lines back one at a time (each add may move the order back to
+ * AddingItems). Failures are ignored: callers refetch the cart and compare.
+ */
+export async function addCartLines(lines: CartLine[]): Promise<void> {
+  for (const line of lines) {
+    try {
+      await fetch('/api/cart/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ productVariantId: line.variantId, quantity: line.quantity }),
+      });
+    } catch {
+      // Network failure for this line: the refetched cart will show it as missing.
+    }
+  }
 }
 
 // Hooks
