@@ -86,11 +86,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
         const errorMessage = error.message || error.error?.message || error.error || 'Login failed';
-        const errorWithCode = new Error(errorMessage) as Error & { code?: string };
-        if (typeof error.code === 'string') {
-          errorWithCode.code = error.code;
-        }
-        throw errorWithCode;
+        // `status` lets the global mutation retry policy skip 4xx (wrong password, unverified).
+        throw Object.assign(new Error(errorMessage), {
+          status: response.status,
+          code: typeof error.code === 'string' ? error.code : undefined,
+        });
       }
 
       return response.json();
