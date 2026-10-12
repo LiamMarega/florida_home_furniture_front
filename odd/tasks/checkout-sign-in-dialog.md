@@ -30,6 +30,7 @@ The user wants a polished, in-checkout recovery: "terminar el sign in sin salir 
 - [x] T2 Reset page + return-to-checkout: `/profile/password-reset` page; `lib/checkout/return-to.ts`; verify page redirects to `/checkout` when flagged. Route: delegated (same writer).
 - [x] T3 Checkout dialog: conflict-aware `setCustomer`/`processCheckout`; `CheckoutSignInDialog`; page integration (auto-resume, dismissed notice, "Not you?" focuses email, address-overwrite guard); flow assert check. Route: delegated (same writer).
 - [x] T4 Verify: lint, tsc, build, flow check; visual pass on dialog states (mocked auth responses). Route: parent inline + independent verifier (native risk: high, RDD off).
+- [x] T7 Delivery: stacked-to-main chain #29 → #30 → #31 (+ independent docs PR #28); PR #27 closed as superseded. Route: parent inline (git/gh state).
 - [ ] T6 Live-backend E2E: real cart + Vendure (conflict, wrong password, unverified, reset email link, cross-tab return, cart-merge notice, dismissed notice, reduced motion).
 - [x] T5 Correction round (visual pass + independent verify). Route: delegated (same writer). Commit: `6d58f02` `fix(checkout): harden sign-in dialog after visual and review pass`.
   - [x] V1 Explicit `{' '}` after the email in multi-line JSX text (dialog unverified, forgot, reset-sent; reset page link-sent); SWC dropped the space ("…comhasn't").
@@ -56,8 +57,14 @@ The user wants a polished, in-checkout recovery: "terminar el sign in sin salir 
 - Typed shipping address survives sign-in.
 
 ## Delivery
-- Strategy: ask-on-risk (default). Forecast ~900 authored lines (actual ~2,250 incl. this doc), over the ~400 budget, so the chain-strategy question is asked before any PR. Work-unit commits per task on `LiamMarega/fix-admin-login-recovery`.
-- RDD: off (global), no native review.
+- Strategy: stacked PRs to `main` (chosen by the user as the recommended option on 2026-10-11): each slice lands on `main` in order and rolls back on its own. RDD off (global), no native review; independent verifier used instead.
+- Actual size ~2,084 authored lines (vs ~900 forecast). One honest slicing pass; slices over 400 carry `size:exception` with rationale in the PR body.
+- Slices (fixes from `6d58f02` folded into the slice they belong to; slice-3 tip is byte-identical to the verified feature files):
+  - #29 `feat/auth-email-recovery-api` (base `main`): auth routes, mutations, login code, plan doc. 421 lines.
+  - #30 `feat/password-reset-page` (base #29): reset page, return-to flag, verify redirect, `syncSession`, analytics token redaction. 546 lines, `size:exception`.
+  - #31 `feat/checkout-sign-in-dialog` (base #30): checkout hook, dialog, page integration, flow check, this doc. 1,117 lines, `size:exception` (dialog alone 709).
+  - #28 `docs/odd-plans-and-tooling` (base `main`, independent): other features' ODD plans, skill registry, `.codegraph/` ignore.
+- Merge order: #29 → retarget #30 to `main` → merge → retarget #31 → merge. #28 any time.
 
 ## Out of scope (follow-ups)
 - Backend `guestCheckoutStrategy.allowGuestCheckoutForRegisteredCustomers` (guest checkout for registered emails).
@@ -72,7 +79,8 @@ The user wants a polished, in-checkout recovery: "terminar el sign in sin salir 
 - 2026-10-09: T2 done (commit `d5bc78e` `feat(auth): password reset page and return to checkout`). `lib/checkout/return-to.ts` (mark/consume/clear, 2h TTL, guarded storage); auth context `syncSession()` awaits the auth-status refetch (plus cart/order invalidation) and returns signed-in state; verify page returns to `/checkout` when flagged and only opens the login modal when not signed in; new `/profile/password-reset` page (form, expired/invalid with new-link request, validation error inline, generic error). Checks: `npx tsc --noEmit` exit 0; `npx eslint` on touched dirs exit 0.
 - 2026-10-09: T3 done (commit `3e372e9` `feat(checkout): sign in from checkout when the email has an account`). `setCustomer` throws `CheckoutApiError` with `code`; `processCheckout` returns `{ ok } | { ok: false, reason }` (no rethrow), sets `emailConflict` on `EMAIL_ADDRESS_CONFLICT_ERROR` and no longer opens the global auth modal. Pure `lib/checkout/sign-in-flow.ts` (`resolveLoginResult`, `stepDirection`, cooldown) with assert check (RED: ERR_MODULE_NOT_FOUND before the module existed; GREEN after). `CheckoutSignInDialog` (5 steps, height + step motion, shake, reduced motion, focus on step change, resend cooldown, live region); it also watches `isAuthenticated` and refetches auth on focus/visibility while open, so cross-tab confirm/reset resumes checkout. Page: dialog per conflict, dismissed notice, "Not you?" focuses the email field, auto-resume via `useEffectEvent`, typed-address guard. Checks: flow check exit 0; `npx tsc --noEmit` exit 0; `npm run lint` exit 1 with only the 2 pre-existing errors (`components/conditional-back.tsx`, `components/header.tsx`); `npm run build` exit 0.
 - 2026-10-09: T4 done. `gentle-ai review assess` (14aa6a4..HEAD, committed-only): risk high (auth hot path), so an independent read-only verifier ran: no blockers, 1 major (cart merge on sign-in) + 8 minor, all fed into T5. Parent visual pass on a scratch page with mocked `/api/auth/*` (deleted after) at 1280px and 375px: sign-in, wrong password x2 (reset shortcut), forgot, reset sent, unverified, verification sent (cooldown ticks, not-confirmed note), success morph; `/profile/password-reset`. Found 4 visual defects (lost space after email, `break-all` splitting emails, duplicated email, reset card centered below the fold on mobile), fixed in T5; re-checked. Spot check: `npx tsc --noEmit` exit 0.
+- 2026-10-11: T7 done. Rebuilt the chain from `origin/main` (drops `51a1b78`, already on `main` as #26 `efad1f9`). Per slice: `npx tsc --noEmit` 0, `npm run build` 0, `npx eslint .` only the 2 baseline errors; flow check 0 on #31. Invariant: #31 tip vs old tip differs only in #28's docs/tooling paths. PRs #28-#31 opened; #27 closed with the chain map.
 - 2026-10-09: T5 done (commit `6d58f02` `fix(checkout): harden sign-in dialog after visual and review pass`). Checks: `npm run lint` exit 1 with only the 2 baseline errors (`components/conditional-back.tsx:16`, `components/header.tsx:37`); `npx tsc --noEmit` exit 0; flow check exit 0; `npm run build` exit 0 (prerender logs "HTTP 404 error from Vendure" because no `.env` points at the shop API; environmental, non-fatal). Dev smoke: form-encoded POST to reset-password 415, `null` JSON body 400; token redaction verified on sample URLs.
 
 ## Next step
-T6 live-backend E2E (needs a `.env` pointing at a Vendure shop API; avoid sending reset/verification emails to real customers). Then the chain-strategy decision before any PR.
+T6 on the Vercel preview of #31 with a real backend (manual plan in the #31 body), then merge #29 → #30 → #31 in order, retargeting each to `main`.
