@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint .",
     "stop": "pkill -f next || true",
-    "test:stripe": "node scripts/test-stripe-config.js"
+    "test:stripe": "node scripts/test-stripe-config.js",
+    "check:sitemap": "node scripts/check-sitemap-routes.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
