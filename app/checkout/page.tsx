@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { useForm } from 'react-hook-form';
+import { useEffect, useEffectEvent, useRef, useState, useCallback } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { toast } from 'sonner';
@@ -22,18 +23,60 @@ import { ShippingAddressSection } from '@/components/checkout/shipping-address-s
 import { BillingAddressSection } from '@/components/checkout/billing-address-section';
 import { ShippingMethodsSection } from '@/components/checkout/shipping-methods-section';
 import { AddressSelectorWithModal } from '@/components/checkout/address-selector';
+import { CheckoutSignInDialog } from '@/components/checkout/checkout-sign-in-dialog';
 
 // Hooks and types
-import { useShippingMethods, useCheckoutProcess } from '@/hooks/use-checkout';
+import { addCartLines, useShippingMethods, useCheckoutProcess } from '@/hooks/use-checkout';
+import {
+  missingGuestLines,
+  reviewCartAfterSignIn,
+  type CartReview,
+  type CartState,
+} from '@/lib/checkout/sign-in-flow';
+import { cartKeys } from '@/hooks/use-cart';
 import { customerSchema, CustomerFormData, CheckoutStep } from '@/lib/checkout/types';
 import { useSavedAddresses, addressToFormData, formDataToAddress } from '@/hooks/use-saved-addresses';
 import { UserAddress } from '@/app/profile/types';
+import { useAuth } from '@/contexts/auth-context';
 
 // Stripe configuration
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
+const normalizeEmail = (value?: string | null) => (value ?? '').trim().toLowerCase();
+
+// Minimal shapes of the cached auth-status and active-cart responses read after sign-in.
+interface SessionSnapshot {
+  user?: { identifier?: string } | null;
+  customer?: { firstName?: string; emailAddress?: string } | null;
+}
+
+interface CartSnapshot {
+  activeOrder?: {
+    totalWithTax?: number;
+    lines?: Array<{ quantity: number; productVariant?: { id: string } }>;
+  } | null;
+}
+
+function toCartState(data: CartSnapshot | undefined): CartState {
+  const order = data?.activeOrder;
+  return {
+    lines: (order?.lines ?? []).flatMap((line) =>
+      line.productVariant?.id ? [{ variantId: line.productVariant.id, quantity: line.quantity }] : []
+    ),
+    total: order?.totalWithTax ?? 0,
+  };
+}
+
+const CART_NOTICE: Record<Exclude<CartReview, 'resume'>, string> = {
+  merged: 'We added items saved in your account to this order. Review your cart, then continue to payment.',
+  partial: "Some items from your cart couldn't be kept when you signed in. Review your cart before continuing.",
+  changed: 'Your cart changed when you signed in. Review it before continuing.',
+};
+
 export default function CheckoutPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { isAuthenticated, syncSession } = useAuth();
 
   // Custom hooks for state management
   const {
@@ -49,6 +92,8 @@ export default function CheckoutPage() {
     orderCode,
     isProcessing,
     error: checkoutError,
+    emailConflict,
+    clearEmailConflict,
     processCheckout,
     resetCheckout,
   } = useCheckoutProcess();
@@ -72,6 +117,9 @@ export default function CheckoutPage() {
     handleSubmit,
     watch,
     setValue,
+    getValues,
+    setFocus,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
@@ -81,6 +129,29 @@ export default function CheckoutPage() {
       shippingMethodId: '',
     },
   });
+
+  // Existing-account email: offer sign-in instead of failing checkout.
+  const watchedEmail = useWatch({ control, name: 'emailAddress' });
+  const [dialogEmail, setDialogEmail] = useState<string | null>(null);
+  const [dialogSession, setDialogSession] = useState(0);
+  const [conflictDismissed, setConflictDismissed] = useState(false);
+  const [resumeAfterSignIn, setResumeAfterSignIn] = useState(false);
+  // Signing in can merge the account's saved cart into this order (Vendure merge strategy).
+  const [conflictCart, setConflictCart] = useState<CartState | null>(null);
+  const [cartNotice, setCartNotice] = useState<Exclude<CartReview, 'resume'> | null>(null);
+  // Set when a different account signed in (e.g. in another tab) during the conflict.
+  const [signedInAsOther, setSignedInAsOther] = useState<string | null>(null);
+  const [focusPaymentHeading, setFocusPaymentHeading] = useState(false);
+  const focusAfterDialog = useRef<'email' | 'notice' | null>(null);
+  const noticeSignInRef = useRef<HTMLButtonElement>(null);
+  const paymentHeadingRef = useRef<HTMLHeadingElement>(null);
+  const cartNoticeRef = useRef<HTMLDivElement>(null);
+  const accountNoticeRef = useRef<HTMLDivElement>(null);
+
+  // Editing the email to another address clears the conflict.
+  const conflictEmail =
+    emailConflict && normalizeEmail(watchedEmail) === normalizeEmail(emailConflict) ? emailConflict : null;
+  const signInDialogOpen = conflictEmail !== null && !conflictDismissed;
 
   // Handle address selection — declared before the effect below that calls it.
   const handleSelectAddress = useCallback((address: UserAddress) => {
@@ -100,6 +171,11 @@ export default function CheckoutPage() {
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (savedAddresses.length > 0 && !selectedAddressId && !showAddressForm) {
+      // Signing in mid-checkout loads saved addresses: keep an address the shopper already typed.
+      if (getValues('shippingStreetLine1')?.trim()) {
+        setShowAddressForm(true);
+        return;
+      }
       const defaultAddr = savedAddresses.find(a => a.isDefault) || savedAddresses[0];
       handleSelectAddress(defaultAddr);
     }
@@ -141,10 +217,26 @@ export default function CheckoutPage() {
 
   // Handle form submission
   const onSubmit = async (data: CustomerFormData) => {
-    await processCheckout(data, selectedShippingMethod);
+    const isResumedSubmit = resumeAfterSignIn;
+    setResumeAfterSignIn(false);
+    setCartNotice(null);
+    setSignedInAsOther(null);
+    setFocusPaymentHeading(isResumedSubmit);
+    const result = await processCheckout(data, selectedShippingMethod);
 
-    // Auto-save address if it's a new one and there's room
-    if (!selectedAddressId && canAddMore) {
+    if (!result.ok) {
+      if (result.reason === 'email-conflict') {
+        setConflictCart(toCartState(queryClient.getQueryData<CartSnapshot>(cartKeys.active())));
+        setDialogEmail(data.emailAddress.trim());
+        setDialogSession((session) => session + 1);
+        setConflictDismissed(false);
+      }
+      return;
+    }
+
+    // Auto-save address if it's a new one and there's room. Skipped right after
+    // signing in: the saved-address list may still be stale (duplicates, over the limit).
+    if (!isResumedSubmit && !selectedAddressId && canAddMore) {
       try {
         const addressData = formDataToAddress(data);
         await createAddress(addressData);
@@ -154,6 +246,90 @@ export default function CheckoutPage() {
       }
     }
   };
+
+  // Vendure's MergeOrdersStrategy can drop guest lines (e.g. the account's saved order is
+  // locked in ArrangingPayment). Add the missing quantities back, then review the fresh cart.
+  const restoreGuestCart = async (guestCart: CartState): Promise<CartReview> => {
+    const readCart = () => toCartState(queryClient.getQueryData<CartSnapshot>(cartKeys.active()));
+    const missing = missingGuestLines(guestCart.lines, readCart().lines);
+    if (missing.length > 0) {
+      await addCartLines(missing);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: cartKeys.all }),
+        queryClient.invalidateQueries({ queryKey: ['active-order'] }),
+      ]);
+    }
+    return reviewCartAfterSignIn(guestCart, readCart());
+  };
+
+  const handleSignedIn = async () => {
+    if (!conflictEmail) return;
+    const expectedEmail = conflictEmail;
+    const cartBefore = conflictCart;
+    focusAfterDialog.current = null;
+    clearEmailConflict();
+    setConflictDismissed(false);
+
+    // Fresh session, cart and addresses (awaited), never the pre-sign-in cache.
+    const signedIn = await syncSession();
+    if (!signedIn) return;
+
+    const session = queryClient.getQueryData<SessionSnapshot>(['auth-status']);
+    const accountEmail = session?.customer?.emailAddress || session?.user?.identifier || '';
+    const review = cartBefore ? await restoreGuestCart(cartBefore) : 'changed';
+
+    // A different account signed in (e.g. in another tab): the order now belongs to it.
+    if (normalizeEmail(accountEmail) !== normalizeEmail(expectedEmail)) {
+      if (accountEmail) {
+        setValue('emailAddress', accountEmail, { shouldDirty: true });
+        setSignedInAsOther(accountEmail);
+      }
+      if (review !== 'resume') setCartNotice(review);
+      return;
+    }
+
+    toast.success(`Signed in as ${session?.customer?.firstName || accountEmail || expectedEmail}`);
+    if (review === 'resume') {
+      setResumeAfterSignIn(true);
+      return;
+    }
+    // Never auto-resume when the cart differs from what the shopper had as a guest.
+    setCartNotice(review);
+  };
+
+  const handleUseDifferentEmail = () => {
+    focusAfterDialog.current = 'email';
+    clearEmailConflict();
+  };
+
+  const handleSignInDialogOpenChange = (open: boolean) => {
+    focusAfterDialog.current = open ? null : 'notice';
+    setConflictDismissed(!open);
+  };
+
+  const handleSignInDialogCloseAutoFocus = (event: Event) => {
+    event.preventDefault();
+    const target = focusAfterDialog.current;
+    focusAfterDialog.current = null;
+    if (target === 'email') {
+      setFocus('emailAddress', { shouldSelect: true });
+    } else if (target === 'notice') {
+      noticeSignInRef.current?.focus();
+    }
+  };
+
+  // After signing in, continue to payment without a second click.
+  const resumeCheckout = useEffectEvent(() => {
+    // The shopper may have continued manually while the session was syncing.
+    if (clientSecret || isProcessing || isSubmitting) return;
+    void handleSubmit(onSubmit, () => setResumeAfterSignIn(false))();
+  });
+
+  useEffect(() => {
+    if (resumeAfterSignIn && isAuthenticated) {
+      resumeCheckout();
+    }
+  }, [resumeAfterSignIn, isAuthenticated]);
 
   // Handle successful payment
   const handlePaid = (orderCode: string) => {
@@ -168,6 +344,18 @@ export default function CheckoutPage() {
   // Determine current step
   const currentStep = clientSecret ? CheckoutStep.PAYMENT : CheckoutStep.CUSTOMER_INFO;
 
+  // The dialog has just closed when a notice appears: give focus a home there.
+  useEffect(() => {
+    (accountNoticeRef.current ?? cartNoticeRef.current)?.focus();
+  }, [signedInAsOther, cartNotice]);
+
+  // After a resumed submit lands on payment, keyboard and screen-reader focus follows.
+  useEffect(() => {
+    if (currentStep === CheckoutStep.PAYMENT && focusPaymentHeading) {
+      paymentHeadingRef.current?.focus();
+    }
+  }, [currentStep, focusPaymentHeading]);
+
   // Whether to show the address form (always show if no saved addresses)
   const hasAddresses = savedAddresses.length > 0;
   const shouldShowForm = !hasAddresses || showAddressForm || selectedAddressId !== null;
@@ -179,7 +367,11 @@ export default function CheckoutPage() {
           {/* Main Content */}
           <div className="lg:col-span-2">
             <Card className="p-4 sm:p-8">
-              <h1 className="text-3xl font-bold text-brand-dark-blue mb-6 font-tango-sans">
+              <h1
+                ref={paymentHeadingRef}
+                tabIndex={-1}
+                className="text-3xl font-bold text-brand-dark-blue mb-6 font-tango-sans outline-none"
+              >
                 <User className="inline-block w-8 h-8 mr-2 mb-1" />
                 {currentStep === CheckoutStep.PAYMENT ? 'Payment' : 'Customer Information'}
               </h1>
@@ -194,6 +386,47 @@ export default function CheckoutPage() {
               {currentStep === CheckoutStep.CUSTOMER_INFO ? (
                 /* Customer Information Form */
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                  {conflictEmail && conflictDismissed && (
+                    <div
+                      role="status"
+                      className="rounded-lg border border-brand-cream bg-brand-cream/30 px-4 py-3 text-sm leading-relaxed text-brand-dark-blue"
+                    >
+                      <span className="font-medium break-words">{conflictEmail}</span> already has an account.{' '}
+                      <button
+                        ref={noticeSignInRef}
+                        type="button"
+                        onClick={() => handleSignInDialogOpenChange(true)}
+                        className="rounded-sm font-semibold underline underline-offset-4 hover:text-brand-dark-blue/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:ring-offset-2"
+                      >
+                        Sign in
+                      </button>{' '}
+                      or use a different email.
+                    </div>
+                  )}
+
+                  {signedInAsOther && (
+                    <div
+                      ref={accountNoticeRef}
+                      role="status"
+                      tabIndex={-1}
+                      className="outline-none rounded-lg border border-brand-cream bg-brand-cream/30 px-4 py-3 text-sm leading-relaxed text-brand-dark-blue"
+                    >
+                      You&apos;re signed in as <span className="font-medium break-words">{signedInAsOther}</span>
+                      {'. '}This order will be placed with that account.
+                    </div>
+                  )}
+
+                  {cartNotice && (
+                    <div
+                      ref={cartNoticeRef}
+                      role="status"
+                      tabIndex={-1}
+                      className="outline-none rounded-lg border border-brand-cream bg-brand-cream/30 px-4 py-3 text-sm leading-relaxed text-brand-dark-blue"
+                    >
+                      {CART_NOTICE[cartNotice]}
+                    </div>
+                  )}
+
                   <CustomerInfoSection register={register} errors={errors} />
 
                   <Separator />
@@ -286,6 +519,18 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
+
+      {dialogEmail && (
+        <CheckoutSignInDialog
+          key={dialogSession}
+          open={signInDialogOpen}
+          email={dialogEmail}
+          onOpenChange={handleSignInDialogOpenChange}
+          onSignedIn={handleSignedIn}
+          onUseDifferentEmail={handleUseDifferentEmail}
+          onCloseAutoFocus={handleSignInDialogCloseAutoFocus}
+        />
+      )}
     </div>
   );
 }
