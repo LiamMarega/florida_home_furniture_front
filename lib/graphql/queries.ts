@@ -424,6 +424,25 @@ export const GET_ACTIVE_ORDER_FOR_PAYMENT = gql`
   }
 `;
 
+// Payment methods enabled for the active order, with eligibility (e.g. Affirm min/max amount, US only)
+export const GET_ELIGIBLE_PAYMENT_METHODS = gql`
+  query EligiblePaymentMethods {
+    eligiblePaymentMethods {
+      code
+      name
+      isEligible
+      eligibilityMessage
+    }
+  }
+`;
+
+// affirm.js checkout object for the active order (built by the backend AffirmPlugin)
+export const GET_AFFIRM_CHECKOUT = gql`
+  query AffirmCheckout($confirmationUrl: String!, $cancelUrl: String!) {
+    affirmCheckout(confirmationUrl: $confirmationUrl, cancelUrl: $cancelUrl)
+  }
+`;
+
 export const AUTH_STATE_QUERY = gql`
   query AuthState {
     me {

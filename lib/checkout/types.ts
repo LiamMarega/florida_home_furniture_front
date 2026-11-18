@@ -42,6 +42,14 @@ export interface ShippingMethod {
   };
 }
 
+// Payment method offered for the active order (Vendure `eligiblePaymentMethods`)
+export interface EligiblePaymentMethod {
+  code: string;
+  name: string;
+  isEligible: boolean;
+  eligibilityMessage?: string | null;
+}
+
 // Payment step props
 export interface PaymentStepProps {
   clientSecret: string;

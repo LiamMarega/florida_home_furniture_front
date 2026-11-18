@@ -150,12 +150,25 @@ export const ADD_PAYMENT_TO_ORDER = gql`
   ${ORDER_FRAGMENT}
   mutation AddPaymentToOrder($input: PaymentInput!) {
     addPaymentToOrder(input: $input) {
+      __typename
       ... on Order {
         ...Order
       }
       ... on ErrorResult {
         errorCode
         message
+      }
+      ... on PaymentDeclinedError {
+        paymentErrorMessage
+      }
+      ... on PaymentFailedError {
+        paymentErrorMessage
+      }
+      ... on IneligiblePaymentMethodError {
+        eligibilityCheckerMessage
+      }
+      ... on OrderStateTransitionError {
+        transitionError
       }
     }
   }

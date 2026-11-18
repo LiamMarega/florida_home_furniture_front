@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchGraphQL } from '@/lib/vendure-server';
-import { GET_ACTIVE_ORDER_FOR_PAYMENT } from '@/lib/graphql/queries';
+import { GET_ACTIVE_ORDER_FOR_PAYMENT, GET_ELIGIBLE_PAYMENT_METHODS } from '@/lib/graphql/queries';
 import { TRANSITION_ORDER_TO_STATE, CREATE_STRIPE_PAYMENT_INTENT } from '@/lib/graphql/mutations';
 import { createErrorResponse, forwardCookies, HTTP_STATUS, ERROR_CODES } from '@/lib/api-utils';
+import { findAffirmPaymentMethod } from '@/lib/affirm';
+import type { EligiblePaymentMethod } from '@/lib/checkout/types';
 
 export async function POST(req: NextRequest) {
   try {
@@ -57,7 +59,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. Crear PaymentIntent usando la mutación de Vendure (StripePlugin)
+    // 3. Payment methods enabled for the order (Stripe, Affirm, ...). Not blocking: if this query
+    // fails, checkout continues with the card payment exactly as before.
+    const paymentMethodsRes = await fetchGraphQL<{ eligiblePaymentMethods?: EligiblePaymentMethod[] }>(
+      { query: GET_ELIGIBLE_PAYMENT_METHODS },
+      { req }
+    );
+    if (paymentMethodsRes.errors) {
+      console.error('Failed to load eligible payment methods:', paymentMethodsRes.errors[0]?.message);
+    }
+    const paymentMethods = paymentMethodsRes.data?.eligiblePaymentMethods ?? [];
+    // With an eligible Affirm method, a failed PaymentIntent no longer blocks checkout.
+    const affirmAvailable = findAffirmPaymentMethod(paymentMethods)?.isEligible === true;
+
+    // 4. Crear PaymentIntent usando la mutación de Vendure (StripePlugin)
     // El StripePlugin maneja la creación del PaymentIntent con los metadatos correctos
     // y el webhook de Vendure (/payments/stripe) manejará la confirmación del pago
     const paymentIntentRes = await fetchGraphQL(
@@ -65,7 +80,7 @@ export async function POST(req: NextRequest) {
       { req }
     );
 
-    if (paymentIntentRes.errors) {
+    if (paymentIntentRes.errors && !affirmAvailable) {
       return createErrorResponse(
         'Failed to create payment intent',
         paymentIntentRes.errors[0]?.message || 'Failed to create Stripe payment intent',
@@ -75,9 +90,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const clientSecret = paymentIntentRes.data?.createStripePaymentIntent;
-    
-    if (!clientSecret) {
+    const clientSecret: string | null = paymentIntentRes.data?.createStripePaymentIntent ?? null;
+
+    if (!clientSecret && !affirmAvailable) {
       return createErrorResponse(
         'No client secret',
         'Failed to get payment client secret from Stripe',
@@ -86,12 +101,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!clientSecret) {
+      console.error(
+        'Stripe PaymentIntent unavailable, offering Affirm only:',
+        paymentIntentRes.errors?.[0]?.message ?? 'no client secret'
+      );
+    }
+
     const res = NextResponse.json({
       clientSecret,
       orderCode: order.code,
+      paymentMethods,
     });
 
     forwardCookies(res, orderRes);
+    forwardCookies(res, paymentMethodsRes);
     forwardCookies(res, paymentIntentRes);
     return res;
   } catch (error) {

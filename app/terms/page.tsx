@@ -68,7 +68,11 @@ export default function TermsPage() {
                 total amount shown at checkout.
               </p>
               <p className="mt-2">
-                All transactions are processed securely through Stripe. Florida Home Furniture does not store
+                Eligible orders can also be paid over time with financing provided by Affirm, subject to
+                eligibility and to Affirm&apos;s own terms.
+              </p>
+              <p className="mt-2">
+                Card transactions are processed securely through Stripe. Florida Home Furniture does not store
                 your full card details. You are responsible for ensuring that the payment information provided
                 is accurate and belongs to you.
               </p>
@@ -125,8 +129,9 @@ export default function TermsPage() {
               <h2 className="text-[16px] font-semibold text-brand-dark-blue mb-3">8. Privacy</h2>
               <p>
                 We collect and process personal information solely for the purpose of fulfilling orders and
-                improving our service. We do not sell your data to third parties. Payment data is handled
-                entirely by Stripe in compliance with PCI DSS standards.
+                improving our service. We do not sell your data to third parties. Card payment data is handled
+                entirely by Stripe in compliance with PCI DSS standards; pay-over-time financing is handled by
+                Affirm.
               </p>
             </section>
 

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CheckCircle2, XCircle, Clock, AlertTriangle, ArrowRight, Loader2, RefreshCw } from 'lucide-react';
+import { AFFIRM_PAYMENT_METHOD_CODE } from '@/lib/affirm';
 
 // Order states that indicate successful payment
 const SUCCESS_STATES = ['PaymentAuthorized', 'PaymentSettled', 'Shipped', 'PartiallyShipped', 'Delivered', 'PartiallyDelivered'];
@@ -200,6 +201,11 @@ export default function ConfirmationPage() {
 
   // Success state
   if (displayStatus === 'success') {
+    // Affirm orders arrive here without Stripe's payment_intent / redirect_status params
+    const paidWithAffirm = order?.payments?.some(
+      p => p.method === AFFIRM_PAYMENT_METHOD_CODE && (p.state === 'Settled' || p.state === 'Authorized')
+    );
+
     return (
       <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white pt-28 pb-12 flex items-center justify-center">
         <div className="max-w-2xl mx-auto px-4 w-full">
@@ -231,6 +237,12 @@ export default function ConfirmationPage() {
                 <>
                   <p className="text-sm text-brand-dark-blue/60 mt-4 mb-2">Payment ID</p>
                   <p className="text-sm font-mono text-brand-dark-blue/80">{paymentIntent}</p>
+                </>
+              )}
+              {paidWithAffirm && (
+                <>
+                  <p className="text-sm text-brand-dark-blue/60 mt-4 mb-2">Payment Method</p>
+                  <p className="text-sm font-medium text-brand-dark-blue/80">Paid with Affirm</p>
                 </>
               )}
             </div>

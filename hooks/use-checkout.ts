@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { CustomerFormData, ShippingMethod } from '@/lib/checkout/types';
+import { CustomerFormData, EligiblePaymentMethod, ShippingMethod } from '@/lib/checkout/types';
+import { findAffirmPaymentMethod } from '@/lib/affirm';
 
 // Query keys
 export const checkoutKeys = {
@@ -11,8 +12,10 @@ export const checkoutKeys = {
 
 // Types
 interface PaymentIntentData {
-  clientSecret: string;
+  // Null when the Stripe PaymentIntent is unavailable but Affirm can still be used
+  clientSecret: string | null;
   orderCode: string;
+  paymentMethods: EligiblePaymentMethod[];
   amount?: number;
   currency?: string;
 }
@@ -102,11 +105,13 @@ async function createPaymentIntent(): Promise<PaymentIntentData> {
     throw new Error(errorMsg);
   }
 
-  if (!data.clientSecret) {
+  const paymentMethods: EligiblePaymentMethod[] = Array.isArray(data.paymentMethods) ? data.paymentMethods : [];
+
+  if (!data.clientSecret && !findAffirmPaymentMethod(paymentMethods)?.isEligible) {
     throw new Error('No client secret received');
   }
 
-  return data;
+  return { ...data, clientSecret: data.clientSecret || null, paymentMethods };
 }
 
 // Hooks
@@ -127,6 +132,7 @@ export function useCheckoutProcess() {
   const { openAuthModal, isAuthenticated } = useAuth();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderCode, setOrderCode] = useState<string | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<EligiblePaymentMethod[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const setCustomerMutation = useMutation({
@@ -198,6 +204,7 @@ export function useCheckoutProcess() {
         // Create payment intent
         const paymentIntent = await createPaymentIntentMutation.mutateAsync();
         setClientSecret(paymentIntent.clientSecret);
+        setPaymentMethods(paymentIntent.paymentMethods);
         setOrderCode(paymentIntent.orderCode);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An error occurred during checkout';
@@ -211,12 +218,14 @@ export function useCheckoutProcess() {
   const resetCheckout = useCallback(() => {
     setClientSecret(null);
     setOrderCode(null);
+    setPaymentMethods([]);
     setError(null);
   }, []);
 
   return {
     clientSecret,
     orderCode,
+    paymentMethods,
     isProcessing:
       setCustomerMutation.isPending ||
       setShippingAddressMutation.isPending ||

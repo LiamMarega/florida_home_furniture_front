@@ -235,6 +235,8 @@ florida_home_front/
 | `NEXT_PUBLIC_SITE_URL` | Public site URL | `http://localhost:3001` |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key | `pk_test_...` |
 | `STRIPE_SECRET_KEY` | Stripe secret key (server-side only) | `sk_test_...` |
+| `NEXT_PUBLIC_AFFIRM_PUBLIC_KEY` | Affirm public API key; empty hides Affirm (see [Affirm](#affirm-pay-over-time)) | empty |
+| `NEXT_PUBLIC_AFFIRM_ENV` | `sandbox` loads the sandbox affirm.js; anything else loads production | `sandbox` |
 
 ### Next.js Configuration
 
@@ -723,6 +725,41 @@ export const config: VendureConfig = {
   ],
 };
 ```
+
+### Affirm (Pay Over Time)
+
+Affirm is offered next to Stripe for eligible US orders, through Affirm's Direct API: the backend
+`AffirmPlugin` builds the checkout object and authorizes, captures, voids and refunds; the storefront
+opens the affirm.js modal and hands the checkout token back to Vendure.
+
+**Enable it**
+
+1. In the Vendure dashboard, create a PaymentMethod with code **`affirm`**, handler **Affirm** and
+   checker **Affirm eligibility**, and set its sandbox toggle, public/private keys, auto capture and
+   min/max amounts. The private key stays there and never reaches the storefront.
+2. Set `NEXT_PUBLIC_AFFIRM_PUBLIC_KEY` (same key pair and environment as that PaymentMethod) and
+   `NEXT_PUBLIC_AFFIRM_ENV` (`sandbox` or `production`), then rebuild: `NEXT_PUBLIC_*` values are
+   inlined at build time. With an empty key every Affirm option is hidden.
+
+**Flow**
+
+1. `POST /api/checkout/payment-intent` also returns `paymentMethods` (`eligiblePaymentMethods`). The
+   payment step offers "Credit or debit card" when a Stripe client secret exists and "Affirm" when the
+   key is set and an `affirm` method is listed (disabled, with its eligibility message, when the order
+   is not eligible). If the PaymentIntent fails but Affirm is eligible, checkout continues with Affirm.
+2. "Continue with Affirm" loads affirm.js (`lib/affirm.ts`) and gets the checkout object from
+   `GET /api/checkout/affirm` (Shop API `affirmCheckout`), then opens the modal.
+3. On success the token goes to `POST /api/checkout/affirm`, which calls
+   `addPaymentToOrder({ method: "affirm", metadata: { checkoutToken } })`, and the customer lands on
+   `/checkout/confirmation/<orderCode>`. A decline keeps the customer in checkout with a message; when
+   Affirm is unreachable the same token is retried once (authorizing is idempotent per order and token).
+4. Redirect fallback: if affirm.js submits to the checkout object's `user_confirmation_url` instead of
+   calling `onSuccess`, `GET /api/checkout/affirm/confirm?checkout_token=...` adds the payment and
+   redirects to the confirmation page, or back to `/checkout?affirm=failed` (or `?affirm=check` when
+   the order is no longer awaiting payment). A cancelled checkout returns to `/checkout?affirm=cancelled`.
+
+**Testing** needs Affirm sandbox keys (`NEXT_PUBLIC_AFFIRM_ENV=sandbox` plus the PaymentMethod's sandbox
+toggle). Never test with production keys: every authorization there is a real loan.
 
 ### Security Best Practices
 

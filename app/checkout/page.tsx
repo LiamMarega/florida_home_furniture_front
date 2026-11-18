@@ -1,11 +1,9 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { Suspense, useEffect, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements } from '@stripe/react-stripe-js';
 import { toast } from 'sonner';
 
 // Components
@@ -15,7 +13,8 @@ import { Separator } from '@/components/ui/separator';
 import { ArrowRight, User } from 'lucide-react';
 
 // Checkout components
-import { PaymentStep } from '@/components/checkout/payment-step';
+import { PaymentMethodSelector } from '@/components/checkout/payment-method-selector';
+import { AffirmReturnNotice } from '@/components/checkout/affirm-payment';
 import { OrderSummary } from '@/components/checkout/order-summary';
 import { CustomerInfoSection } from '@/components/checkout/customer-info-section';
 import { ShippingAddressSection } from '@/components/checkout/shipping-address-section';
@@ -28,9 +27,6 @@ import { useShippingMethods, useCheckoutProcess } from '@/hooks/use-checkout';
 import { customerSchema, CustomerFormData, CheckoutStep } from '@/lib/checkout/types';
 import { useSavedAddresses, addressToFormData, formDataToAddress } from '@/hooks/use-saved-addresses';
 import { UserAddress } from '@/app/profile/types';
-
-// Stripe configuration
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -47,6 +43,7 @@ export default function CheckoutPage() {
   const {
     clientSecret,
     orderCode,
+    paymentMethods,
     isProcessing,
     error: checkoutError,
     processCheckout,
@@ -165,8 +162,8 @@ export default function CheckoutPage() {
     resetCheckout();
   };
 
-  // Determine current step
-  const currentStep = clientSecret ? CheckoutStep.PAYMENT : CheckoutStep.CUSTOMER_INFO;
+  // Determine current step (the order code is set once the order is ready for payment)
+  const currentStep = orderCode ? CheckoutStep.PAYMENT : CheckoutStep.CUSTOMER_INFO;
 
   // Whether to show the address form (always show if no saved addresses)
   const hasAddresses = savedAddresses.length > 0;
@@ -190,6 +187,11 @@ export default function CheckoutPage() {
                   <p className="text-red-600 text-sm">{checkoutError}</p>
                 </div>
               )}
+
+              {/* Notice after Affirm's redirect fallback returns here (?affirm=...) */}
+              <Suspense fallback={null}>
+                <AffirmReturnNotice />
+              </Suspense>
 
               {currentStep === CheckoutStep.CUSTOMER_INFO ? (
                 /* Customer Information Form */
@@ -266,11 +268,15 @@ export default function CheckoutPage() {
                   </Button>
                 </form>
               ) : (
-                /* Payment Step */
-                clientSecret && orderCode && typeof clientSecret === 'string' && clientSecret.trim() !== '' ? (
-                  <Elements stripe={stripePromise} options={{ clientSecret }}>
-                    <PaymentStep clientSecret={clientSecret} orderCode={orderCode} onPaid={handlePaid} onBack={handleBack} />
-                  </Elements>
+                /* Payment Step: card (Stripe) and/or Affirm, depending on what the order can use */
+                orderCode ? (
+                  <PaymentMethodSelector
+                    clientSecret={clientSecret}
+                    orderCode={orderCode}
+                    paymentMethods={paymentMethods}
+                    onPaid={handlePaid}
+                    onBack={handleBack}
+                  />
                 ) : (
                   <div className="text-center py-8">
                     <p className="text-gray-600">Loading payment form...</p>
