@@ -24,6 +24,7 @@ import { AddressSelectorWithModal } from '@/components/checkout/address-selector
 
 // Hooks and types
 import { useShippingMethods, useCheckoutProcess } from '@/hooks/use-checkout';
+import { useCart } from '@/contexts/cart-context';
 import { customerSchema, CustomerFormData, CheckoutStep } from '@/lib/checkout/types';
 import { useSavedAddresses, addressToFormData, formDataToAddress } from '@/hooks/use-saved-addresses';
 import { UserAddress } from '@/app/profile/types';
@@ -49,6 +50,9 @@ export default function CheckoutPage() {
     processCheckout,
     resetCheckout,
   } = useCheckoutProcess();
+
+  // Active order (same data as the order summary); its total feeds Affirm's payment messaging
+  const { order: cartOrder } = useCart();
 
   // Address persistence
   const {
@@ -274,6 +278,7 @@ export default function CheckoutPage() {
                     clientSecret={clientSecret}
                     orderCode={orderCode}
                     paymentMethods={paymentMethods}
+                    orderTotal={cartOrder?.totalWithTax}
                     onPaid={handlePaid}
                     onBack={handleBack}
                   />

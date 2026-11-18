@@ -758,6 +758,11 @@ opens the affirm.js modal and hands the checkout token back to Vendure.
    redirects to the confirmation page, or back to `/checkout?affirm=failed` (or `?affirm=check` when
    the order is no longer awaiting payment). A cancelled checkout returns to `/checkout?affirm=cancelled`.
 
+**Promotional messaging**: `components/affirm/affirm-promo.tsx` renders Affirm's "As low as $X/mo"
+messaging (`affirm-as-low-as`, amount in cents) under the product price, next to the totals in the cart
+drawer and on the cart page, and on the Affirm payment option at checkout. affirm.js fills it in after the
+page loads; it is hidden when `NEXT_PUBLIC_AFFIRM_PUBLIC_KEY` is unset.
+
 **Testing** needs Affirm sandbox keys (`NEXT_PUBLIC_AFFIRM_ENV=sandbox` plus the PaymentMethod's sandbox
 toggle). Never test with production keys: every authorization there is a real loan.
 

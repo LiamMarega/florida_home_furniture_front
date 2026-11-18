@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { AddToCartButton } from '@/components/cart/add-to-cart-button';
+import { AffirmPromo } from '@/components/affirm/affirm-promo';
 import { ShoppingCart, Heart, Share2, Truck, Shield, RotateCcw, MessageCircle } from 'lucide-react';
 import { fadeInUp } from '@/lib/animations';
 import { toast } from 'sonner';
@@ -141,6 +142,8 @@ export function ProductDetails({ product }: ProductDetailsProps) {
           </div>
         )}
 
+        {/* Affirm "As low as" messaging for the displayed price (hidden when Affirm is not configured) */}
+        <AffirmPromo amount={price} pageType="product" sku={mainVariant?.sku} className="-mt-2 mb-4" />
       </div>
 
       {/* Product Description */}

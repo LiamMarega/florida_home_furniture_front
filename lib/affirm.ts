@@ -77,6 +77,8 @@ export interface Affirm {
   checkout: AffirmCheckout;
   ui: {
     ready: (callback: () => void) => void;
+    /** Re-renders every `.affirm-as-low-as` element (promotional messaging). Absent on the pre-load stub. */
+    refresh?: () => void;
   };
 }
 

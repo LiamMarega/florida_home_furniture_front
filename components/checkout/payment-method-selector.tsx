@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { PaymentStep } from '@/components/checkout/payment-step';
 import { AffirmPayment } from '@/components/checkout/affirm-payment';
+import { AffirmPromo } from '@/components/affirm/affirm-promo';
 import { findAffirmPaymentMethod } from '@/lib/affirm';
 import { getStripe } from '@/lib/stripe';
 import { EligiblePaymentMethod } from '@/lib/checkout/types';
@@ -27,6 +28,8 @@ interface PaymentMethodSelectorProps {
   clientSecret: string | null;
   orderCode: string;
   paymentMethods: EligiblePaymentMethod[];
+  // Order total in cents, for Affirm's "As low as" messaging
+  orderTotal?: number;
   onPaid: (orderCode: string) => void;
   onBack: () => void;
 }
@@ -35,6 +38,7 @@ export function PaymentMethodSelector({
   clientSecret,
   orderCode,
   paymentMethods,
+  orderTotal,
   onPaid,
   onBack,
 }: PaymentMethodSelectorProps) {
@@ -99,26 +103,36 @@ export function PaymentMethodSelector({
           {options.map((option) => {
             const id = `payment-method-${option.value}`;
             return (
-              <Label
+              <div
                 key={option.value}
-                htmlFor={id}
                 className={cn(
-                  'flex items-start gap-3 rounded-lg border p-4 leading-normal transition-colors',
-                  option.disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+                  'rounded-lg border transition-colors',
                   current === option.value
                     ? 'border-brand-primary bg-brand-primary/5'
                     : 'border-gray-200 hover:border-gray-300'
                 )}
               >
-                <RadioGroupItem id={id} value={option.value} disabled={option.disabled} className="mt-1" />
-                <span className="flex-1">
-                  <span className="flex items-center gap-2 text-base font-medium text-brand-dark-blue">
-                    {option.value === 'card' && <CreditCard className="w-4 h-4" aria-hidden="true" />}
-                    {option.label}
+                <Label
+                  htmlFor={id}
+                  className={cn(
+                    'flex items-start gap-3 p-4 leading-normal',
+                    option.disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                  )}
+                >
+                  <RadioGroupItem id={id} value={option.value} disabled={option.disabled} className="mt-1" />
+                  <span className="flex-1">
+                    <span className="flex items-center gap-2 text-base font-medium text-brand-dark-blue">
+                      {option.value === 'card' && <CreditCard className="w-4 h-4" aria-hidden="true" />}
+                      {option.label}
+                    </span>
+                    <span className="block text-sm font-normal text-brand-dark-blue/70">{option.description}</span>
                   </span>
-                  <span className="block text-sm font-normal text-brand-dark-blue/70">{option.description}</span>
-                </span>
-              </Label>
+                </Label>
+                {/* Outside the label: Affirm's messaging contains its own "Learn more" link */}
+                {option.value === 'affirm' && !option.disabled && (
+                  <AffirmPromo amount={orderTotal} pageType="payment" className="-mt-2 pb-4 pl-11 pr-4" />
+                )}
+              </div>
             );
           })}
         </RadioGroup>
@@ -129,7 +143,15 @@ export function PaymentMethodSelector({
           <PaymentStep clientSecret={cardClientSecret} orderCode={orderCode} onPaid={onPaid} onBack={onBack} />
         </Elements>
       )}
-      {current === 'affirm' && <AffirmPayment orderCode={orderCode} onPaid={onPaid} onBack={onBack} />}
+      {current === 'affirm' && (
+        <AffirmPayment
+          orderCode={orderCode}
+          // Without the chooser, the messaging moves into the Affirm panel
+          promoAmount={options.length > 1 ? undefined : orderTotal}
+          onPaid={onPaid}
+          onBack={onBack}
+        />
+      )}
     </div>
   );
 }

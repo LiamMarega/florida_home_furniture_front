@@ -8,6 +8,7 @@ import { useCart } from '@/contexts/cart-context';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CartDrawerItem } from './cart-drawer-item';
+import { AffirmPromo } from '@/components/affirm/affirm-promo';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 interface CartDrawerProps {
@@ -175,6 +176,9 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               <p className="text-xs text-brand-dark-blue/70 text-center">
                 Tax included, shipping at checkout
               </p>
+
+              {/* Affirm "As low as" messaging for the subtotal */}
+              <AffirmPromo amount={order?.totalWithTax} pageType="cart" className="min-h-4 text-xs text-center" />
 
               {/* Checkout Button */}
               <Button

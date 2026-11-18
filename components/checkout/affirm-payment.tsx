@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
+import { AffirmPromo } from '@/components/affirm/affirm-promo';
 import { cartKeys } from '@/hooks/use-cart';
 import { getAffirmPublicConfig, loadAffirm, type Affirm, type AffirmCheckoutSuccess } from '@/lib/affirm';
 import { cn } from '@/lib/utils';
@@ -18,6 +19,8 @@ const VALIDATION_FALLBACK_MESSAGE =
 
 interface AffirmPaymentProps {
   orderCode: string;
+  // Order total in cents for "As low as" messaging; omitted when the payment option already shows it
+  promoAmount?: number;
   onPaid: (orderCode: string) => void;
   onBack: () => void;
 }
@@ -71,7 +74,7 @@ function validationMessage(validationError: unknown): string {
   return typeof message === 'string' && message.trim() ? message : VALIDATION_FALLBACK_MESSAGE;
 }
 
-export function AffirmPayment({ orderCode, onPaid, onBack }: AffirmPaymentProps) {
+export function AffirmPayment({ orderCode, promoAmount, onPaid, onBack }: AffirmPaymentProps) {
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -161,6 +164,7 @@ export function AffirmPayment({ orderCode, onPaid, onBack }: AffirmPaymentProps)
           Pay over time with Affirm. You&apos;ll be redirected to Affirm to complete your purchase securely;
           subject to eligibility check.
         </p>
+        <AffirmPromo amount={promoAmount} pageType="payment" className="mt-2" />
       </div>
       {error && (
         <div role="alert" className="p-4 bg-red-50 border border-red-200 rounded-lg">

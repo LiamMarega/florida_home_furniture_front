@@ -2,6 +2,7 @@
 
 import { useCart } from '@/contexts/cart-context';
 import { CartItem } from './cart-item';
+import { AffirmPromo } from '@/components/affirm/affirm-promo';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -108,6 +109,8 @@ export function CartPage() {
                     {order && formatPrice(order.totalWithTax, order.currencyCode)}
                   </span>
                 </div>
+                {/* Affirm "As low as" messaging for the total */}
+                <AffirmPromo amount={order?.totalWithTax} pageType="cart" className="mt-2 text-right" />
               </div>
             </div>
 
