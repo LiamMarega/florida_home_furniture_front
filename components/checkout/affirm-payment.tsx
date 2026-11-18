@@ -77,14 +77,14 @@ function validationMessage(validationError: unknown): string {
 export function AffirmPayment({ orderCode, promoAmount, onPaid, onBack }: AffirmPaymentProps) {
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ message: string; tone: 'error' | 'info' } | null>(null);
   // Blocks a second click before the disabled state has rendered.
   const busyRef = useRef(false);
 
-  const stop = (message: string) => {
+  const stop = (message: string, tone: 'error' | 'info' = 'error') => {
     busyRef.current = false;
     setBusy(false);
-    setError(message);
+    setFeedback({ message, tone });
   };
 
   const goToConfirmation = (paidOrderCode: string) => {
@@ -117,7 +117,7 @@ export function AffirmPayment({ orderCode, promoAmount, onPaid, onBack }: Affirm
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
-    setError(null);
+    setFeedback(null);
 
     let affirm: Affirm;
     let checkout: Record<string, unknown>;
@@ -145,7 +145,8 @@ export function AffirmPayment({ orderCode, promoAmount, onPaid, onBack }: Affirm
           }
           completePayment(checkoutToken).catch(() => stop(PAYMENT_FAILED_MESSAGE));
         },
-        onFail: () => stop(NOT_COMPLETED_MESSAGE),
+        // Closed, cancelled or not approved by Affirm: informational, not an error on our side.
+        onFail: () => stop(NOT_COMPLETED_MESSAGE, 'info'),
         onValidationError: (validationError) => {
           console.warn('Affirm checkout validation error:', validationError);
           stop(validationMessage(validationError));
@@ -161,14 +162,22 @@ export function AffirmPayment({ orderCode, promoAmount, onPaid, onBack }: Affirm
     <div className="space-y-4">
       <div className="rounded-lg border border-gray-200 p-4">
         <p className="text-sm text-brand-dark-blue/80">
-          Pay over time with Affirm. You&apos;ll be redirected to Affirm to complete your purchase securely;
-          subject to eligibility check.
+          Pay over time with Affirm. Affirm opens in a secure window to complete your purchase; subject to
+          eligibility check.
         </p>
         <AffirmPromo amount={promoAmount} pageType="payment" className="mt-2" />
       </div>
-      {error && (
-        <div role="alert" className="p-4 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-600 text-sm">{error}</p>
+      {feedback && (
+        <div
+          role={feedback.tone === 'error' ? 'alert' : 'status'}
+          className={cn(
+            'p-4 border rounded-lg',
+            feedback.tone === 'error' ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
+          )}
+        >
+          <p className={cn('text-sm', feedback.tone === 'error' ? 'text-red-600' : 'text-amber-800')}>
+            {feedback.message}
+          </p>
         </div>
       )}
       <div className="flex gap-3">

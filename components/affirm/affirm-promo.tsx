@@ -51,7 +51,12 @@ export function AffirmPromo({ amount, pageType, sku, className }: AffirmPromoPro
 
   return (
     <p
-      className={cn('affirm-as-low-as min-h-5 text-sm text-brand-dark-blue/70', className)}
+      // /80 keeps text contrast above 4.5:1 on white and light-gray summaries; Affirm injects the
+      // "Learn more" link, so it is underlined from here.
+      className={cn(
+        'affirm-as-low-as min-h-5 text-sm text-brand-dark-blue/80 [&_a]:underline [&_a]:underline-offset-2',
+        className
+      )}
       data-page-type={pageType}
       data-amount={amount}
       data-sku={sku || undefined}
