@@ -15,7 +15,7 @@ import {
 } from '@/lib/checkout/affirm-session';
 import { AFFIRM_PAYMENT_FAILED_MESSAGE, finishAffirmPayment } from '@/lib/checkout/affirm-token';
 import type { PaymentAttemptHandlers } from '@/lib/checkout/types';
-import { readableApiError } from '@/lib/checkout/utils';
+import { affirmValidationMessage, readableApiError } from '@/lib/checkout/utils';
 import { cn } from '@/lib/utils';
 
 const UNAVAILABLE_MESSAGE = 'Affirm is unavailable right now. Please choose another payment method.';
@@ -51,14 +51,6 @@ async function fetchAffirmCheckout(): Promise<Record<string, unknown>> {
     throw new Error(readableApiError(data, UNAVAILABLE_MESSAGE));
   }
   return data.checkout;
-}
-
-function validationMessage(validationError: unknown): string {
-  const message =
-    validationError && typeof validationError === 'object' && 'message' in validationError
-      ? (validationError as { message?: unknown }).message
-      : undefined;
-  return typeof message === 'string' && message.trim() ? message : VALIDATION_FALLBACK_MESSAGE;
 }
 
 export function AffirmPayment({
@@ -188,7 +180,7 @@ export function AffirmPayment({
         onFail: () => stop(NOT_COMPLETED_MESSAGE, 'info'),
         onValidationError: (validationError) => {
           console.warn('Affirm checkout validation error:', validationError);
-          stop(validationMessage(validationError));
+          stop(affirmValidationMessage(validationError, VALIDATION_FALLBACK_MESSAGE));
         },
       });
     } catch (err) {

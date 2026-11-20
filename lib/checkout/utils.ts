@@ -105,3 +105,33 @@ export const formatPhoneNumber = (phone: string): string => {
   }
   return phone;
 };
+
+/** What the fields Affirm names in a validation error ("billing.zipcode") are called on the checkout form. */
+const AFFIRM_FIELD_NAMES: Record<string, string> = {
+  zipcode: 'ZIP code',
+  state: 'state',
+  city: 'city',
+  line1: 'street address',
+  phone_number: 'phone number',
+  email: 'email',
+};
+
+/**
+ * A readable message for affirm.js `onValidationError`: the fields Affirm refused, by their form names (its own
+ * message is then a bare "Invalid Request"); otherwise Affirm's message, or `fallback`.
+ */
+export function affirmValidationMessage(validationError: unknown, fallback: string): string {
+  const { message, fields } =
+    validationError && typeof validationError === 'object'
+      ? (validationError as { message?: unknown; fields?: unknown })
+      : {};
+  const names = Array.isArray(fields)
+    ? [...new Set(fields.map((field) => AFFIRM_FIELD_NAMES[String(field).split('.').pop() ?? '']).filter(Boolean))]
+    : [];
+  if (names.length > 0) {
+    const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0];
+    return `Affirm could not verify your ${list}. Please check your details or choose another payment method.`;
+  }
+  const text = typeof message === 'string' ? message.trim() : '';
+  return text && text !== 'Invalid Request' ? text : fallback;
+}

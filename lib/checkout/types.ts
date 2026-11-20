@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+/** `12345` or `12345-6789`: the store ships within the US only, and Affirm refuses any other postal code. */
+const US_ZIP_CODE = /^\d{5}(-\d{4})?$/;
+const ZIP_CODE_MESSAGE = 'Enter a valid 5-digit ZIP code';
+
 // Form validation schema
 export const customerSchema = z.object({
   emailAddress: z.string().email('Invalid email address'),
@@ -11,7 +15,7 @@ export const customerSchema = z.object({
   shippingStreetLine2: z.string().optional(),
   shippingCity: z.string().min(2, 'City is required'),
   shippingProvince: z.string().min(2, 'State/Province is required'),
-  shippingPostalCode: z.string().min(3, 'Postal code is required'),
+  shippingPostalCode: z.string().trim().regex(US_ZIP_CODE, ZIP_CODE_MESSAGE),
   shippingCountry: z.string(),
   shippingPhoneNumber: z.string().min(10, 'Phone number is required'),
 
@@ -26,6 +30,17 @@ export const customerSchema = z.object({
   billingPhoneNumber: z.string().optional(),
 
   shippingMethodId: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.billingSameAsShipping) return;
+  // A separate billing address must be complete: payment providers such as Affirm refuse a partial one.
+  const need = (ok: boolean, path: string, message: string) => {
+    if (!ok) ctx.addIssue({ code: 'custom', path: [path], message });
+  };
+  const length = (value: string | undefined) => (value ?? '').trim().length;
+  need(length(data.billingStreetLine1) >= 5, 'billingStreetLine1', 'Street address is required');
+  need(length(data.billingCity) >= 2, 'billingCity', 'City is required');
+  need(length(data.billingProvince) >= 2, 'billingProvince', 'State/Province is required');
+  need(US_ZIP_CODE.test((data.billingPostalCode ?? '').trim()), 'billingPostalCode', ZIP_CODE_MESSAGE);
 });
 
 export type CustomerFormData = z.infer<typeof customerSchema>;
