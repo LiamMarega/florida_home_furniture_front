@@ -27,7 +27,8 @@ function normalizeAddressBody(raw: any) {
         city: raw.billingCity,
         province: raw.billingProvince,
         postalCode: raw.billingPostalCode,
-        countryCode: raw.billingCountry,
+        // The billing form has no country input; the store ships within the US only.
+        countryCode: raw.billingCountry || raw.shippingCountry || 'US',
         phoneNumber: raw.billingPhoneNumber,
       }
     : undefined;
