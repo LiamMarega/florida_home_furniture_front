@@ -64,10 +64,10 @@ export async function GET(req: NextRequest) {
     };
 
     if (status === 'current') {
-      // Get active orders (not delivered or cancelled)
+      // Placed orders still on their way (same filter as /api/orders: not the cart, not delivered or cancelled)
       options.filter = {
-        active: { eq: true },
-        state: { notIn: ['Delivered', 'Cancelled'] },
+        active: { eq: false },
+        state: { notIn: ['Delivered', 'Cancelled', 'Draft'] },
       };
     } else if (status === 'unpaid') {
       // Orders awaiting payment (a PaymentAuthorized order is placed and paid)

@@ -436,6 +436,21 @@ export const GET_ELIGIBLE_PAYMENT_METHODS = gql`
   }
 `;
 
+// Affirm settings of the channel (public, session-free): whether to offer Affirm, its method code, public key and
+// affirm.js environment. Never contains secrets.
+export const GET_AFFIRM_CONFIG = gql`
+  query AffirmConfig {
+    affirmConfig {
+      enabled
+      methodCode
+      publicApiKey
+      environment
+      minimumAmount
+      maximumAmount
+    }
+  }
+`;
+
 // affirm.js checkout object for the active order (built by the backend AffirmPlugin)
 export const GET_AFFIRM_CHECKOUT = gql`
   query AffirmCheckout($confirmationUrl: String!, $cancelUrl: String!) {
@@ -548,6 +563,22 @@ export const GET_ACTIVE_ORDER_STATE = gql`
       id
       code
       state
+    }
+  }
+`;
+
+// State and current shipping methods of the active order, to change its shipping method safely
+export const GET_ACTIVE_ORDER_SHIPPING = gql`
+  query ActiveOrderShipping {
+    activeOrder {
+      id
+      code
+      state
+      shippingLines {
+        shippingMethod {
+          id
+        }
+      }
     }
   }
 `;

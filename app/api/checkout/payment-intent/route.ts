@@ -4,8 +4,10 @@ import { GET_ACTIVE_ORDER_FOR_PAYMENT, GET_ELIGIBLE_PAYMENT_METHODS } from '@/li
 import { TRANSITION_ORDER_TO_STATE, CREATE_STRIPE_PAYMENT_INTENT } from '@/lib/graphql/mutations';
 import { createErrorResponse, forwardCookies, HTTP_STATUS, ERROR_CODES } from '@/lib/api-utils';
 import { findAffirmPaymentMethod } from '@/lib/affirm';
+import { getAffirmConfig } from '@/lib/affirm-config';
 import type { EligiblePaymentMethod } from '@/lib/checkout/types';
 
+// Error bodies carry a readable `message` for the shopper; backend error details stay in the server logs.
 export async function POST(req: NextRequest) {
   try {
     // 1. Verificar que existe una orden activa
@@ -15,12 +17,12 @@ export async function POST(req: NextRequest) {
     );
 
     if (orderRes.errors) {
+      console.error('Failed to fetch the active order for payment:', orderRes.errors[0]?.message);
       return createErrorResponse(
         'Failed to fetch order',
-        orderRes.errors[0]?.message || 'Failed to fetch active order',
+        'We could not load your order. Please refresh the page and try again.',
         HTTP_STATUS.BAD_REQUEST,
-        ERROR_CODES.VALIDATION_ERROR,
-        orderRes.errors
+        ERROR_CODES.VALIDATION_ERROR
       );
     }
 
@@ -47,12 +49,14 @@ export async function POST(req: NextRequest) {
         order.state = transition.state;
       } else if (transition?.__typename === 'OrderStateTransitionError') {
         if (!transition.transitionError?.includes('from "ArrangingPayment" to "ArrangingPayment"')) {
+          console.error('Order not ready for payment:', transition.transitionError);
           return createErrorResponse(
             'Failed to transition order',
-            'Cannot transition order to payment state',
+            typeof transition.transitionError === 'string' && transition.transitionError.trim()
+              ? `Your order is not ready for payment: ${transition.transitionError}`
+              : 'Your order is not ready for payment. Please review it and try again.',
             HTTP_STATUS.CONFLICT,
-            'ORDER_TRANSITION_FAILED',
-            transition
+            'ORDER_TRANSITION_FAILED'
           );
         }
         order.state = 'ArrangingPayment';
@@ -69,8 +73,11 @@ export async function POST(req: NextRequest) {
       console.error('Failed to load eligible payment methods:', paymentMethodsRes.errors[0]?.message);
     }
     const paymentMethods = paymentMethodsRes.data?.eligiblePaymentMethods ?? [];
-    // With an eligible Affirm method, a failed PaymentIntent no longer blocks checkout.
-    const affirmAvailable = findAffirmPaymentMethod(paymentMethods)?.isEligible === true;
+    // With an eligible Affirm method (the channel's affirmConfig names its code), a failed
+    // PaymentIntent no longer blocks checkout.
+    const affirmConfig = await getAffirmConfig();
+    const affirmAvailable =
+      affirmConfig.ok && findAffirmPaymentMethod(paymentMethods, affirmConfig.config)?.isEligible === true;
 
     // 4. Crear PaymentIntent usando la mutación de Vendure (StripePlugin)
     // El StripePlugin maneja la creación del PaymentIntent con los metadatos correctos
@@ -81,12 +88,12 @@ export async function POST(req: NextRequest) {
     );
 
     if (paymentIntentRes.errors && !affirmAvailable) {
+      console.error('Failed to create the Stripe PaymentIntent:', paymentIntentRes.errors[0]?.message);
       return createErrorResponse(
         'Failed to create payment intent',
-        paymentIntentRes.errors[0]?.message || 'Failed to create Stripe payment intent',
+        'We could not start the card payment. Please try again in a moment.',
         HTTP_STATUS.BAD_REQUEST,
-        ERROR_CODES.VALIDATION_ERROR,
-        paymentIntentRes.errors
+        ERROR_CODES.VALIDATION_ERROR
       );
     }
 
@@ -95,7 +102,7 @@ export async function POST(req: NextRequest) {
     if (!clientSecret && !affirmAvailable) {
       return createErrorResponse(
         'No client secret',
-        'Failed to get payment client secret from Stripe',
+        'We could not start the card payment. Please try again in a moment.',
         HTTP_STATUS.INTERNAL_ERROR,
         ERROR_CODES.INTERNAL_ERROR
       );
@@ -119,9 +126,10 @@ export async function POST(req: NextRequest) {
     forwardCookies(res, paymentIntentRes);
     return res;
   } catch (error) {
+    console.error('Payment intent route failed:', error instanceof Error ? error.message : error);
     return createErrorResponse(
       'Internal server error',
-      error instanceof Error ? error.message : 'Failed to create payment intent',
+      'We could not start the payment. Please try again in a moment.',
       HTTP_STATUS.INTERNAL_ERROR,
       ERROR_CODES.INTERNAL_ERROR
     );

@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import { getAffirmPublicConfig, loadAffirm } from '@/lib/affirm';
+import { useAffirmConfig } from '@/hooks/use-affirm-config';
+import { loadAffirm } from '@/lib/affirm';
 import { cn } from '@/lib/utils';
 
 export type AffirmPromoPageType =
@@ -26,26 +27,26 @@ interface AffirmPromoProps {
 /**
  * Affirm "As low as $X/mo" promotional messaging. Renders an empty element that affirm.js fills in
  * after hydration (server and client render the same markup, and React never manages its children).
- * Hidden when NEXT_PUBLIC_AFFIRM_PUBLIC_KEY is unset or the amount is not a positive integer.
- * Messaging is never critical: loading errors are ignored.
+ * Shown only when the channel offers Affirm (`affirmConfig.enabled`, read from the backend) and the
+ * amount is a positive integer. Messaging is never critical: loading errors are ignored.
  */
 export function AffirmPromo({ amount, pageType, sku, className }: AffirmPromoProps) {
-  const visible =
-    getAffirmPublicConfig() !== null && typeof amount === 'number' && Number.isInteger(amount) && amount > 0;
+  const { affirm } = useAffirmConfig();
+  const visible = affirm !== null && typeof amount === 'number' && Number.isInteger(amount) && amount > 0;
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || !affirm) return;
     let cancelled = false;
     // Re-render after mount and whenever the amount changes (affirm.js does not watch the DOM).
-    loadAffirm()
-      .then((affirm) => {
-        if (!cancelled) affirm.ui.refresh?.();
+    loadAffirm(affirm)
+      .then((affirmJs) => {
+        if (!cancelled) affirmJs.ui.refresh?.();
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [visible, amount, pageType, sku]);
+  }, [visible, affirm, amount, pageType, sku]);
 
   if (!visible) return null;
 

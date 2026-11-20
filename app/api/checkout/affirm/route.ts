@@ -14,17 +14,21 @@ const UNAVAILABLE_MESSAGE = 'Affirm is unavailable right now. Please choose anot
 /**
  * GET -> `{ checkout }`: the affirm.js checkout object for the active order, built by the backend
  * (items, discounts, shipping, tax and total) so that all money math stays server-side.
- * The modal flow completes only through `onSuccess` and the POST below. Affirm would use the
- * confirmation and cancel URLs only if it redirected instead; both lead back to the checkout with a
- * "not completed" notice, because a payment is never completed from a GET (a state-changing GET could
- * be triggered cross-site).
+ * The modal flow completes through `onSuccess` and the POST below. Affirm uses the confirmation and
+ * cancel URLs only if it redirects instead: the confirmation URL is the return page
+ * (/checkout/affirm/return), which sends the token with the same POST, from the browser that opened
+ * Affirm only (never from a GET to this server, which a cross-site link could trigger); the cancel URL
+ * leads back to the checkout with a "not completed" notice.
  */
 export async function GET(req: NextRequest) {
-  const returnUrl = `${req.nextUrl.origin}/checkout?affirm=cancelled`;
+  const origin = req.nextUrl.origin;
   const result = await fetchGraphQL<{ affirmCheckout?: Record<string, unknown> }>(
     {
       query: GET_AFFIRM_CHECKOUT,
-      variables: { confirmationUrl: returnUrl, cancelUrl: returnUrl },
+      variables: {
+        confirmationUrl: `${origin}/checkout/affirm/return`,
+        cancelUrl: `${origin}/checkout?affirm=cancelled`,
+      },
     },
     { req }
   );

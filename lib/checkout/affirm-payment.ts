@@ -1,16 +1,19 @@
 /**
  * Server-only: adds the Affirm payment to the session's active order, for POST /api/checkout/affirm
- * (the modal flow's onSuccess). A payment is never added from a GET.
+ * (the modal's onSuccess, the return page after Affirm's redirect, or a resume after a refresh).
+ * A payment is never added from a GET.
  *
  * The backend handler authorizes the checkout token, checks amount and currency against the order
  * and returns the order in PaymentAuthorized; with auto-capture on it captures right after commit,
  * so the order reaches PaymentSettled a moment later. Authorizing is idempotent per order and token,
- * so a `retryable` failure may be retried with the same token.
+ * so a `retryable` failure may be retried with the same token. The payment method code comes from the
+ * channel's `affirmConfig`, never from the browser.
  */
 import { z } from 'zod';
 import { fetchGraphQL } from '@/lib/vendure-server';
 import { ADD_PAYMENT_TO_ORDER } from '@/lib/graphql/mutations';
-import { AFFIRM_PAYMENT_METHOD_CODE } from '@/lib/affirm';
+import { isAffirmEnabled } from '@/lib/affirm';
+import { getAffirmConfig } from '@/lib/affirm-config';
 import type { AddPaymentToOrderResult, Order } from '@/lib/types';
 
 // Same format the backend handler accepts.
@@ -36,11 +39,28 @@ export async function addAffirmPayment(req: Request, checkoutToken: unknown): Pr
     };
   }
 
+  const affirmConfig = await getAffirmConfig();
+  if (!affirmConfig.ok) {
+    // The backend could not be asked: nothing was sent, so the same token can be sent again.
+    return { result: { ok: false, status: 502, error: RETRY_MESSAGE, retryable: true } };
+  }
+  if (!isAffirmEnabled(affirmConfig.config)) {
+    // Affirm was turned off: final for this token (an unauthorized Affirm checkout charges nothing).
+    return {
+      result: {
+        ok: false,
+        status: 400,
+        error: 'Affirm is not available right now. Please choose another payment method.',
+        retryable: false,
+      },
+    };
+  }
+
   const response = await fetchGraphQL<{ addPaymentToOrder?: AddPaymentToOrderResult }>(
     {
       query: ADD_PAYMENT_TO_ORDER,
       variables: {
-        input: { method: AFFIRM_PAYMENT_METHOD_CODE, metadata: { checkoutToken: token.data } },
+        input: { method: affirmConfig.config.methodCode, metadata: { checkoutToken: token.data } },
       },
     },
     { req }
@@ -73,8 +93,9 @@ function toFailure(error: Exclude<AddPaymentToOrderResult, Order>): AffirmPaymen
         retryable: false,
       };
     case 'PAYMENT_FAILED_ERROR':
-      // Affirm unreachable or failing, or the order changed while paying (cart edited elsewhere,
-      // already paid by a concurrent request). The order's real state decides what happened.
+      // Affirm unreachable or busy, the order changed while paying (cart edited elsewhere, already paid
+      // by a concurrent request), or a card payment of the order is in progress. The order's real state
+      // decides what happened.
       return { ok: false, status: 502, error: error.paymentErrorMessage || RETRY_MESSAGE, retryable: true };
     case 'INELIGIBLE_PAYMENT_METHOD_ERROR':
       return {

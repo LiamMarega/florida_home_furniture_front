@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { CustomerFormData, EligiblePaymentMethod, ShippingMethod } from '@/lib/checkout/types';
-import { findAffirmPaymentMethod } from '@/lib/affirm';
+import { readableApiError } from '@/lib/checkout/utils';
 
 // Query keys
 export const checkoutKeys = {
@@ -20,6 +20,21 @@ interface PaymentIntentData {
   currency?: string;
 }
 
+/** The JSON body of a response, or null when it has none (an error page, a cut-off body). */
+async function readJson(response: Response): Promise<unknown> {
+  return response.json().catch(() => null);
+}
+
+/**
+ * An Error with the route's readable message and its HTTP status, so the global React Query retry skips
+ * 4xx answers (a rejected change is not retried).
+ */
+function apiError(response: Response, data: unknown, fallback: string): Error & { status: number } {
+  const error = new Error(readableApiError(data, fallback)) as Error & { status: number };
+  error.status = response.status;
+  return error;
+}
+
 // API functions
 async function fetchShippingMethods(): Promise<{ eligibleShippingMethods: ShippingMethod[] }> {
   const response = await fetch('/api/checkout/shipping-methods', {
@@ -28,8 +43,7 @@ async function fetchShippingMethods(): Promise<{ eligibleShippingMethods: Shippi
   });
 
   if (!response.ok) {
-    const data = await response.json();
-    throw new Error(data.error || 'Failed to load shipping methods');
+    throw apiError(response, await readJson(response), 'We could not load the shipping methods.');
   }
 
   return response.json();
@@ -48,10 +62,10 @@ async function setCustomer(customerData: {
     body: JSON.stringify(customerData),
   });
 
-  const data = await response.json();
+  const data = await readJson(response);
 
   if (!response.ok) {
-    throw new Error(data.error || 'Failed to set customer');
+    throw apiError(response, data, 'We could not save your contact details. Please try again.');
   }
 
   return data;
@@ -65,15 +79,19 @@ async function setShippingAddress(addressData: CustomerFormData): Promise<any> {
     body: JSON.stringify(addressData),
   });
 
-  const data = await response.json();
+  const data = await readJson(response);
 
   if (!response.ok) {
-    throw new Error(data.error || 'Failed to set shipping address');
+    throw apiError(response, data, 'We could not save your shipping address. Please try again.');
   }
 
   return data;
 }
 
+/**
+ * Saves the shipping method on the order. Throws (with the route's readable message) unless the order really
+ * has it, so checkout never moves on with a shipping price that would not be charged.
+ */
 async function setShippingMethod(shippingMethodId: string): Promise<any> {
   const response = await fetch('/api/checkout/shipping-methods', {
     method: 'POST',
@@ -82,10 +100,10 @@ async function setShippingMethod(shippingMethodId: string): Promise<any> {
     body: JSON.stringify({ shippingMethodIds: [shippingMethodId] }),
   });
 
-  const data = await response.json();
+  const data = await readJson(response);
 
   if (!response.ok) {
-    throw new Error(data.error || 'Failed to set shipping method');
+    throw apiError(response, data, 'We could not save the shipping method. Please try again.');
   }
 
   return data;
@@ -98,20 +116,26 @@ async function createPaymentIntent(): Promise<PaymentIntentData> {
     headers: { 'Content-Type': 'application/json' },
   });
 
-  const data = await response.json();
+  const data = await readJson(response);
 
-  if (!response.ok) {
-    const errorMsg = data.details || data.error || 'Failed to create payment intent';
-    throw new Error(errorMsg);
+  if (!response.ok || !data || typeof data !== 'object') {
+    throw apiError(response, data, 'We could not start the payment. Please try again.');
   }
 
-  const paymentMethods: EligiblePaymentMethod[] = Array.isArray(data.paymentMethods) ? data.paymentMethods : [];
-
-  if (!data.clientSecret && !findAffirmPaymentMethod(paymentMethods)?.isEligible) {
-    throw new Error('No client secret received');
+  // The route answers 200 only with a card client secret, or without one when Affirm is eligible; the
+  // payment step shows what the order can use.
+  const result = data as Partial<PaymentIntentData>;
+  if (typeof result.orderCode !== 'string' || !result.orderCode) {
+    throw new Error('We could not start the payment. Please try again.');
   }
+  const paymentMethods: EligiblePaymentMethod[] = Array.isArray(result.paymentMethods) ? result.paymentMethods : [];
 
-  return { ...data, clientSecret: data.clientSecret || null, paymentMethods };
+  return {
+    ...result,
+    orderCode: result.orderCode,
+    clientSecret: typeof result.clientSecret === 'string' && result.clientSecret ? result.clientSecret : null,
+    paymentMethods,
+  };
 }
 
 // Hooks
@@ -151,13 +175,19 @@ export function useCheckoutProcess() {
 
   const setShippingMethodMutation = useMutation({
     mutationFn: setShippingMethod,
-    onSuccess: () => {
+    // Also on failure: the order may have moved back to AddingItems before the change was refused, and
+    // the summary must show what the order really charges.
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['cart'] });
     },
   });
 
   const createPaymentIntentMutation = useMutation({
     mutationFn: createPaymentIntent,
+    // The order is now in ArrangingPayment.
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+    },
   });
 
   const processCheckout = useCallback(

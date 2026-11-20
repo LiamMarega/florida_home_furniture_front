@@ -1,14 +1,13 @@
 /**
- * Affirm (US pay-over-time) storefront helpers: public configuration and the affirm.js loader.
+ * Affirm (US pay-over-time) storefront helpers: the channel's Affirm configuration and the affirm.js loader.
  *
- * Client-safe and server-safe: nothing runs on import, and browser APIs are only touched inside
- * `loadAffirm()`. Only the public API key is used here; the private key lives in the Vendure
- * PaymentMethod handler args.
+ * Zero-config: everything comes from the backend's Shop API `affirmConfig` (served by GET /api/affirm/config and
+ * read with `useAffirmConfig()`), so the storefront has no Affirm environment variables and cannot drift from the
+ * PaymentMethod's key pair, sandbox flag or code. Client-safe and server-safe: nothing runs on import, and browser
+ * APIs are only touched inside `loadAffirm()`. Only the public API key ever reaches the storefront; the private key
+ * stays in the Vendure PaymentMethod handler args.
  */
 import type { EligiblePaymentMethod } from '@/lib/checkout/types';
-
-/** Code of the Vendure PaymentMethod that uses the Affirm handler (naming convention). */
-export const AFFIRM_PAYMENT_METHOD_CODE = 'affirm';
 
 const AFFIRM_SCRIPT_URLS = {
   sandbox: 'https://cdn1-sandbox.affirm.com/js/v2/affirm.js',
@@ -17,40 +16,95 @@ const AFFIRM_SCRIPT_URLS = {
 
 const AFFIRM_LOAD_TIMEOUT_MS = 15000;
 
+// Sanity limits for what the backend sends; anything else means Affirm is not offered.
+const PUBLIC_KEY_PATTERN = /^[A-Za-z0-9_-]{1,256}$/;
+const METHOD_CODE_PATTERN = /^[A-Za-z0-9_-]{1,100}$/;
+
 export type AffirmEnvironment = keyof typeof AFFIRM_SCRIPT_URLS;
 
-export interface AffirmPublicConfig {
+/** The Shop API `affirmConfig`: what the storefront needs to offer Affirm in its channel. */
+export interface AffirmConfig {
+  enabled: boolean;
+  /** The PaymentMethod code to pay with: `addPaymentToOrder({ method: methodCode, ... })`. */
+  methodCode: string | null;
+  /** The public API key for affirm.js. */
+  publicApiKey: string | null;
+  /** Which affirm.js to load. */
+  environment: AffirmEnvironment | null;
+  /** Order totals (tax included, minor units) Affirm is offered for; null without the Affirm eligibility checker. */
+  minimumAmount: number | null;
+  maximumAmount: number | null;
+}
+
+/** An `affirmConfig` that offers Affirm: every field affirm.js and `addPaymentToOrder` need is set. */
+export interface EnabledAffirmConfig extends AffirmConfig {
+  enabled: true;
+  methodCode: string;
   publicApiKey: string;
   environment: AffirmEnvironment;
-  scriptUrl: string;
 }
 
+export const AFFIRM_DISABLED: AffirmConfig = {
+  enabled: false,
+  methodCode: null,
+  publicApiKey: null,
+  environment: null,
+  minimumAmount: null,
+  maximumAmount: null,
+};
+
 /**
- * Affirm settings from NEXT_PUBLIC_AFFIRM_PUBLIC_KEY and NEXT_PUBLIC_AFFIRM_ENV (`sandbox`, anything
- * else means production). Returns null when no public key is set, which hides every Affirm UI.
- * The variables are referenced statically so Next.js inlines them into the client bundle.
+ * Validates an `affirmConfig` answer. Anything incomplete or unexpected (an unknown environment, a missing key or
+ * code) means Affirm is not offered: the storefront never guesses which affirm.js or method to use.
  */
-export function getAffirmPublicConfig(): AffirmPublicConfig | null {
-  const publicApiKey = process.env.NEXT_PUBLIC_AFFIRM_PUBLIC_KEY?.trim();
-  if (!publicApiKey) {
-    return null;
+export function parseAffirmConfig(value: unknown): AffirmConfig {
+  if (!value || typeof value !== 'object') {
+    return AFFIRM_DISABLED;
   }
-  const environment: AffirmEnvironment =
-    process.env.NEXT_PUBLIC_AFFIRM_ENV?.trim().toLowerCase() === 'sandbox' ? 'sandbox' : 'production';
-  return { publicApiKey, environment, scriptUrl: AFFIRM_SCRIPT_URLS[environment] };
+  const config = value as Record<string, unknown>;
+  const methodCode = typeof config.methodCode === 'string' ? config.methodCode.trim() : '';
+  const publicApiKey = typeof config.publicApiKey === 'string' ? config.publicApiKey.trim() : '';
+  const environment =
+    config.environment === 'sandbox' || config.environment === 'production' ? config.environment : null;
+  if (
+    config.enabled !== true ||
+    !METHOD_CODE_PATTERN.test(methodCode) ||
+    !PUBLIC_KEY_PATTERN.test(publicApiKey) ||
+    !environment
+  ) {
+    return AFFIRM_DISABLED;
+  }
+  return {
+    enabled: true,
+    methodCode,
+    publicApiKey,
+    environment,
+    minimumAmount: amountOrNull(config.minimumAmount),
+    maximumAmount: amountOrNull(config.maximumAmount),
+  };
+}
+
+function amountOrNull(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+/** Whether `config` offers Affirm, with everything set to pay with it. */
+export function isAffirmEnabled(config: AffirmConfig | null | undefined): config is EnabledAffirmConfig {
+  return !!config && config.enabled && !!config.methodCode && !!config.publicApiKey && !!config.environment;
 }
 
 /**
- * The Affirm entry of `eligiblePaymentMethods` (eligible or not), or undefined when the storefront has
- * no Affirm key or the backend lists no `affirm` method.
+ * The Affirm entry of `eligiblePaymentMethods` (eligible or not): the method whose code is the config's
+ * `methodCode`. Undefined when Affirm is not offered or the order lists no such method.
  */
 export function findAffirmPaymentMethod(
-  paymentMethods: readonly EligiblePaymentMethod[] | undefined
+  paymentMethods: readonly EligiblePaymentMethod[] | undefined,
+  config: AffirmConfig | null | undefined
 ): EligiblePaymentMethod | undefined {
-  if (!getAffirmPublicConfig()) {
+  if (!isAffirmEnabled(config)) {
     return undefined;
   }
-  return paymentMethods?.find((method) => method.code === AFFIRM_PAYMENT_METHOD_CODE);
+  return paymentMethods?.find((method) => method.code === config.methodCode);
 }
 
 // Minimal typings for the part of affirm.js the storefront uses.
@@ -112,16 +166,16 @@ let affirmScript: HTMLScriptElement | null = null;
 let affirmScriptFailed = false;
 
 /**
- * Loads affirm.js (once per page) and resolves with `window.affirm` once `affirm.ui.ready` fires.
- * Rejects when the script fails to load or after 15 s; the promise is then reset so a later call can
- * retry. SSR-safe: rejects outside the browser.
+ * Loads affirm.js (once per page) with the channel's public key and environment, and resolves with
+ * `window.affirm` once `affirm.ui.ready` fires. Rejects when the script fails to load or after 15 s; the
+ * promise is then reset so a later call can retry. The first config used wins for the page: affirm.js cannot
+ * switch keys or environments without a reload. SSR-safe: rejects outside the browser.
  */
-export function loadAffirm(): Promise<Affirm> {
+export function loadAffirm(config: EnabledAffirmConfig): Promise<Affirm> {
   if (typeof window === 'undefined') {
     return Promise.reject(new Error('affirm.js can only be loaded in the browser'));
   }
-  const config = getAffirmPublicConfig();
-  if (!config) {
+  if (!isAffirmEnabled(config)) {
     return Promise.reject(new Error('Affirm is not configured'));
   }
   if (!affirmPromise) {
@@ -133,7 +187,7 @@ export function loadAffirm(): Promise<Affirm> {
   return affirmPromise;
 }
 
-function waitForAffirm(config: AffirmPublicConfig): Promise<Affirm> {
+function waitForAffirm(config: EnabledAffirmConfig): Promise<Affirm> {
   return new Promise<Affirm>((resolve, reject) => {
     let script: HTMLScriptElement | null = null;
     let settled = false;
@@ -160,7 +214,7 @@ function waitForAffirm(config: AffirmPublicConfig): Promise<Affirm> {
     );
 
     try {
-      script = injectAffirmScript(config);
+      script = injectAffirmScript(config.publicApiKey, AFFIRM_SCRIPT_URLS[config.environment]);
     } catch (error) {
       finish(error instanceof Error ? error : new Error('Failed to start affirm.js'));
       return;
@@ -175,15 +229,15 @@ function waitForAffirm(config: AffirmPublicConfig): Promise<Affirm> {
  * library with fresh stubs): they only re-append affirm.js when the previous load failed, and
  * otherwise keep waiting for the script already on the page.
  */
-function injectAffirmScript(config: AffirmPublicConfig): HTMLScriptElement | null {
+function injectAffirmScript(publicApiKey: string, scriptUrl: string): HTMLScriptElement | null {
   if (!affirmScript) {
     if (window.affirm) {
       // Already on the page (loaded elsewhere, or kept across a dev hot reload).
       return null;
     }
     window._affirm_config = {
-      public_api_key: config.publicApiKey,
-      script: config.scriptUrl,
+      public_api_key: publicApiKey,
+      script: scriptUrl,
       locale: 'en_US',
       country_code: 'USA',
     };
@@ -191,11 +245,11 @@ function injectAffirmScript(config: AffirmPublicConfig): HTMLScriptElement | nul
     snippet.text = AFFIRM_EMBED_SNIPPET;
     document.head.appendChild(snippet); // inline scripts run synchronously on insertion
     snippet.remove();
-    affirmScript = document.querySelector<HTMLScriptElement>(`script[src="${config.scriptUrl}"]`);
+    affirmScript = document.querySelector<HTMLScriptElement>(`script[src="${scriptUrl}"]`);
   } else if (affirmScriptFailed) {
     const retry = document.createElement('script');
     retry.async = true;
-    retry.src = config.scriptUrl;
+    retry.src = affirmScript.src;
     affirmScript.remove();
     document.head.appendChild(retry);
     affirmScript = retry;

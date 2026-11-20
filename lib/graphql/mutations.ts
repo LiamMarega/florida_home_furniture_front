@@ -118,11 +118,9 @@ export const SET_ORDER_SHIPPING_METHOD = gql`
       ... on Order {
         ...OrderPricingSummary
       }
-      ... on NoActiveOrderError {
-        errorCode
-        message
-      }
-      ... on IneligibleShippingMethodError {
+      # Every error result (OrderModificationError outside AddingItems, IneligibleShippingMethodError,
+      # NoActiveOrderError), so none can pass for a saved shipping method
+      ... on ErrorResult {
         errorCode
         message
       }

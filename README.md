@@ -235,8 +235,8 @@ florida_home_front/
 | `NEXT_PUBLIC_SITE_URL` | Public site URL | `http://localhost:3001` |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key | `pk_test_...` |
 | `STRIPE_SECRET_KEY` | Stripe secret key (server-side only) | `sk_test_...` |
-| `NEXT_PUBLIC_AFFIRM_PUBLIC_KEY` | Affirm public API key; empty hides Affirm (see [Affirm](#affirm-pay-over-time)) | empty |
-| `NEXT_PUBLIC_AFFIRM_ENV` | `sandbox` loads the sandbox affirm.js; anything else loads production | `sandbox` |
+
+Affirm needs no variables here: its settings come from the backend (see [Affirm](#affirm-pay-over-time)).
 
 ### Next.js Configuration
 
@@ -732,49 +732,89 @@ Affirm is offered next to Stripe for eligible US orders, through Affirm's Direct
 `AffirmPlugin` builds the checkout object and authorizes, captures, voids and refunds; the storefront
 opens the affirm.js modal and hands the checkout token back to Vendure.
 
-**Enable it**
+**Enable it** (backend only, nothing to set or rebuild in the storefront)
 
-1. In the Vendure dashboard, create a PaymentMethod with code **`affirm`**, handler **Affirm** and
-   checker **Affirm eligibility**, and set its sandbox toggle, public/private keys, auto capture and
-   min/max amounts. The private key stays there and never reaches the storefront.
-2. Set `NEXT_PUBLIC_AFFIRM_PUBLIC_KEY` (same key pair and environment as that PaymentMethod) and
-   `NEXT_PUBLIC_AFFIRM_ENV` (`sandbox` or `production`), then rebuild: `NEXT_PUBLIC_*` values are
-   inlined at build time. With an empty key every Affirm option is hidden.
+In the Vendure dashboard, create a PaymentMethod with handler **Affirm** and checker **Affirm
+eligibility** (any code), and set its sandbox toggle, public/private keys, auto capture and min/max
+amounts. The private key stays there and never reaches the storefront. Turning the method off (or
+"Offer at checkout" off) hides every Affirm option.
+
+**How the configuration flows**
+
+1. The backend's Shop API query `affirmConfig` (public, session-free) answers
+   `{ enabled, methodCode, publicApiKey, environment, minimumAmount, maximumAmount }` for the channel.
+2. `lib/affirm-config.ts` asks it server-side without cookies and caches the answer in memory (60 s; 10 s
+   after a failure, which is reported as "unknown", never as "disabled"). API routes take the payment
+   method code from it, never from the browser.
+3. `GET /api/affirm/config` serves it to browsers (`Cache-Control: public, max-age=60`). When the backend
+   cannot be reached it answers `enabled: false` (never a 500), uncached.
+4. `useAffirmConfig()` (`hooks/use-affirm-config.ts`) shares it through React Query. Promotional
+   messaging and the checkout option render only when `enabled`, and `lib/affirm.ts` loads the sandbox
+   or production affirm.js with that public key.
+
+There are no `NEXT_PUBLIC_AFFIRM_*` variables anymore: they were inlined at build time and could drift
+from the PaymentMethod's key pair, sandbox flag or code (affirm.js of one environment with the key of
+another breaks checkout); the backend is the single source of truth.
 
 **Flow**
 
 1. `POST /api/checkout/payment-intent` also returns `paymentMethods` (`eligiblePaymentMethods`). The
    payment step offers "Credit or debit card" when a Stripe client secret exists and "Affirm" when the
-   key is set and an `affirm` method is listed (disabled, with its eligibility message, when the order
-   is not eligible). If the PaymentIntent fails but Affirm is eligible, checkout continues with Affirm.
-2. "Continue with Affirm" loads affirm.js (`lib/affirm.ts`) and gets the checkout object from
-   `GET /api/checkout/affirm` (Shop API `affirmCheckout`), then opens the modal.
-3. On success the token goes to `POST /api/checkout/affirm` (JSON only, otherwise 415; `maxDuration`
-   60 s), which calls `addPaymentToOrder({ method: "affirm", metadata: { checkoutToken } })`. Only two
-   answers are final: 200 sends the customer to `/checkout/confirmation/<orderCode>`, and 400/402 (not
-   eligible or declined) keeps the customer in checkout with a message, where a new attempt opens a new
-   Affirm checkout. Anything else (409, any 5xx, a non-JSON body, a network error) leaves the outcome
-   unknown: server and network failures resend the same token once (authorizing is idempotent per order
-   and token), then the customer goes to the confirmation page, which never offers another payment
-   method. While a card or Affirm payment is in flight, the payment method cannot be switched.
-4. The confirmation page decides from the real order state: `PaymentAuthorized` (Affirm captures right
-   after) and later states are a placed order; a latest payment `Declined`/`Error` while the order is
-   `ArrangingPayment` shows "Payment not completed" with a way back to checkout; `AddingItems` means the
-   cart changed before the payment completed (nothing charged); otherwise it re-checks for about two
-   minutes, then asks the customer to check their email before paying again. Stripe's
-   `redirect_status=succeeded` (or `processing`) keeps it waiting instead of showing a failure.
-5. Redirects: the checkout object's confirmation and cancel URLs both point to
-   `/checkout?affirm=cancelled` ("not completed" notice). Affirm uses them only if it redirects instead
-   of calling the modal callbacks, and a payment is never completed from a GET. The notice clears when
-   the next payment attempt starts.
+   channel offers Affirm and the method named by `methodCode` is listed (disabled, with its eligibility
+   message, when the order is not eligible). If the PaymentIntent fails but Affirm is eligible, checkout
+   continues with Affirm.
+2. "Continue with Affirm" loads affirm.js and gets the checkout object from `GET /api/checkout/affirm`
+   (Shop API `affirmCheckout`), then opens the modal.
+3. On success the token is first stored in this browser (`lib/checkout/affirm-session.ts`: bound to the
+   order code, 30 minutes, cleared on any final answer), then sent to `POST /api/checkout/affirm` (JSON
+   only, otherwise 415; `maxDuration` 60 s), which calls
+   `addPaymentToOrder({ method: <methodCode>, metadata: { checkoutToken } })`. Only two answers are final:
+   200 sends the customer to `/checkout/confirmation/<orderCode>`, and 400/402 (not eligible or declined)
+   keeps the customer in checkout with a message, where a new attempt opens a new Affirm checkout.
+   Anything else (409, any 5xx, a non-JSON body, a network error) leaves the outcome unknown: server and
+   network failures resend the same token once (authorizing is idempotent per order and token), then the
+   customer goes to the confirmation page, which never offers another payment method.
+4. A stored token that never got a final answer (a refresh, a closed tab, a lost answer) is sent again
+   automatically, once per page load, when the checkout or confirmation page of that order loads while
+   the order still awaits payment ("Finishing your Affirm payment…"); "Check Status" on the confirmation
+   page sends it again too. It is dropped once the order is placed, cancelled or changed.
+5. The confirmation page decides from the real order state: `PaymentAuthorized` (Affirm captures right
+   after) and later states are a placed order; a latest payment `Declined` while the order is
+   `ArrangingPayment` shows "Payment not completed" with a way back to checkout; a latest payment in
+   `Error` (Affirm busy or unreachable, the order changed meanwhile, or a card payment in progress, which
+   the page says explicitly) means "still confirming" and never suggests another payment method;
+   `AddingItems` means the cart changed before the payment completed (nothing charged); otherwise it
+   re-checks for about two minutes, then asks the customer to check their email before paying again.
+   Stripe's `redirect_status=succeeded` (or `processing`) keeps it waiting instead of showing a failure.
+   A session that may not read the order (FORBIDDEN) sees a neutral "Sign in to view this order".
+6. Redirects: Affirm uses the checkout object's URLs only if it redirects instead of calling the modal
+   callbacks. The confirmation URL is `/checkout/affirm/return`: it reads `checkout_token` and sends it
+   (like the modal's success) only if this browser set the "Affirm opened for order X" marker right before
+   opening Affirm (one hour, single use), so a crafted link cannot submit a token on someone's order;
+   otherwise it only offers "Return to checkout". The cancel URL is `/checkout?affirm=cancelled` ("not
+   completed" notice, cleared when the next payment attempt starts). A payment is never completed from a
+   GET to the server.
+
+**Never two payments**
+
+- While a card or Affirm payment is in flight, the payment method cannot be switched. A card payment
+  unlocks it again only on a definitive Stripe error (`card_error`, `validation_error`: nothing was
+  charged); any other error keeps it locked with "We couldn't confirm your card payment. Check your order
+  status before trying again." and a link to the confirmation page.
+- `hooks/use-payment-lock.ts` locks the order across tabs (localStorage with a 90 s expiry refreshed every
+  15 s, changes announced on a BroadcastChannel): while one tab pays, the others show "A payment for this
+  order is in progress in another tab" and disable their pay actions. It is released on a final outcome
+  and left to expire on an unknown one. It is best effort; the backend's order lock, card/Affirm
+  exclusivity and idempotent tokens are the real protection.
 
 **Promotional messaging**: `components/affirm/affirm-promo.tsx` renders Affirm's "As low as $X/mo"
 messaging (`affirm-as-low-as`, amount in cents) under the product price, next to the totals in the cart
 drawer and on the cart page, and on the Affirm payment option at checkout. affirm.js fills it in after the
-page loads; it is hidden when `NEXT_PUBLIC_AFFIRM_PUBLIC_KEY` is unset.
+page loads; it is hidden while the channel does not offer Affirm.
 
-**Testing** needs Affirm sandbox keys (`NEXT_PUBLIC_AFFIRM_ENV=sandbox` plus the PaymentMethod's sandbox
-toggle). Never test with production keys: every authorization there is a real loan.
+**Testing** needs Affirm sandbox keys on the PaymentMethod with its sandbox toggle on (the storefront then
+loads the sandbox affirm.js by itself). Never test with production keys: every authorization there is a
+real loan.
 
 ### Security Best Practices
 
