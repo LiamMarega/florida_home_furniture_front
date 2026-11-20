@@ -749,14 +749,24 @@ opens the affirm.js modal and hands the checkout token back to Vendure.
    is not eligible). If the PaymentIntent fails but Affirm is eligible, checkout continues with Affirm.
 2. "Continue with Affirm" loads affirm.js (`lib/affirm.ts`) and gets the checkout object from
    `GET /api/checkout/affirm` (Shop API `affirmCheckout`), then opens the modal.
-3. On success the token goes to `POST /api/checkout/affirm`, which calls
-   `addPaymentToOrder({ method: "affirm", metadata: { checkoutToken } })`, and the customer lands on
-   `/checkout/confirmation/<orderCode>`. A decline keeps the customer in checkout with a message; when
-   Affirm is unreachable the same token is retried once (authorizing is idempotent per order and token).
-4. Redirect fallback: if affirm.js submits to the checkout object's `user_confirmation_url` instead of
-   calling `onSuccess`, `GET /api/checkout/affirm/confirm?checkout_token=...` adds the payment and
-   redirects to the confirmation page, or back to `/checkout?affirm=failed` (or `?affirm=check` when
-   the order is no longer awaiting payment). A cancelled checkout returns to `/checkout?affirm=cancelled`.
+3. On success the token goes to `POST /api/checkout/affirm` (JSON only, otherwise 415; `maxDuration`
+   60 s), which calls `addPaymentToOrder({ method: "affirm", metadata: { checkoutToken } })`. Only two
+   answers are final: 200 sends the customer to `/checkout/confirmation/<orderCode>`, and 400/402 (not
+   eligible or declined) keeps the customer in checkout with a message, where a new attempt opens a new
+   Affirm checkout. Anything else (409, any 5xx, a non-JSON body, a network error) leaves the outcome
+   unknown: server and network failures resend the same token once (authorizing is idempotent per order
+   and token), then the customer goes to the confirmation page, which never offers another payment
+   method. While a card or Affirm payment is in flight, the payment method cannot be switched.
+4. The confirmation page decides from the real order state: `PaymentAuthorized` (Affirm captures right
+   after) and later states are a placed order; a latest payment `Declined`/`Error` while the order is
+   `ArrangingPayment` shows "Payment not completed" with a way back to checkout; `AddingItems` means the
+   cart changed before the payment completed (nothing charged); otherwise it re-checks for about two
+   minutes, then asks the customer to check their email before paying again. Stripe's
+   `redirect_status=succeeded` (or `processing`) keeps it waiting instead of showing a failure.
+5. Redirects: the checkout object's confirmation and cancel URLs both point to
+   `/checkout?affirm=cancelled` ("not completed" notice). Affirm uses them only if it redirects instead
+   of calling the modal callbacks, and a payment is never completed from a GET. The notice clears when
+   the next payment attempt starts.
 
 **Promotional messaging**: `components/affirm/affirm-promo.tsx` renders Affirm's "As low as $X/mo"
 messaging (`affirm-as-low-as`, amount in cents) under the product price, next to the totals in the cart

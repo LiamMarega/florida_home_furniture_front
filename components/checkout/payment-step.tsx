@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { CreditCard } from 'lucide-react';
 import { PaymentStepProps } from '@/lib/checkout/types';
 
-export function PaymentStep({ clientSecret, orderCode, onPaid, onBack }: PaymentStepProps) {
+export function PaymentStep({ clientSecret, orderCode, onPaid, onBack, onBusyChange }: PaymentStepProps) {
   const stripe = useStripe();
   const elements = useElements();
   const [paying, setPaying] = useState(false);
@@ -16,10 +16,16 @@ export function PaymentStep({ clientSecret, orderCode, onPaid, onBack }: Payment
   const isValidClientSecret = clientSecret && typeof clientSecret === 'string' && clientSecret.trim() !== '';
   const isValidOrderCode = orderCode && typeof orderCode === 'string' && orderCode.trim() !== '';
 
+  // The parent locks the payment method choice while a card payment is in flight
+  const updatePaying = (next: boolean) => {
+    setPaying(next);
+    onBusyChange?.(next);
+  };
+
   const handlePay = async () => {
     if (!stripe || !elements || !isValidOrderCode) return;
-    
-    setPaying(true);
+
+    updatePaying(true);
     setError(null);
 
     try {
@@ -27,7 +33,7 @@ export function PaymentStep({ clientSecret, orderCode, onPaid, onBack }: Payment
       const { error: submitError } = await elements.submit();
       if (submitError) {
         setError(submitError.message || 'Payment validation failed');
-        setPaying(false);
+        updatePaying(false);
         return;
       }
 
@@ -43,7 +49,7 @@ export function PaymentStep({ clientSecret, orderCode, onPaid, onBack }: Payment
       // Si hay error, mostrarlo (Stripe solo llama al callback si NO redirige)
       if (confirmError) {
         setError(confirmError.message || 'Payment failed');
-        setPaying(false);
+        updatePaying(false);
         return;
       }
 
@@ -52,7 +58,7 @@ export function PaymentStep({ clientSecret, orderCode, onPaid, onBack }: Payment
       onPaid(orderCode);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Payment error');
-      setPaying(false);
+      updatePaying(false);
     }
   };
 

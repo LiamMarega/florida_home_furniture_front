@@ -68,9 +68,10 @@ export default function PrivacyPage() {
                   Level 1 certified provider. We never see or store your full card number.
                 </li>
                 <li>
-                  <strong>Financing provider</strong> — if you choose to pay over time, Affirm receives your
-                  order and contact details to process your financing application, subject to eligibility,
-                  under its own privacy policy.
+                  <strong>Financing provider</strong> — Affirm&apos;s script loads on our product, cart and
+                  checkout pages to show financing offers, such as estimated monthly payments. If you choose
+                  to pay over time with Affirm, your order and contact details are shared with Affirm to
+                  process your financing application, subject to eligibility, under its own privacy policy.
                 </li>
                 <li>
                   <strong>Hosting &amp; infrastructure</strong> — our website is served through a

@@ -5,24 +5,26 @@ import { forwardCookies } from '@/lib/api-utils';
 import { addAffirmPayment } from '@/lib/checkout/affirm-payment';
 
 export const dynamic = 'force-dynamic';
+// The POST waits for the backend to authorize (and capture) the payment, which is bounded at about
+// 15 s; the platform's default function timeout can be lower.
+export const maxDuration = 60;
 
 const UNAVAILABLE_MESSAGE = 'Affirm is unavailable right now. Please choose another payment method.';
 
 /**
  * GET -> `{ checkout }`: the affirm.js checkout object for the active order, built by the backend
  * (items, discounts, shipping, tax and total) so that all money math stays server-side.
- * Affirm sends the customer to `confirmationUrl` (GET) only when it falls back to a redirect; the
- * modal flow completes through `onSuccess` and the POST below.
+ * The modal flow completes only through `onSuccess` and the POST below. Affirm would use the
+ * confirmation and cancel URLs only if it redirected instead; both lead back to the checkout with a
+ * "not completed" notice, because a payment is never completed from a GET (a state-changing GET could
+ * be triggered cross-site).
  */
 export async function GET(req: NextRequest) {
-  const origin = req.nextUrl.origin;
+  const returnUrl = `${req.nextUrl.origin}/checkout?affirm=cancelled`;
   const result = await fetchGraphQL<{ affirmCheckout?: Record<string, unknown> }>(
     {
       query: GET_AFFIRM_CHECKOUT,
-      variables: {
-        confirmationUrl: `${origin}/api/checkout/affirm/confirm`,
-        cancelUrl: `${origin}/checkout?affirm=cancelled`,
-      },
+      variables: { confirmationUrl: returnUrl, cancelUrl: returnUrl },
     },
     { req }
   );
@@ -40,11 +42,19 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST { checkoutToken } -> adds the Affirm payment to the active order.
+ * POST { checkoutToken } (JSON only, otherwise 415) -> adds the Affirm payment to the active order.
  * 200 `{ orderCode, state }`, otherwise `{ error, retryable }` with 400 (invalid token or not
  * eligible), 402 (declined), 409 (order no longer awaiting payment) or 502 (retry with the same token).
+ * Requiring a JSON body means a cross-site form cannot submit it without a CORS preflight.
  */
 export async function POST(req: NextRequest) {
+  if (!isJsonRequest(req)) {
+    return NextResponse.json(
+      { error: 'Content-Type must be application/json.', retryable: false },
+      { status: 415 }
+    );
+  }
+
   const body: unknown = await req.json().catch(() => null);
   const checkoutToken =
     body && typeof body === 'object' ? (body as { checkoutToken?: unknown }).checkoutToken : undefined;
@@ -55,6 +65,11 @@ export async function POST(req: NextRequest) {
     : NextResponse.json({ error: result.error, retryable: result.retryable }, { status: result.status });
   forwardCookies(res, { setCookies });
   return res;
+}
+
+function isJsonRequest(req: NextRequest): boolean {
+  const mediaType = req.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase();
+  return mediaType === 'application/json';
 }
 
 function checkoutError(errors: GraphQLResponse['errors']): { status: number; error: string } {

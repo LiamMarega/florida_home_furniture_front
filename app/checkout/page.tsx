@@ -166,6 +166,15 @@ export default function CheckoutPage() {
     resetCheckout();
   };
 
+  // A new payment attempt (card or Affirm) drops the notice left by Affirm's redirect (?affirm=...).
+  // Read from window instead of useSearchParams, which would need a Suspense boundary around the page.
+  const handlePaymentStart = () => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('affirm')) return;
+    url.searchParams.delete('affirm');
+    router.replace(`${url.pathname}${url.search}`, { scroll: false });
+  };
+
   // Determine current step (the order code is set once the order is ready for payment)
   const currentStep = orderCode ? CheckoutStep.PAYMENT : CheckoutStep.CUSTOMER_INFO;
 
@@ -192,7 +201,7 @@ export default function CheckoutPage() {
                 </div>
               )}
 
-              {/* Notice after Affirm's redirect fallback returns here (?affirm=...) */}
+              {/* Notice if Affirm ever redirects here instead of calling the modal callbacks (?affirm=cancelled) */}
               <Suspense fallback={null}>
                 <AffirmReturnNotice />
               </Suspense>
@@ -281,6 +290,7 @@ export default function CheckoutPage() {
                     orderTotal={cartOrder?.totalWithTax}
                     onPaid={handlePaid}
                     onBack={handleBack}
+                    onPaymentStart={handlePaymentStart}
                   />
                 ) : (
                   <div className="text-center py-8">

@@ -1,10 +1,11 @@
 /**
- * Server-only: adds the Affirm payment to the session's active order. Shared by the modal flow
- * (POST /api/checkout/affirm) and the redirect fallback (GET /api/checkout/affirm/confirm).
+ * Server-only: adds the Affirm payment to the session's active order, for POST /api/checkout/affirm
+ * (the modal flow's onSuccess). A payment is never added from a GET.
  *
  * The backend handler authorizes the checkout token, checks amount and currency against the order
- * and captures it when auto-capture is on. Authorizing is idempotent per order and token, so a
- * `retryable` failure may be retried with the same token.
+ * and returns the order in PaymentAuthorized; with auto-capture on it captures right after commit,
+ * so the order reaches PaymentSettled a moment later. Authorizing is idempotent per order and token,
+ * so a `retryable` failure may be retried with the same token.
  */
 import { z } from 'zod';
 import { fetchGraphQL } from '@/lib/vendure-server';
@@ -72,7 +73,8 @@ function toFailure(error: Exclude<AddPaymentToOrderResult, Order>): AffirmPaymen
         retryable: false,
       };
     case 'PAYMENT_FAILED_ERROR':
-      // Affirm unreachable or failing.
+      // Affirm unreachable or failing, or the order changed while paying (cart edited elsewhere,
+      // already paid by a concurrent request). The order's real state decides what happened.
       return { ok: false, status: 502, error: error.paymentErrorMessage || RETRY_MESSAGE, retryable: true };
     case 'INELIGIBLE_PAYMENT_METHOD_ERROR':
       return {
@@ -83,7 +85,7 @@ function toFailure(error: Exclude<AddPaymentToOrderResult, Order>): AffirmPaymen
       };
     default:
       // OrderPaymentStateError, OrderStateTransitionError, NoActiveOrderError: the order is no longer
-      // waiting for a payment, usually because an earlier attempt already paid it.
+      // waiting for a payment, usually because an earlier attempt already paid it or the cart changed.
       return {
         ok: false,
         status: 409,

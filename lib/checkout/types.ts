@@ -56,6 +56,8 @@ export interface PaymentStepProps {
   orderCode: string;
   onPaid: (orderCode: string) => void;
   onBack: () => void;
+  // true while the card payment is being submitted or confirmed, false once it stops without leaving the page
+  onBusyChange?: (busy: boolean) => void;
 }
 
 // Checkout step enum

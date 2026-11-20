@@ -32,6 +32,8 @@ interface PaymentMethodSelectorProps {
   orderTotal?: number;
   onPaid: (orderCode: string) => void;
   onBack: () => void;
+  // Called when a card or Affirm payment attempt starts
+  onPaymentStart?: () => void;
 }
 
 export function PaymentMethodSelector({
@@ -41,11 +43,21 @@ export function PaymentMethodSelector({
   orderTotal,
   onPaid,
   onBack,
+  onPaymentStart,
 }: PaymentMethodSelectorProps) {
   const [selected, setSelected] = useState<PaymentOptionValue | null>(null);
+  // True while a card or Affirm payment is in flight: switching methods then could pay twice
+  const [paymentBusy, setPaymentBusy] = useState(false);
+
+  const handleBusyChange = (busy: boolean) => {
+    setPaymentBusy(busy);
+    if (busy) onPaymentStart?.();
+  };
 
   const cardClientSecret = clientSecret && clientSecret.trim() !== '' ? clientSecret : null;
   const affirmMethod = findAffirmPaymentMethod(paymentMethods);
+  // The PaymentIntent could not be created, so only Affirm is offered
+  const cardUnavailable = !cardClientSecret && affirmMethod?.isEligible === true;
 
   const options: PaymentOption[] = [];
   if (cardClientSecret) {
@@ -92,16 +104,23 @@ export function PaymentMethodSelector({
 
   return (
     <div className="space-y-6">
+      {cardUnavailable && (
+        <p className="text-sm text-brand-dark-blue/80">Card payments are temporarily unavailable.</p>
+      )}
+
       {/* With a single option the chooser is skipped, so card-only checkout looks as before */}
       {options.length > 1 && (
         <RadioGroup
           value={current}
           onValueChange={(value) => setSelected(value as PaymentOptionValue)}
+          // Locked while a payment is in flight
+          disabled={paymentBusy}
           aria-label="Payment method"
           className="gap-3"
         >
           {options.map((option) => {
             const id = `payment-method-${option.value}`;
+            const locked = option.disabled || paymentBusy;
             return (
               <div
                 key={option.value}
@@ -116,7 +135,9 @@ export function PaymentMethodSelector({
                   htmlFor={id}
                   className={cn(
                     'flex items-start gap-3 p-4 leading-normal',
-                    option.disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                    locked ? 'cursor-not-allowed' : 'cursor-pointer',
+                    // The option being paid keeps full opacity while the others are locked
+                    locked && current !== option.value && 'opacity-60'
                   )}
                 >
                   <RadioGroupItem id={id} value={option.value} disabled={option.disabled} className="mt-1" />
@@ -140,7 +161,13 @@ export function PaymentMethodSelector({
 
       {current === 'card' && cardClientSecret && (
         <Elements stripe={getStripe()} options={{ clientSecret: cardClientSecret }}>
-          <PaymentStep clientSecret={cardClientSecret} orderCode={orderCode} onPaid={onPaid} onBack={onBack} />
+          <PaymentStep
+            clientSecret={cardClientSecret}
+            orderCode={orderCode}
+            onPaid={onPaid}
+            onBack={onBack}
+            onBusyChange={handleBusyChange}
+          />
         </Elements>
       )}
       {current === 'affirm' && (
@@ -150,6 +177,7 @@ export function PaymentMethodSelector({
           promoAmount={options.length > 1 ? undefined : orderTotal}
           onPaid={onPaid}
           onBack={onBack}
+          onBusyChange={handleBusyChange}
         />
       )}
     </div>

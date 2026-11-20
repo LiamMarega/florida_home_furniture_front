@@ -11,7 +11,8 @@ function mapOrderState(state: string): UserOrder['status'] {
   const stateMap: Record<string, UserOrder['status']> = {
     'AddingItems': 'pending',
     'ArrangingPayment': 'pending',
-    'PaymentAuthorized': 'pending',
+    // Placed: the payment is authorized (Affirm captures it right after), same as settled
+    'PaymentAuthorized': 'on-the-way',
     'PaymentSettled': 'on-the-way',
     'PartiallyShipped': 'on-the-way',
     'Shipped': 'shipped',
@@ -69,9 +70,9 @@ export async function GET(req: NextRequest) {
         state: { notIn: ['Delivered', 'Cancelled'] },
       };
     } else if (status === 'unpaid') {
-      // Get orders in payment states
+      // Orders awaiting payment (a PaymentAuthorized order is placed and paid)
       options.filter = {
-        state: { in: ['ArrangingPayment', 'PaymentAuthorized'] },
+        state: { eq: 'ArrangingPayment' },
       };
     }
     // 'all' doesn't need additional filters
