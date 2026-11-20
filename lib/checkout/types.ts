@@ -42,10 +42,36 @@ export interface ShippingMethod {
   };
 }
 
+// Payment method offered for the active order (Vendure `eligiblePaymentMethods`)
+export interface EligiblePaymentMethod {
+  code: string;
+  name: string;
+  isEligible: boolean;
+  eligibilityMessage?: string | null;
+}
+
+/**
+ * How a payment attempt ended on the page:
+ * - failed: nothing was paid (declined, closed, invalid input): the payment method choice unlocks
+ * - uncertain: the outcome is unknown: everything stays locked and the shopper checks the order status first
+ * - paid: final success, the page moves on to the confirmation
+ */
+export type PaymentAttemptOutcome = 'failed' | 'uncertain' | 'paid';
+
+// What the payment method selector hands each payment form, so only one payment runs per order
+export interface PaymentAttemptHandlers {
+  /** Called right before a payment attempt starts; false when another tab is paying this order: do not start. */
+  onAttemptStart: () => boolean;
+  /** Called once when the attempt ends (see PaymentAttemptOutcome). */
+  onAttemptEnd: (outcome: PaymentAttemptOutcome) => void;
+}
+
 // Payment step props
-export interface PaymentStepProps {
+export interface PaymentStepProps extends PaymentAttemptHandlers {
   clientSecret: string;
   orderCode: string;
+  /** True while another tab is paying this order: the pay button stays disabled. */
+  disabled?: boolean;
   onPaid: (orderCode: string) => void;
   onBack: () => void;
 }

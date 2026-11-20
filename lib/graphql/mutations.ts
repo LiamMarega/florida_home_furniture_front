@@ -118,11 +118,9 @@ export const SET_ORDER_SHIPPING_METHOD = gql`
       ... on Order {
         ...OrderPricingSummary
       }
-      ... on NoActiveOrderError {
-        errorCode
-        message
-      }
-      ... on IneligibleShippingMethodError {
+      # Every error result (OrderModificationError outside AddingItems, IneligibleShippingMethodError,
+      # NoActiveOrderError), so none can pass for a saved shipping method
+      ... on ErrorResult {
         errorCode
         message
       }
@@ -150,12 +148,25 @@ export const ADD_PAYMENT_TO_ORDER = gql`
   ${ORDER_FRAGMENT}
   mutation AddPaymentToOrder($input: PaymentInput!) {
     addPaymentToOrder(input: $input) {
+      __typename
       ... on Order {
         ...Order
       }
       ... on ErrorResult {
         errorCode
         message
+      }
+      ... on PaymentDeclinedError {
+        paymentErrorMessage
+      }
+      ... on PaymentFailedError {
+        paymentErrorMessage
+      }
+      ... on IneligiblePaymentMethodError {
+        eligibilityCheckerMessage
+      }
+      ... on OrderStateTransitionError {
+        transitionError
       }
     }
   }

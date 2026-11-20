@@ -38,8 +38,9 @@ export default function PrivacyPage() {
                 <li>Newsletter subscription email (only if you opt in)</li>
               </ul>
               <p className="mt-3">
-                We do <strong>not</strong> collect or store payment card data. All payment processing is handled
-                securely by <strong>Stripe</strong>, which is PCI DSS Level 1 certified.
+                We do <strong>not</strong> collect or store payment card data. Card payments are handled
+                securely by <strong>Stripe</strong>, which is PCI DSS Level 1 certified. If you choose to pay
+                over time, your financing is provided by <strong>Affirm</strong>, subject to eligibility.
               </p>
             </section>
 
@@ -65,6 +66,12 @@ export default function PrivacyPage() {
                 <li>
                   <strong>Payment processor</strong> — all card transactions are handled by a PCI DSS
                   Level 1 certified provider. We never see or store your full card number.
+                </li>
+                <li>
+                  <strong>Financing provider</strong> — Affirm&apos;s script loads on our product, cart and
+                  checkout pages to show financing offers, such as estimated monthly payments. If you choose
+                  to pay over time with Affirm, your order and contact details are shared with Affirm to
+                  process your financing application, subject to eligibility, under its own privacy policy.
                 </li>
                 <li>
                   <strong>Hosting &amp; infrastructure</strong> — our website is served through a
@@ -126,7 +133,8 @@ export default function PrivacyPage() {
               <h2 className="text-[16px] font-semibold text-brand-dark-blue mb-3">7. Security</h2>
               <p>
                 We implement reasonable technical and organizational measures to protect your personal
-                information. Payment data is encrypted end-to-end and handled exclusively by Stripe.
+                information. Card payment data is encrypted end-to-end and handled exclusively by Stripe;
+                pay-over-time financing is handled by Affirm.
                 Despite our efforts, no method of transmission over the internet is 100% secure.
               </p>
             </section>

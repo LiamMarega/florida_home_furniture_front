@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { Suspense, useEffect, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements } from '@stripe/react-stripe-js';
 import { toast } from 'sonner';
 
 // Components
@@ -15,7 +14,14 @@ import { Separator } from '@/components/ui/separator';
 import { ArrowRight, User } from 'lucide-react';
 
 // Checkout components
-import { PaymentStep } from '@/components/checkout/payment-step';
+import { PaymentInOtherTabNotice, PaymentMethodSelector } from '@/components/checkout/payment-method-selector';
+import { AffirmReturnNotice } from '@/components/checkout/affirm-payment';
+import {
+  AffirmFinishingNotice,
+  useAffirmResume,
+  usePendingAffirmOrder,
+  type AffirmResumeAction,
+} from '@/components/checkout/affirm-resume';
 import { OrderSummary } from '@/components/checkout/order-summary';
 import { CustomerInfoSection } from '@/components/checkout/customer-info-section';
 import { ShippingAddressSection } from '@/components/checkout/shipping-address-section';
@@ -25,12 +31,11 @@ import { AddressSelectorWithModal } from '@/components/checkout/address-selector
 
 // Hooks and types
 import { useShippingMethods, useCheckoutProcess } from '@/hooks/use-checkout';
+import { usePaymentLock } from '@/hooks/use-payment-lock';
+import { useCart } from '@/contexts/cart-context';
 import { customerSchema, CustomerFormData, CheckoutStep } from '@/lib/checkout/types';
 import { useSavedAddresses, addressToFormData, formDataToAddress } from '@/hooks/use-saved-addresses';
 import { UserAddress } from '@/app/profile/types';
-
-// Stripe configuration
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -42,16 +47,29 @@ export default function CheckoutPage() {
   } = useShippingMethods();
 
   const shippingMethods = shippingData?.shippingMethods || [];
-  const [selectedShippingMethod, setSelectedShippingMethod] = useState<string>('');
+  // The shopper's explicit choice; until then, the method the order already has (so the page never
+  // shows a shipping price other than the one the order charges), else the first eligible one.
+  const [chosenShippingMethod, setChosenShippingMethod] = useState<string>('');
 
   const {
     clientSecret,
     orderCode,
+    paymentMethods,
     isProcessing,
     error: checkoutError,
     processCheckout,
     resetCheckout,
   } = useCheckoutProcess();
+
+  // Active order (same data as the order summary); its total feeds Affirm's payment messaging
+  const { order: cartOrder, isLoading: isLoadingCart } = useCart();
+
+  const savedShippingMethodId = cartOrder?.shippingLines?.[0]?.shippingMethod?.id;
+  const selectedShippingMethod =
+    chosenShippingMethod ||
+    (savedShippingMethodId && shippingMethods.some((method) => method.id === savedShippingMethodId)
+      ? savedShippingMethodId
+      : shippingData?.selectedShippingMethod || '');
 
   // Address persistence
   const {
@@ -107,15 +125,6 @@ export default function CheckoutPage() {
   }, [savedAddresses]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Initialize selected shipping method once async shipping data loads (not derivable in render).
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    if (shippingData?.selectedShippingMethod && !selectedShippingMethod) {
-      setSelectedShippingMethod(shippingData.selectedShippingMethod);
-    }
-  }, [shippingData?.selectedShippingMethod, selectedShippingMethod]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
   // Update form when shipping method changes
   useEffect(() => {
     if (selectedShippingMethod) {
@@ -139,9 +148,49 @@ export default function CheckoutPage() {
     setValue('shippingPhoneNumber', '');
   }, [setValue]);
 
-  // Handle form submission
+  // Determine current step (the order code is set once the order is ready for payment)
+  const currentStep = orderCode ? CheckoutStep.PAYMENT : CheckoutStep.CUSTOMER_INFO;
+
+  // A payment of the active order is in flight: another tab pays it ('elsewhere'), or this tab does or just did
+  // with an unknown outcome ('mine', until its lock expires). Nothing here may change the order meanwhile.
+  const activeOrderCode = cartOrder?.code ?? null;
+  const paymentLock = usePaymentLock(activeOrderCode);
+  const paymentElsewhere = paymentLock === 'elsewhere';
+
+  // An Affirm payment this browser started but never settled (refresh, closed tab, lost answer) is finished
+  // here before anything else; on the payment step the payment forms handle their own attempts.
+  const resumeAction: AffirmResumeAction =
+    currentStep !== CheckoutStep.CUSTOMER_INFO
+      ? 'wait'
+      : cartOrder?.state === 'ArrangingPayment'
+        ? 'resume'
+        : cartOrder?.state === 'AddingItems'
+          ? // The cart changed after Affirm approved it: that approval no longer matches the order.
+            'discard'
+          : 'wait';
+  const affirmResume = useAffirmResume({
+    orderCode: activeOrderCode,
+    action: resumeAction,
+    onOutcome: (outcome, resumedOrderCode) => {
+      if (outcome.outcome === 'paid') {
+        router.push(`/checkout/confirmation/${outcome.orderCode}`);
+      } else if (outcome.outcome === 'unknown') {
+        // The confirmation page decides from the real order state.
+        router.push(`/checkout/confirmation/${resumedOrderCode}`);
+      }
+    },
+  });
+  const resumeRejection = affirmResume.outcome?.outcome === 'rejected' ? affirmResume.outcome.error : null;
+  // An unsettled Affirm token of another order (a refresh mid-payment, after which that order may be placed
+  // and no longer the cart): point to its status instead of an empty checkout that invites paying again.
+  const pendingAffirmOrder = usePendingAffirmOrder();
+  const otherPendingAffirmOrder =
+    !isLoadingCart && pendingAffirmOrder && pendingAffirmOrder !== activeOrderCode ? pendingAffirmOrder : null;
+
+  // Handle form submission. processCheckout never throws (a failed step shows its message above the form), so
+  // the submit handler never leaves an unhandled rejection behind.
   const onSubmit = async (data: CustomerFormData) => {
-    await processCheckout(data, selectedShippingMethod);
+    if (!(await processCheckout(data, selectedShippingMethod))) return;
 
     // Auto-save address if it's a new one and there's room
     if (!selectedAddressId && canAddMore) {
@@ -165,12 +214,26 @@ export default function CheckoutPage() {
     resetCheckout();
   };
 
-  // Determine current step
-  const currentStep = clientSecret ? CheckoutStep.PAYMENT : CheckoutStep.CUSTOMER_INFO;
+  // A new payment attempt (card or Affirm) drops the notice left by Affirm's redirect (?affirm=...).
+  // Read from window instead of useSearchParams, which would need a Suspense boundary around the page.
+  const handlePaymentStart = () => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('affirm')) return;
+    url.searchParams.delete('affirm');
+    router.replace(`${url.pathname}${url.search}`, { scroll: false });
+  };
 
   // Whether to show the address form (always show if no saved addresses)
   const hasAddresses = savedAddresses.length > 0;
   const shouldShowForm = !hasAddresses || showAddressForm || selectedAddressId !== null;
+
+  // A stored Affirm token is being sent, or sent again automatically after a short wait.
+  const affirmResumeBusy = affirmResume.finishing || affirmResume.retrying;
+  const continueBlocked = affirmResumeBusy || paymentLock !== 'free';
+  // This tab's payment of the order is still unsettled (e.g. a reload right after an unknown card outcome) and no
+  // other notice says so.
+  const ownPaymentPending =
+    currentStep === CheckoutStep.CUSTOMER_INFO && paymentLock === 'mine' && !affirmResumeBusy && !!activeOrderCode;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white pt-24 pb-12 sm:py-18">
@@ -190,6 +253,51 @@ export default function CheckoutPage() {
                   <p className="text-red-600 text-sm">{checkoutError}</p>
                 </div>
               )}
+
+              {/* An Affirm payment of this order is being finished (resumed after a refresh), or retried automatically */}
+              {affirmResumeBusy && <AffirmFinishingNotice className="mb-6" retrying={!affirmResume.finishing} />}
+              {ownPaymentPending && (
+                <div role="status" className="mb-6 p-4 border rounded-lg bg-amber-50 border-amber-200">
+                  <p className="text-sm text-amber-800">
+                    A payment for this order is still being confirmed. Please check its status before paying again.
+                  </p>
+                  <Link
+                    href={`/checkout/confirmation/${activeOrderCode}`}
+                    className="mt-2 inline-block text-sm font-medium text-brand-dark-blue underline underline-offset-2"
+                  >
+                    Check order status
+                  </Link>
+                </div>
+              )}
+              {resumeRejection && currentStep === CheckoutStep.CUSTOMER_INFO && (
+                <div role="alert" className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-600 text-sm font-medium">Your Affirm payment was not completed.</p>
+                  <p className="text-red-600 text-sm mt-1">{resumeRejection}</p>
+                </div>
+              )}
+              {otherPendingAffirmOrder && (
+                <div role="status" className="mb-6 p-4 border rounded-lg bg-amber-50 border-amber-200">
+                  <p className="text-sm text-amber-800">
+                    We&apos;re still confirming your Affirm payment for order {otherPendingAffirmOrder}. Please
+                    check its status before paying again.
+                  </p>
+                  <Link
+                    href={`/checkout/confirmation/${otherPendingAffirmOrder}`}
+                    className="mt-2 inline-block text-sm font-medium text-brand-dark-blue underline underline-offset-2"
+                  >
+                    Check order status
+                  </Link>
+                </div>
+              )}
+              {/* On the payment step the payment method selector shows this notice itself */}
+              {paymentElsewhere && currentStep === CheckoutStep.CUSTOMER_INFO && (
+                <PaymentInOtherTabNotice className="mb-6" />
+              )}
+
+              {/* Notice if Affirm ever redirects here instead of calling the modal callbacks (?affirm=cancelled) */}
+              <Suspense fallback={null}>
+                <AffirmReturnNotice />
+              </Suspense>
 
               {currentStep === CheckoutStep.CUSTOMER_INFO ? (
                 /* Customer Information Form */
@@ -244,13 +352,19 @@ export default function CheckoutPage() {
                     shippingMethods={shippingMethods}
                     selectedShippingMethod={selectedShippingMethod}
                     isLoadingShippingMethods={isLoadingShippingMethods}
-                    onShippingMethodSelect={setSelectedShippingMethod}
+                    onShippingMethodSelect={setChosenShippingMethod}
                   />
 
+                  {continueBlocked && (
+                    <p id="checkout-continue-hint" className="text-sm text-center text-brand-dark-blue/70">
+                      You can continue once the payment in progress for this order ends.
+                    </p>
+                  )}
                   <Button
                     type="submit"
                     className="w-full h-12 text-lg font-semibold"
-                    disabled={isSubmitting || isProcessing}
+                    disabled={isSubmitting || isProcessing || continueBlocked}
+                    aria-describedby={continueBlocked ? 'checkout-continue-hint' : undefined}
                   >
                     {isSubmitting || isProcessing ? (
                       <>
@@ -266,11 +380,17 @@ export default function CheckoutPage() {
                   </Button>
                 </form>
               ) : (
-                /* Payment Step */
-                clientSecret && orderCode && typeof clientSecret === 'string' && clientSecret.trim() !== '' ? (
-                  <Elements stripe={stripePromise} options={{ clientSecret }}>
-                    <PaymentStep clientSecret={clientSecret} orderCode={orderCode} onPaid={handlePaid} onBack={handleBack} />
-                  </Elements>
+                /* Payment Step: card (Stripe) and/or Affirm, depending on what the order can use */
+                orderCode ? (
+                  <PaymentMethodSelector
+                    clientSecret={clientSecret}
+                    orderCode={orderCode}
+                    paymentMethods={paymentMethods}
+                    orderTotal={cartOrder?.totalWithTax}
+                    onPaid={handlePaid}
+                    onBack={handleBack}
+                    onPaymentStart={handlePaymentStart}
+                  />
                 ) : (
                   <div className="text-center py-8">
                     <p className="text-gray-600">Loading payment form...</p>

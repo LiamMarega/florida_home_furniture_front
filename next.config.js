@@ -47,7 +47,7 @@ const nextConfig = {
 
   // Headers para SEO y seguridad
   async headers() {
-    return [
+    const headers = [
       {
         source: '/:path*',
         headers: [
@@ -69,7 +69,12 @@ const nextConfig = {
           },
         ],
       },
-      {
+    ];
+
+    // Credentialed CORS for http://localhost:3001, in development only: in production the storefront
+    // calls its own API routes from the same origin, and no other origin may call them with cookies.
+    if (process.env.NODE_ENV !== 'production') {
+      headers.push({
         source: '/api/:path*',
         headers: [
           { key: 'Access-Control-Allow-Credentials', value: 'true' },
@@ -77,8 +82,10 @@ const nextConfig = {
           { key: 'Access-Control-Allow-Methods', value: 'GET,DELETE,PATCH,POST,PUT,OPTIONS' },
           { key: 'Access-Control-Allow-Headers', value: 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Cookie' },
         ],
-      },
-    ];
+      });
+    }
+
+    return headers;
   },
 
   // Experimental features para mejor rendimiento

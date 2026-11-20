@@ -9,6 +9,84 @@ export const formatPrice = (price: number, currencyCode: string = 'USD'): string
   }).format(price / 100);
 };
 
+/** Shown when the order a checkout step works on is gone or no longer in the state that step expects. */
+export const CART_CHANGED_MESSAGE = 'Your cart has changed or expired. Please review your cart and try again.';
+const ORDER_NOT_READY_MESSAGE = 'Your order is not ready for payment yet. Please review your details and try again.';
+export const EMAIL_IN_USE_MESSAGE = 'This email address is already registered. Please sign in to continue.';
+const SESSION_EXPIRED_MESSAGE = 'Your session has expired. Please refresh the page and try again.';
+const AFFIRM_DECLINED_MESSAGE = 'Affirm declined the payment. You can try again or choose another payment method.';
+
+// Vendure error codes (an ErrorResult's `errorCode`) and the storefront routes' own codes, with what the shopper sees.
+const MESSAGES_BY_CODE = new Map<string, string>([
+  ['NO_ACTIVE_ORDER', CART_CHANGED_MESSAGE],
+  ['NO_ACTIVE_ORDER_ERROR', CART_CHANGED_MESSAGE],
+  ['ORDER_MODIFICATION_ERROR', CART_CHANGED_MESSAGE],
+  ['ORDER_PAYMENT_STATE_ERROR', CART_CHANGED_MESSAGE],
+  ['ORDER_STATE_TRANSITION_ERROR', ORDER_NOT_READY_MESSAGE],
+  ['ORDER_TRANSITION_FAILED', ORDER_NOT_READY_MESSAGE],
+  ['EMAIL_ADDRESS_CONFLICT_ERROR', EMAIL_IN_USE_MESSAGE],
+]);
+
+// Raw backend texts (Vendure's own messages, Affirm's decline reason and code), with what the shopper sees.
+const MESSAGE_RULES: ReadonlyArray<readonly [RegExp, string]> = [
+  [/\bno active order\b/i, CART_CHANGED_MESSAGE],
+  [/may only be (modified|added) when/i, CART_CHANGED_MESSAGE],
+  [/cannot transition order/i, ORDER_NOT_READY_MESSAGE],
+  [/not currently authorized/i, SESSION_EXPIRED_MESSAGE],
+  [/^affirm declined the payment\b/i, AFFIRM_DECLINED_MESSAGE],
+];
+
+// Technical text never meant for the shopper: an error code, a transport or parsing failure, a generic route label.
+const TECHNICAL_TEXT =
+  /\w_\w|graphql|json|econn|etimedout|failed to|load failed|networkerror|unexpected token|internal server error|invalid response/i;
+
+/**
+ * What the shopper sees for a backend error: friendly copy for Vendure's raw codes and messages, `fallback` for
+ * technical text (or none), otherwise the text itself (the storefront routes already send readable messages). The
+ * details stay in the server logs.
+ */
+export function friendlyCheckoutMessage(message: unknown, fallback: string, code?: unknown): string {
+  const byCode = typeof code === 'string' ? MESSAGES_BY_CODE.get(code) : undefined;
+  if (byCode) {
+    return byCode;
+  }
+  const text = typeof message === 'string' ? message.trim() : '';
+  if (!text) {
+    return fallback;
+  }
+  const rule = MESSAGE_RULES.find(([pattern]) => pattern.test(text));
+  if (rule) {
+    return rule[1];
+  }
+  return TECHNICAL_TEXT.test(text) ? fallback : text;
+}
+
+/** The error code of an API error body (Vendure's `errorCode`, else the route's `code`), if any. */
+export function apiErrorCode(data: unknown): string | undefined {
+  if (!data || typeof data !== 'object') {
+    return undefined;
+  }
+  const body = data as { errorCode?: unknown; code?: unknown };
+  const code = body.errorCode ?? body.code;
+  return typeof code === 'string' ? code : undefined;
+}
+
+/**
+ * A readable message from an API error body: the first non-empty string among `message`, `error` and
+ * `details` (never an object, so never "[object Object]"), made friendly by `friendlyCheckoutMessage` with the
+ * body's error code; otherwise `fallback`.
+ */
+export function readableApiError(data: unknown, fallback: string): string {
+  if (data && typeof data === 'object') {
+    const body = data as { message?: unknown; error?: unknown; details?: unknown };
+    const text = [body.message, body.error, body.details].find(
+      (candidate) => typeof candidate === 'string' && candidate.trim()
+    );
+    return friendlyCheckoutMessage(text, fallback, apiErrorCode(data));
+  }
+  return fallback;
+}
+
 export const validateEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);

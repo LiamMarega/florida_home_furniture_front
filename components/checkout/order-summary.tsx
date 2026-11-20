@@ -1,12 +1,18 @@
 'use client';
 
+import { useId } from 'react';
 import { Card } from '@/components/ui/card';
 import { useCart } from '@/contexts/cart-context';
 import { CartItem } from '@/components/cart/cart-item';
 import { Separator } from '@/components/ui/separator';
+import { usePaymentLock } from '@/hooks/use-payment-lock';
 
 export function OrderSummary() {
   const { items, itemCount, order } = useCart();
+  // A card or Affirm payment of this order is in flight (in this tab or another): a quantity change or removal
+  // would change the order being paid, so the item controls are paused until the payment ends.
+  const paymentInFlight = usePaymentLock(order?.code) !== 'free';
+  const hintId = useId();
 
   const formatPrice = (price: number, currencyCode: string = 'USD') => {
     return new Intl.NumberFormat('en-US', {
@@ -52,13 +58,26 @@ export function OrderSummary() {
     <Card className="p-6 sticky top-24">
       <h3 className="text-lg font-semibold text-brand-dark-blue mb-4">Order Summary</h3>
       
-      {/* Cart Items */}
+      {/* Cart Items: a disabled fieldset disables every quantity and remove button inside it */}
       {items.length > 0 && (
         <>
-          <div className="space-y-3 mb-4">
+          <fieldset
+            disabled={paymentInFlight}
+            aria-label="Items in your order"
+            aria-describedby={paymentInFlight ? hintId : undefined}
+            className="min-w-0 space-y-3 mb-4"
+          >
             {items.map((item) => (
               <CartItem key={item.id} item={item} currencyCode={order.currencyCode} />
             ))}
+          </fieldset>
+          {/* Always mounted, so the hint is announced when it appears */}
+          <div role="status" aria-live="polite">
+            {paymentInFlight && (
+              <p id={hintId} className="text-xs text-brand-dark-blue/70 mb-4">
+                Cart changes are paused while your payment is being processed.
+              </p>
+            )}
           </div>
           <Separator className="my-4" />
         </>

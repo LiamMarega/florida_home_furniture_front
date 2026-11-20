@@ -13,7 +13,8 @@ function mapOrderState(state: string): UserOrder['status'] {
   const stateMap: Record<string, UserOrder['status']> = {
     'AddingItems': 'pending',
     'ArrangingPayment': 'pending',
-    'PaymentAuthorized': 'pending',
+    // Placed: the payment is authorized (Affirm captures it right after), same as settled
+    'PaymentAuthorized': 'on-the-way',
     'PaymentSettled': 'on-the-way',
     'PartiallyShipped': 'on-the-way',
     'Shipped': 'shipped',
@@ -115,6 +116,17 @@ function transformOrder(order: any): UserOrder {
 }
 
 /**
+ * The "Current" tab: placed orders still on their way (paid, not yet delivered or cancelled). Vendure's
+ * `active` flag marks the cart (the order still being built or paid, AddingItems/ArrangingPayment) and turns
+ * false once the order is placed, so filtering on `active: true` showed only the cart. Draft orders are
+ * admin-side and not shown.
+ */
+const CURRENT_ORDERS_FILTER = {
+  active: { eq: false },
+  state: { notIn: ['Delivered', 'Cancelled', 'Draft'] },
+};
+
+/**
  * Build OrderListOptions from query parameters
  */
 function buildOrderOptions(
@@ -134,18 +146,12 @@ function buildOrderOptions(
   
   // Apply status filters
   if (status === 'current') {
-    // Active orders (not delivered or cancelled)
-    options.filter = {
-      active: { eq: true },
-      state: { 
-        notIn: ['Delivered', 'Cancelled'] 
-      },
-    };
+    options.filter = CURRENT_ORDERS_FILTER;
   } else if (status === 'unpaid') {
-    // Orders awaiting payment
+    // Orders awaiting payment (a PaymentAuthorized order is placed and paid)
     options.filter = {
-      state: { 
-        in: ['ArrangingPayment', 'PaymentAuthorized'] 
+      state: {
+        eq: 'ArrangingPayment'
       },
     };
   } else if (status && status !== 'all') {
