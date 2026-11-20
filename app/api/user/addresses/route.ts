@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
       city: addr.city || '',
       state: addr.province || '',
       zipCode: addr.postalCode || '',
-      country: addr.country?.name || addr.country?.code || 'US',
+      country: addr.country?.code || 'US',
       phoneNumber: addr.phoneNumber || undefined,
       isDefault: addr.defaultShippingAddress || addr.defaultBillingAddress || false,
     }));
@@ -143,7 +143,7 @@ export async function POST(req: NextRequest) {
       city: address.city || '',
       state: address.province || '',
       zipCode: address.postalCode || '',
-      country: address.country?.name || address.country?.code || country,
+      country: address.country?.code || country,
       phoneNumber: address.phoneNumber || undefined,
       isDefault: address.defaultShippingAddress || address.defaultBillingAddress || false,
     };
