@@ -151,9 +151,11 @@ export default function CheckoutPage() {
   // Determine current step (the order code is set once the order is ready for payment)
   const currentStep = orderCode ? CheckoutStep.PAYMENT : CheckoutStep.CUSTOMER_INFO;
 
-  // Another tab is paying the active order: nothing here may change it or start a payment meanwhile.
+  // A payment of the active order is in flight: another tab pays it ('elsewhere'), or this tab does or just did
+  // with an unknown outcome ('mine', until its lock expires). Nothing here may change the order meanwhile.
   const activeOrderCode = cartOrder?.code ?? null;
-  const paymentElsewhere = usePaymentLock(activeOrderCode) === 'elsewhere';
+  const paymentLock = usePaymentLock(activeOrderCode);
+  const paymentElsewhere = paymentLock === 'elsewhere';
 
   // An Affirm payment this browser started but never settled (refresh, closed tab, lost answer) is finished
   // here before anything else; on the payment step the payment forms handle their own attempts.
@@ -185,9 +187,10 @@ export default function CheckoutPage() {
   const otherPendingAffirmOrder =
     !isLoadingCart && pendingAffirmOrder && pendingAffirmOrder !== activeOrderCode ? pendingAffirmOrder : null;
 
-  // Handle form submission
+  // Handle form submission. processCheckout never throws (a failed step shows its message above the form), so
+  // the submit handler never leaves an unhandled rejection behind.
   const onSubmit = async (data: CustomerFormData) => {
-    await processCheckout(data, selectedShippingMethod);
+    if (!(await processCheckout(data, selectedShippingMethod))) return;
 
     // Auto-save address if it's a new one and there's room
     if (!selectedAddressId && canAddMore) {
@@ -224,7 +227,13 @@ export default function CheckoutPage() {
   const hasAddresses = savedAddresses.length > 0;
   const shouldShowForm = !hasAddresses || showAddressForm || selectedAddressId !== null;
 
-  const continueBlocked = affirmResume.finishing || paymentElsewhere;
+  // A stored Affirm token is being sent, or sent again automatically after a short wait.
+  const affirmResumeBusy = affirmResume.finishing || affirmResume.retrying;
+  const continueBlocked = affirmResumeBusy || paymentLock !== 'free';
+  // This tab's payment of the order is still unsettled (e.g. a reload right after an unknown card outcome) and no
+  // other notice says so.
+  const ownPaymentPending =
+    currentStep === CheckoutStep.CUSTOMER_INFO && paymentLock === 'mine' && !affirmResumeBusy && !!activeOrderCode;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white pt-24 pb-12 sm:py-18">
@@ -245,8 +254,21 @@ export default function CheckoutPage() {
                 </div>
               )}
 
-              {/* An Affirm payment of this order is being finished (resumed after a refresh) */}
-              {affirmResume.finishing && <AffirmFinishingNotice className="mb-6" />}
+              {/* An Affirm payment of this order is being finished (resumed after a refresh), or retried automatically */}
+              {affirmResumeBusy && <AffirmFinishingNotice className="mb-6" retrying={!affirmResume.finishing} />}
+              {ownPaymentPending && (
+                <div role="status" className="mb-6 p-4 border rounded-lg bg-amber-50 border-amber-200">
+                  <p className="text-sm text-amber-800">
+                    A payment for this order is still being confirmed. Please check its status before paying again.
+                  </p>
+                  <Link
+                    href={`/checkout/confirmation/${activeOrderCode}`}
+                    className="mt-2 inline-block text-sm font-medium text-brand-dark-blue underline underline-offset-2"
+                  >
+                    Check order status
+                  </Link>
+                </div>
+              )}
               {resumeRejection && currentStep === CheckoutStep.CUSTOMER_INFO && (
                 <div role="alert" className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-red-600 text-sm font-medium">Your Affirm payment was not completed.</p>
@@ -333,10 +355,16 @@ export default function CheckoutPage() {
                     onShippingMethodSelect={setChosenShippingMethod}
                   />
 
+                  {continueBlocked && (
+                    <p id="checkout-continue-hint" className="text-sm text-center text-brand-dark-blue/70">
+                      You can continue once the payment in progress for this order ends.
+                    </p>
+                  )}
                   <Button
                     type="submit"
                     className="w-full h-12 text-lg font-semibold"
                     disabled={isSubmitting || isProcessing || continueBlocked}
+                    aria-describedby={continueBlocked ? 'checkout-continue-hint' : undefined}
                   >
                     {isSubmitting || isProcessing ? (
                       <>

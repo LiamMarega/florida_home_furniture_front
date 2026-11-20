@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShoppingCart } from 'lucide-react';
@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { CartDrawerItem } from './cart-drawer-item';
 import { AffirmPromo } from '@/components/affirm/affirm-promo';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { usePaymentLock } from '@/hooks/use-payment-lock';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -21,6 +22,10 @@ const FREE_SHIPPING_THRESHOLD = 20000; // $200 in cents
 export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
   const router = useRouter();
   const { items, itemCount, order, isLoading } = useCart();
+  // A card or Affirm payment of this order is in flight (in any tab): a quantity change or removal would change
+  // the order being paid, so the item controls are paused until the payment ends (as in the checkout summary).
+  const paymentInFlight = usePaymentLock(order?.code) !== 'free';
+  const hintId = useId();
 
   const formatPrice = (price: number, currencyCode: string = 'USD') => {
     return new Intl.NumberFormat('en-US', {
@@ -140,24 +145,39 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               </div>
             )} */}
 
-            {/* Cart Items */}
+            {/* Cart Items: a disabled fieldset disables every quantity and remove button inside it */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
-              <AnimatePresence mode="popLayout">
-                {items.map((item, index) => (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ delay: index * 0.05 }}
-                  >
-                    <CartDrawerItem 
-                      item={item} 
-                      currencyCode={order?.currencyCode} 
-                    />
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+              {/* Always mounted, so the hint is announced when it appears */}
+              <div role="status" aria-live="polite">
+                {paymentInFlight && (
+                  <p id={hintId} className="text-sm text-brand-dark-blue/70 pb-2">
+                    Cart changes are paused while your payment is being processed.
+                  </p>
+                )}
+              </div>
+              <fieldset
+                disabled={paymentInFlight}
+                aria-label="Items in your cart"
+                aria-describedby={paymentInFlight ? hintId : undefined}
+                className="min-w-0"
+              >
+                <AnimatePresence mode="popLayout">
+                  {items.map((item, index) => (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 20 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <CartDrawerItem
+                        item={item}
+                        currencyCode={order?.currencyCode}
+                      />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </fieldset>
             </div>
 
             {/* Footer - Subtotal and Checkout */}

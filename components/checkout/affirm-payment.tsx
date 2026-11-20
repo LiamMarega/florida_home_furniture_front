@@ -15,6 +15,7 @@ import {
 } from '@/lib/checkout/affirm-session';
 import { AFFIRM_PAYMENT_FAILED_MESSAGE, finishAffirmPayment } from '@/lib/checkout/affirm-token';
 import type { PaymentAttemptHandlers } from '@/lib/checkout/types';
+import { readableApiError } from '@/lib/checkout/utils';
 import { cn } from '@/lib/utils';
 
 const UNAVAILABLE_MESSAGE = 'Affirm is unavailable right now. Please choose another payment method.';
@@ -44,9 +45,10 @@ async function fetchAffirmCheckout(): Promise<Record<string, unknown>> {
   } catch {
     throw new Error(UNAVAILABLE_MESSAGE);
   }
-  const data: { checkout?: Record<string, unknown>; error?: string } = await response.json().catch(() => ({}));
+  const data: { checkout?: Record<string, unknown> } = await response.json().catch(() => ({}));
   if (!response.ok || !data.checkout) {
-    throw new Error(data.error || UNAVAILABLE_MESSAGE);
+    // The eligibility checker's reasons pass; Vendure's raw texts ("There is no active order") do not.
+    throw new Error(readableApiError(data, UNAVAILABLE_MESSAGE));
   }
   return data.checkout;
 }

@@ -98,6 +98,16 @@ export function PaymentMethodSelector({
     setAttempt(outcome === 'paid' ? 'active' : 'idle');
   };
 
+  // Back is only enabled while nothing is being submitted (a card payment disables it, so does an approved Affirm
+  // checkout being sent): an attempt still active then is one that never ended, such as an Affirm window closed
+  // without calling back. Its lock is released, or it would keep the order's checkout locked.
+  const handleBack = () => {
+    if (attempt === 'active') {
+      releasePaymentLock(orderCode);
+    }
+    onBack();
+  };
+
   const cardClientSecret = clientSecret && clientSecret.trim() !== '' ? clientSecret : null;
   const affirmMethod = findAffirmPaymentMethod(paymentMethods, affirm);
   // The PaymentIntent could not be created, so only Affirm is offered
@@ -225,7 +235,7 @@ export function PaymentMethodSelector({
             orderCode={orderCode}
             disabled={lockedElsewhere}
             onPaid={onPaid}
-            onBack={onBack}
+            onBack={handleBack}
             onAttemptStart={() => startAttempt('card')}
             onAttemptEnd={endAttempt}
           />
@@ -239,7 +249,7 @@ export function PaymentMethodSelector({
           promoAmount={options.length > 1 ? undefined : orderTotal}
           disabled={lockedElsewhere}
           onPaid={onPaid}
-          onBack={onBack}
+          onBack={handleBack}
           onAttemptStart={() => startAttempt('affirm')}
           onAttemptEnd={endAttempt}
         />

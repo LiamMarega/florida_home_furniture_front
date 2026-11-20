@@ -2,7 +2,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { CustomerFormData, EligiblePaymentMethod, ShippingMethod } from '@/lib/checkout/types';
-import { readableApiError } from '@/lib/checkout/utils';
+import {
+  apiErrorCode,
+  EMAIL_IN_USE_MESSAGE,
+  friendlyCheckoutMessage,
+  readableApiError,
+} from '@/lib/checkout/utils';
+
+// A checkout step failed without the route's answer: the request never reached the store.
+const CHECKOUT_FAILED_MESSAGE = 'We could not reach the store. Please check your connection and try again.';
 
 // Query keys
 export const checkoutKeys = {
@@ -25,13 +33,16 @@ async function readJson(response: Response): Promise<unknown> {
   return response.json().catch(() => null);
 }
 
+type ApiError = Error & { status: number; code?: string };
+
 /**
- * An Error with the route's readable message and its HTTP status, so the global React Query retry skips
- * 4xx answers (a rejected change is not retried).
+ * An Error with the route's readable message, its HTTP status (so the global React Query retry skips 4xx
+ * answers: a rejected change is not retried) and its error code, if any.
  */
-function apiError(response: Response, data: unknown, fallback: string): Error & { status: number } {
-  const error = new Error(readableApiError(data, fallback)) as Error & { status: number };
+function apiError(response: Response, data: unknown, fallback: string): ApiError {
+  const error = new Error(readableApiError(data, fallback)) as ApiError;
   error.status = response.status;
+  error.code = apiErrorCode(data);
   return error;
 }
 
@@ -190,8 +201,13 @@ export function useCheckoutProcess() {
     },
   });
 
+  /**
+   * Prepares the order for payment: contact details, shipping address and method, then the payment intent. True
+   * once the payment step can open; false when a step failed, with the reason in `error`. Never throws: it runs
+   * in the form's submit handler, where a rejection would be an unhandled promise rejection.
+   */
   const processCheckout = useCallback(
-    async (data: CustomerFormData, selectedShippingMethod: string) => {
+    async (data: CustomerFormData, selectedShippingMethod: string): Promise<boolean> => {
       setError(null);
 
       try {
@@ -213,13 +229,9 @@ export function useCheckoutProcess() {
                 e.message?.includes('EMAIL_ADDRESS_CONFLICT_ERROR')
             )
           ) {
-            const errorMessage =
-              setCustomerData?.setCustomerForOrder?.message ||
-              setCustomerData?.errors?.[0]?.message ||
-              'This email address is already registered. Please login to continue.';
-            setError(errorMessage);
+            setError(EMAIL_IN_USE_MESSAGE);
             openAuthModal('login');
-            return;
+            return false;
           }
         }
 
@@ -236,10 +248,15 @@ export function useCheckoutProcess() {
         setClientSecret(paymentIntent.clientSecret);
         setPaymentMethods(paymentIntent.paymentMethods);
         setOrderCode(paymentIntent.orderCode);
+        return true;
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'An error occurred during checkout';
-        setError(errorMessage);
-        throw err;
+        // The routes' messages are already readable; a network failure ("Failed to fetch") is not.
+        setError(friendlyCheckoutMessage(err instanceof Error ? err.message : undefined, CHECKOUT_FAILED_MESSAGE));
+        // The email belongs to an account (Vendure's EMAIL_ADDRESS_CONFLICT_ERROR): the shopper signs in instead.
+        if ((err as Partial<ApiError> | null)?.code === 'EMAIL_ADDRESS_CONFLICT_ERROR') {
+          openAuthModal('login');
+        }
+        return false;
       }
     },
     [setCustomerMutation, setShippingAddressMutation, setShippingMethodMutation, createPaymentIntentMutation, openAuthModal, isAuthenticated]

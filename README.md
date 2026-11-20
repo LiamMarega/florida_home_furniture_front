@@ -778,15 +778,24 @@ another breaks checkout); the backend is the single source of truth.
    automatically, once per page load, when the checkout or confirmation page of that order loads while
    the order still awaits payment ("Finishing your Affirm payment…"); "Check Status" on the confirmation
    page sends it again too. It is dropped once the order is placed, cancelled or changed.
+   After a server or network failure (e.g. Affirm answered after the backend's timeout, which recorded an
+   `Error`), the page whose order still awaits payment re-sends the same token automatically about 5 s,
+   15 s and 45 s later ("Still confirming your Affirm payment"), one request each, under the payment lock:
+   the backend adopts a late authorization for the same order and token. It stops on 200, 400/402 (final),
+   409 (the page re-checks the order) or once the order is placed.
 5. The confirmation page decides from the real order state: `PaymentAuthorized` (Affirm captures right
    after) and later states are a placed order; a latest payment `Declined` while the order is
    `ArrangingPayment` shows "Payment not completed" with a way back to checkout; a latest payment in
    `Error` (Affirm busy or unreachable, the order changed meanwhile, or a card payment in progress, which
    the page says explicitly) means "still confirming" and never suggests another payment method;
-   `AddingItems` means the cart changed before the payment completed (nothing charged); otherwise it
-   re-checks for about two minutes, then asks the customer to check their email before paying again.
-   Stripe's `redirect_status=succeeded` (or `processing`) keeps it waiting instead of showing a failure.
-   A session that may not read the order (FORBIDDEN) sees a neutral "Sign in to view this order".
+   `AddingItems` means the cart changed before the payment completed (nothing charged); an order with no
+   payment at all and none in flight from this browser (no stored token, no payment lock, no Stripe
+   redirect) shows "We haven't received a payment for this order yet." with "Back to checkout" after about
+   9 s; otherwise it re-checks for about two minutes, then asks the customer to check their email before
+   paying again. Stripe's `redirect_status=succeeded` (or `processing`) keeps it waiting instead of showing a
+   failure. A session that may not read the order (FORBIDDEN) sees a neutral "Sign in to view this order".
+   Raw backend texts (Vendure's "There is no active order", error codes, Affirm's decline codes) are shown
+   as friendly copy (`friendlyCheckoutMessage` in `lib/checkout/utils.ts`); the details stay in the logs.
 6. Redirects: Affirm uses the checkout object's URLs only if it redirects instead of calling the modal
    callbacks. The confirmation URL is `/checkout/affirm/return`: it reads `checkout_token` and sends it
    (like the modal's success) only if this browser set the "Affirm opened for order X" marker right before
@@ -806,6 +815,9 @@ another breaks checkout); the backend is the single source of truth.
   order is in progress in another tab" and disable their pay actions. It is released on a final outcome
   and left to expire on an unknown one. It is best effort; the backend's order lock, card/Affirm
   exclusivity and idempotent tokens are the real protection.
+- While the lock is held (any tab), the quantity and remove buttons of the checkout summary and of the
+  header's cart drawer, and "Continue to Payment", are disabled, with a hint saying why: changing the cart
+  would change the order being paid.
 
 **Promotional messaging**: `components/affirm/affirm-promo.tsx` renders Affirm's "As low as $X/mo"
 messaging (`affirm-as-low-as`, amount in cents) under the product price, next to the totals in the cart

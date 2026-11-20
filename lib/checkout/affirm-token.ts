@@ -6,11 +6,23 @@
  * `unknown`: the payment may or may not have gone through, so the token stays for a resume and the confirmation
  * page decides from the real order state. Sent with plain fetch, never a React Query mutation, whose global
  * retry would replay it on its own.
+ *
+ * An unknown answer from a server or network failure schedules an automatic re-send of the same token (see
+ * AFFIRM_AUTO_RETRY_DELAYS_MS): Affirm may answer the backend after its timeout, which then recorded an Error, and
+ * the backend adopts that late authorization when the same token comes again (authorizing is idempotent per order
+ * and token). The page whose order still awaits payment sends it when due (useAffirmResume).
  */
 import { clearPendingAffirmToken, type PendingAffirmToken } from '@/lib/checkout/affirm-session';
+import { friendlyCheckoutMessage } from '@/lib/checkout/utils';
 
 export const AFFIRM_PAYMENT_FAILED_MESSAGE =
   'Affirm could not complete the payment. You can try again or choose another payment method.';
+
+/**
+ * The automatic re-sends after an unknown answer from a server or network failure, each counted from the previous
+ * answer. One page load sends a token at most five times on its own: the first send, its immediate retry and these.
+ */
+export const AFFIRM_AUTO_RETRY_DELAYS_MS: readonly number[] = [5_000, 15_000, 45_000];
 
 export type AffirmPaymentOutcome =
   | { outcome: 'paid'; orderCode: string }
@@ -65,25 +77,60 @@ async function submitCheckoutToken(checkoutToken: string): Promise<PaymentAttemp
 // Tokens sent from this page load, by any flow. An automatic resume never sends one again: a reload does.
 const sentTokens = new Set<string>();
 
+/** Per token: the automatic re-sends started from this page load, and when the next one is due (null: none). */
+interface AutoRetry {
+  count: number;
+  dueAt: number | null;
+}
+const autoRetries = new Map<string, AutoRetry>();
+
+function setAutoRetry(token: string, retry: AutoRetry | null): void {
+  if (retry) {
+    autoRetries.set(token, retry);
+  } else {
+    autoRetries.delete(token);
+  }
+  resumeListeners.forEach((listener) => listener());
+}
+
 /**
- * Sends a pending token: once, and once more after a server or network failure (authorizing is idempotent per
- * order and token), then clears the stored token on a final answer. Never throws: anything unexpected is an
- * unknown outcome, and the token stays for a later resume.
+ * When the next automatic re-send of `token` is due (epoch ms), or null: none scheduled, one running, or all used.
+ * Observable with subscribeAffirmResumes.
  */
-export async function finishAffirmPayment(pending: PendingAffirmToken): Promise<AffirmPaymentOutcome> {
+export function affirmAutoRetryDueAt(token: string | null | undefined): number | null {
+  return token ? (autoRetries.get(token)?.dueAt ?? null) : null;
+}
+
+/**
+ * Sends a pending token, then clears the stored token on a final answer. The first send (and a manual resend) is
+ * retried once right away after a server or network failure; an automatic re-send (`auto`) is not, its schedule
+ * is the retry. A server or network failure schedules the next automatic re-send while any is left; a 409 (the
+ * order no longer awaits this payment) does not: the page checks the order instead. Never throws: anything
+ * unexpected is an unknown outcome, and the token stays for a later resume.
+ */
+export async function finishAffirmPayment(
+  pending: PendingAffirmToken,
+  options: { auto?: boolean } = {}
+): Promise<AffirmPaymentOutcome> {
   sentTokens.add(pending.token);
+  const count = (autoRetries.get(pending.token)?.count ?? 0) + (options.auto ? 1 : 0);
+  // Nothing else is due while this send runs.
+  setAutoRetry(pending.token, { count, dueAt: null });
   try {
     let attempt = await submitCheckoutToken(pending.token);
-    if (attempt.outcome === 'unknown' && attempt.retry) {
+    if (!options.auto && attempt.outcome === 'unknown' && attempt.retry) {
       attempt = await submitCheckoutToken(pending.token);
     }
     if (attempt.outcome === 'unknown') {
+      const delay = attempt.retry ? AFFIRM_AUTO_RETRY_DELAYS_MS[count] : undefined;
+      setAutoRetry(pending.token, { count, dueAt: delay === undefined ? null : Date.now() + delay });
       return { outcome: 'unknown' };
     }
+    setAutoRetry(pending.token, null);
     clearPendingAffirmToken({ token: pending.token });
     return attempt.outcome === 'paid'
       ? { outcome: 'paid', orderCode: attempt.orderCode || pending.orderCode }
-      : { outcome: 'rejected', error: attempt.error || AFFIRM_PAYMENT_FAILED_MESSAGE };
+      : { outcome: 'rejected', error: friendlyCheckoutMessage(attempt.error, AFFIRM_PAYMENT_FAILED_MESSAGE) };
   } catch (error) {
     console.error('Affirm payment confirmation failed:', error);
     return { outcome: 'unknown' };
@@ -114,14 +161,14 @@ export function canResumeAffirmToken(token: string): boolean {
 }
 
 /**
- * Sends a pending token again (see finishAffirmPayment) and calls `onSettled` once with the outcome, even if the
- * page that started it is gone. Returns false, sending nothing, when this token is already being sent or (unless
- * `force`) was sent from this page load.
+ * Sends a pending token again (see finishAffirmPayment; `auto` for a scheduled automatic re-send) and calls
+ * `onSettled` once with the outcome, even if the page that started it is gone. Returns false, sending nothing,
+ * when a token of the order is already being sent or (unless `force`) this one was sent from this page load.
  */
 export function resumeAffirmPayment(
   pending: PendingAffirmToken,
   onSettled: (outcome: AffirmPaymentOutcome) => void,
-  options: { force?: boolean } = {}
+  options: { force?: boolean; auto?: boolean } = {}
 ): boolean {
   const current = resumes.get(pending.orderCode);
   if (current?.status === 'sending' || (!options.force && sentTokens.has(pending.token))) {
@@ -129,7 +176,7 @@ export function resumeAffirmPayment(
   }
   const id = ++lastResumeId;
   setResume({ id, orderCode: pending.orderCode, status: 'sending' });
-  void finishAffirmPayment(pending).then((outcome) => {
+  void finishAffirmPayment(pending, { auto: options.auto }).then((outcome) => {
     setResume({ id, orderCode: pending.orderCode, status: 'done', outcome });
     onSettled(outcome);
   });

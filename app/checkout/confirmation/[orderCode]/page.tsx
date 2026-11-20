@@ -16,10 +16,13 @@ import {
   ShoppingCart,
   Mail,
   LogIn,
+  CreditCard,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useAffirmConfig } from '@/hooks/use-affirm-config';
+import { usePaymentLock } from '@/hooks/use-payment-lock';
 import { useAffirmResume, type AffirmResumeAction } from '@/components/checkout/affirm-resume';
+import { friendlyCheckoutMessage } from '@/lib/checkout/utils';
 
 // Order states of a placed order: payment authorized (Affirm captures it a moment later) or settled
 const SUCCESS_STATES = ['PaymentAuthorized', 'PaymentSettled', 'PartiallyShipped', 'Shipped', 'PartiallyDelivered', 'Delivered'];
@@ -34,6 +37,11 @@ const CARD_PAYMENT_IN_PROGRESS = /card payment/i;
 // a bounded number of times: 40 attempts x 3 s = about 2 minutes.
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLL_ATTEMPTS = 40;
+// An order with no payment at all, and none in flight from this browser, is re-checked this many times (about
+// 9 s, for a payment that is just landing) before the page says no payment was received.
+const NO_PAYMENT_POLL_ATTEMPTS = 3;
+
+const ORDER_LOAD_FAILED_MESSAGE = 'We could not retrieve your order information.';
 
 interface OrderPayment {
   id: string;
@@ -61,6 +69,8 @@ interface OrderData {
  *   the Error state: Affirm busy or unreachable, the order changed meanwhile, a card payment in progress),
  *   or Stripe accepted the payment and its webhook is pending
  * - stalled: still processing after the last automatic re-check
+ * - nopayment: still awaiting payment with no payment recorded and none in flight from this browser, after a
+ *   few re-checks: nothing is being processed, so the shopper is sent back to checkout
  * - failed: the latest payment was declined while the order still awaits payment
  * - changed: the cart was edited before the payment completed (the order is back in AddingItems)
  * - cancelled: the order was cancelled
@@ -72,6 +82,7 @@ type DisplayStatus =
   | 'success'
   | 'processing'
   | 'stalled'
+  | 'nopayment'
   | 'failed'
   | 'changed'
   | 'cancelled'
@@ -80,25 +91,32 @@ type DisplayStatus =
 
 type OrderResult = { order: OrderData } | { signIn: true } | { error: string };
 
+/** The order, or why it is not shown: a readable message, never a raw backend or network error. */
 async function requestOrder(orderCode: string): Promise<OrderResult> {
   try {
     const response = await fetch(`/api/orders/${orderCode}`, {
       credentials: 'include',
     });
 
-    const data = await response.json();
+    const data: unknown = await response.json().catch(() => null);
+    const body = (data && typeof data === 'object' ? data : {}) as {
+      order?: OrderData;
+      requiresAuth?: unknown;
+      error?: unknown;
+    };
 
     if (!response.ok) {
       // FORBIDDEN: this session may not read the order. Its state is unknown, so nothing is claimed.
-      if (data.requiresAuth) {
+      if (body.requiresAuth) {
         return { signIn: true };
       }
-      throw new Error(typeof data.error === 'string' ? data.error : 'Failed to fetch order');
+      return { error: friendlyCheckoutMessage(body.error, ORDER_LOAD_FAILED_MESSAGE) };
     }
 
-    return { order: data.order };
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Failed to fetch order' };
+    return body.order ? { order: body.order } : { error: ORDER_LOAD_FAILED_MESSAGE };
+  } catch {
+    // Network failure: nothing is known about the order.
+    return { error: ORDER_LOAD_FAILED_MESSAGE };
   }
 }
 
@@ -149,7 +167,7 @@ function isCardPaymentInProgress(order: OrderData | null, redirectStatus: string
 function getDisplayStatus(
   order: OrderData | null,
   redirectStatus: string | null
-): Exclude<DisplayStatus, 'stalled' | 'signin'> {
+): Exclude<DisplayStatus, 'stalled' | 'nopayment' | 'signin'> {
   const stripePaymentInProgress = redirectStatus !== null && STRIPE_PAYMENT_IN_PROGRESS.includes(redirectStatus);
 
   if (!order) {
@@ -288,12 +306,32 @@ export default function ConfirmationPage() {
       ? affirmResume.outcome.error
       : null;
 
+  // No payment at all: none recorded on the order, none in flight from this browser (a stored Affirm token, the
+  // order's payment lock held by any tab) and no Stripe redirect saying one is going through.
+  const paymentLock = usePaymentLock(orderCode);
+  const awaitingFirstPayment =
+    baseStatus === 'processing' &&
+    order?.state === 'ArrangingPayment' &&
+    !order.payments?.length &&
+    !cardPaymentInProgress &&
+    !affirmResume.hasPendingToken &&
+    !affirmResume.finishing &&
+    paymentLock === 'free';
+
   let displayStatus: DisplayStatus;
   if (signInRequired) {
     displayStatus = 'signin';
   } else if (resumeRejection && baseStatus === 'processing' && !cardPaymentInProgress) {
     displayStatus = 'failed';
-  } else if (baseStatus === 'processing' && pollAttempts >= MAX_POLL_ATTEMPTS && !affirmResume.finishing) {
+  } else if (awaitingFirstPayment && pollAttempts >= NO_PAYMENT_POLL_ATTEMPTS) {
+    // Nothing is being processed: say so, instead of "Your payment is being processed"
+    displayStatus = 'nopayment';
+  } else if (
+    baseStatus === 'processing' &&
+    pollAttempts >= MAX_POLL_ATTEMPTS &&
+    !affirmResume.finishing &&
+    !affirmResume.retrying
+  ) {
     // Out of automatic re-checks while still processing: a calm "still confirming" view, never "failed"
     displayStatus = 'stalled';
   } else {
@@ -336,7 +374,8 @@ export default function ConfirmationPage() {
       return;
     }
     setLoading(true);
-    setPollAttempts(0);
+    // Re-checking an order that has no payment goes straight back to saying so, unless one arrived meanwhile.
+    setPollAttempts(displayStatus === 'nopayment' ? NO_PAYMENT_POLL_ATTEMPTS : 0);
     setRetryCount(prev => prev + 1);
   };
 
@@ -481,13 +520,29 @@ export default function ConfirmationPage() {
 
   // Processing state (payment pending)
   if (displayStatus === 'processing') {
+    let title = 'Payment Processing';
+    let description = 'Your payment is being processed. This may take a few moments.';
+    if (affirmResume.finishing) {
+      title = 'Finishing your Affirm payment…';
+      description = 'Please keep this page open while we confirm your payment with Affirm.';
+    } else if (affirmResume.retrying) {
+      // A slow Affirm answer: the same approval is sent again automatically in a moment
+      title = 'Still Confirming Your Affirm Payment';
+      description =
+        "Affirm is taking a little longer than usual. We'll check again automatically, so please keep this page open.";
+    } else if (awaitingFirstPayment) {
+      // No payment recorded yet: never claim one is being processed
+      title = 'Checking Your Payment';
+      description = "We're checking whether a payment for this order has arrived. This only takes a moment.";
+    }
+
     return (
       <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white pt-28 pb-12 flex items-center justify-center">
         <div className="max-w-2xl mx-auto px-4 w-full">
           <Card className="p-8 text-center">
             <div className="flex justify-center mb-6">
               <div className="w-20 h-20 rounded-full bg-yellow-100 flex items-center justify-center">
-                {affirmResume.finishing ? (
+                {affirmResume.finishing || affirmResume.retrying ? (
                   <Loader2 className="w-12 h-12 text-yellow-600 animate-spin" />
                 ) : (
                   <Clock className="w-12 h-12 text-yellow-600" />
@@ -495,14 +550,10 @@ export default function ConfirmationPage() {
               </div>
             </div>
 
-            <h1 className="text-3xl font-bold text-brand-dark-blue mb-4 font-tango-sans">
-              {affirmResume.finishing ? 'Finishing your Affirm payment…' : 'Payment Processing'}
-            </h1>
+            <h1 className="text-3xl font-bold text-brand-dark-blue mb-4 font-tango-sans">{title}</h1>
 
-            <p className="text-lg text-brand-dark-blue/70 mb-8">
-              {affirmResume.finishing
-                ? 'Please keep this page open while we confirm your payment with Affirm.'
-                : 'Your payment is being processed. This may take a few moments.'}
+            <p role="status" className="text-lg text-brand-dark-blue/70 mb-8">
+              {description}
             </p>
 
             {note && !affirmResume.finishing && (
@@ -594,9 +645,56 @@ export default function ConfirmationPage() {
     );
   }
 
+  // No payment recorded and none in flight: nothing to wait for, so the shopper goes back to checkout to pay
+  if (displayStatus === 'nopayment') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white pt-28 pb-12 flex items-center justify-center">
+        <div className="max-w-2xl mx-auto px-4 w-full">
+          <Card className="p-8 text-center">
+            <div className="flex justify-center mb-6">
+              <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center">
+                <CreditCard className="w-12 h-12 text-gray-600" />
+              </div>
+            </div>
+
+            <h1 className="text-3xl font-bold text-brand-dark-blue mb-4 font-tango-sans">
+              Awaiting Payment
+            </h1>
+
+            <p className="text-lg text-brand-dark-blue/70 mb-8">
+              We haven&apos;t received a payment for this order yet.
+            </p>
+
+            <div className="bg-gray-50 rounded-lg p-6 mb-8">
+              <p className="text-sm text-brand-dark-blue/60 mb-2">Order Number</p>
+              <p className="text-2xl font-bold text-brand-primary">{orderCode}</p>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-sm text-brand-dark-blue/70">
+                Already paid? Please check your email for an order confirmation before paying again.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button asChild size="lg">
+                  <Link href="/checkout">Back to checkout</Link>
+                </Button>
+                <Button onClick={handleRetry} variant="outline" size="lg">
+                  <RefreshCw className="w-5 h-5 mr-2" />
+                  Check Status
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   // The latest payment attempt was declined: the order still awaits payment
   if (displayStatus === 'failed') {
-    const paymentError = resumeRejection ?? latestDeclinedPayment(order)?.errorMessage;
+    // Readable reasons only: Affirm's decline code or a raw backend text is not shown
+    const paymentError = resumeRejection ?? friendlyCheckoutMessage(latestDeclinedPayment(order)?.errorMessage, '');
 
     return (
       <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white pt-28 pb-12 flex items-center justify-center">
