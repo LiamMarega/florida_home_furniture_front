@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense, useEffect, useState, useCallback } from 'react';
-import { useForm } from 'react-hook-form';
+import { Suspense, useEffect, useRef, useState, useCallback } from 'react';
+import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -26,7 +26,7 @@ import { OrderSummary } from '@/components/checkout/order-summary';
 import { CustomerInfoSection } from '@/components/checkout/customer-info-section';
 import { ShippingAddressSection } from '@/components/checkout/shipping-address-section';
 import { BillingAddressSection } from '@/components/checkout/billing-address-section';
-import { ShippingMethodsSection } from '@/components/checkout/shipping-methods-section';
+import { NO_SHIPPING_METHOD_ID, ShippingMethodsSection } from '@/components/checkout/shipping-methods-section';
 import { AddressSelectorWithModal } from '@/components/checkout/address-selector';
 
 // Hooks and types
@@ -43,10 +43,18 @@ export default function CheckoutPage() {
   // Custom hooks for state management
   const {
     data: shippingData,
-    isLoading: isLoadingShippingMethods,
+    isPending: isLoadingShippingMethods,
+    isError: shippingMethodsError,
+    isFetching: isFetchingShippingMethods,
+    refetch: refetchShippingMethods,
   } = useShippingMethods();
 
   const shippingMethods = shippingData?.shippingMethods || [];
+  // The list could not load (and none loaded before): the section offers a retry.
+  const shippingMethodsLoadFailed = shippingMethodsError && !shippingData;
+  // The order has no shipping method to choose, so payment cannot start: continuing is blocked and the section
+  // says how to reach the store.
+  const noShippingMethod = !!shippingData && shippingMethods.length === 0;
   // The shopper's explicit choice; until then, the method the order already has (so the page never
   // shows a shipping price other than the one the order charges), else the first eligible one.
   const [chosenShippingMethod, setChosenShippingMethod] = useState<string>('');
@@ -60,6 +68,15 @@ export default function CheckoutPage() {
     processCheckout,
     resetCheckout,
   } = useCheckoutProcess();
+
+  // A failed step is announced and brought into view whenever its message changes (each attempt clears it first),
+  // so it is never missed below the fold, as on a phone where the button is far from the top of the form.
+  const stepErrorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!checkoutError) return;
+    stepErrorRef.current?.focus({ preventScroll: true });
+    stepErrorRef.current?.scrollIntoView({ block: 'center' });
+  }, [checkoutError]);
 
   // Active order (same data as the order summary); its total feeds Affirm's payment messaging
   const { order: cartOrder, isLoading: isLoadingCart } = useCart();
@@ -90,6 +107,9 @@ export default function CheckoutPage() {
     handleSubmit,
     watch,
     setValue,
+    trigger,
+    getFieldState,
+    subscribe,
     formState: { errors, isSubmitting },
   } = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
@@ -105,14 +125,29 @@ export default function CheckoutPage() {
     setSelectedAddressId(address.id);
     setShowAddressForm(false);
 
-    // Auto-populate form fields
+    // Auto-populate form fields, then check them at once: a saved address outside the US or with a field to fix
+    // says what to fix as soon as it is chosen.
     const formData = addressToFormData(address);
-    Object.entries(formData).forEach(([key, value]) => {
-      if (value !== undefined) {
-        setValue(key as keyof CustomerFormData, value as string);
-      }
-    });
-  }, [setValue]);
+    const fields = Object.keys(formData) as (keyof CustomerFormData)[];
+    fields.forEach((field) => setValue(field, formData[field] as string));
+    void trigger(fields);
+  }, [setValue, trigger]);
+
+  // Before the first submit the form checks nothing as the shopper types: a field flagged when an address was
+  // chosen is checked again on each change, so its message goes away once it is right.
+  useEffect(
+    () =>
+      subscribe({
+        formState: { values: true },
+        callback: ({ name, type }) => {
+          const field = name as keyof CustomerFormData | undefined;
+          if (type === 'change' && field && getFieldState(field).error) {
+            void trigger(field);
+          }
+        },
+      }),
+    [subscribe, getFieldState, trigger]
+  );
 
   // Auto-select default address once saved addresses load (one-time init, not derivable in render).
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -204,6 +239,16 @@ export default function CheckoutPage() {
     }
   };
 
+  // The country has no input to type in: when it is a field to fix, its line is focused and its message brought into
+  // view (react-hook-form then focuses the first other field to fix, if any).
+  const onInvalid = (formErrors: FieldErrors<CustomerFormData>) => {
+    if (formErrors.shippingCountry) {
+      const country = document.getElementById('shippingCountry');
+      country?.focus({ preventScroll: true });
+      country?.scrollIntoView({ block: 'center' });
+    }
+  };
+
   // Handle successful payment
   const handlePaid = (orderCode: string) => {
     router.push(`/checkout/confirmation/${orderCode}`);
@@ -249,7 +294,12 @@ export default function CheckoutPage() {
 
               {/* Error Display */}
               {checkoutError && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div
+                  ref={stepErrorRef}
+                  role="alert"
+                  tabIndex={-1}
+                  className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg outline-none"
+                >
                   <p className="text-red-600 text-sm">{checkoutError}</p>
                 </div>
               )}
@@ -301,7 +351,7 @@ export default function CheckoutPage() {
 
               {currentStep === CheckoutStep.CUSTOMER_INFO ? (
                 /* Customer Information Form */
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-6">
                   <CustomerInfoSection register={register} errors={errors} />
 
                   <Separator />
@@ -352,6 +402,9 @@ export default function CheckoutPage() {
                     shippingMethods={shippingMethods}
                     selectedShippingMethod={selectedShippingMethod}
                     isLoadingShippingMethods={isLoadingShippingMethods}
+                    loadFailed={shippingMethodsLoadFailed}
+                    isRetrying={isFetchingShippingMethods}
+                    onRetry={() => void refetchShippingMethods()}
                     onShippingMethodSelect={setChosenShippingMethod}
                   />
 
@@ -363,8 +416,12 @@ export default function CheckoutPage() {
                   <Button
                     type="submit"
                     className="w-full h-12 text-lg font-semibold"
-                    disabled={isSubmitting || isProcessing || continueBlocked}
-                    aria-describedby={continueBlocked ? 'checkout-continue-hint' : undefined}
+                    disabled={isSubmitting || isProcessing || continueBlocked || noShippingMethod}
+                    aria-describedby={
+                      [continueBlocked && 'checkout-continue-hint', noShippingMethod && NO_SHIPPING_METHOD_ID]
+                        .filter(Boolean)
+                        .join(' ') || undefined
+                    }
                   >
                     {isSubmitting || isProcessing ? (
                       <>

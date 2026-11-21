@@ -3,22 +3,28 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useAddresses } from '@/app/profile/hooks/use-addresses';
-import { UserAddress } from '@/app/profile/types';
-import { CustomerFormData } from '@/lib/checkout/types';
+import type { UserAddress } from '@/app/profile/types';
+import type { CustomerFormData } from '@/lib/checkout/types';
+import { toUsCountryCode, toUsStateCode } from '@/lib/checkout/us-states';
 
 const GUEST_ADDRESSES_KEY = 'fhf_guest_addresses';
 const MAX_SAVED_ADDRESSES = 4;
 
-// Map a UserAddress to checkout form fields
+/**
+ * Map a UserAddress to checkout form fields. Every field gets a string, so choosing another address replaces all of
+ * them. Saved states may be names ("Florida") or lowercase codes and become the state select's code (anything else
+ * is empty: the shopper chooses a state); a country naming the US becomes "US" (anything else stays, and checkout
+ * says the address is outside the US).
+ */
 export function addressToFormData(addr: UserAddress): Partial<CustomerFormData> {
   return {
     shippingFullName: addr.fullName || '',
-    shippingStreetLine1: addr.street,
+    shippingStreetLine1: addr.street || '',
     shippingStreetLine2: addr.streetLine2 || '',
-    shippingCity: addr.city,
-    shippingProvince: addr.state,
-    shippingPostalCode: addr.zipCode,
-    shippingCountry: addr.country || 'US',
+    shippingCity: addr.city || '',
+    shippingProvince: toUsStateCode(addr.state),
+    shippingPostalCode: addr.zipCode || '',
+    shippingCountry: toUsCountryCode(addr.country),
     shippingPhoneNumber: addr.phoneNumber || '',
   };
 }
@@ -121,21 +127,22 @@ export function useSavedAddresses() {
     setGuestAddresses(addresses);
   }, []);
 
-  // Unified interface
+  // Unified interface: creating or updating resolves to the saved address (the account routes answer `{ address }`).
   if (isAuthenticated) {
     const canAddMore = authAddresses.addresses.length < MAX_SAVED_ADDRESSES;
-    const guardedCreate = async (address: Omit<UserAddress, 'id'>) => {
+    const guardedCreate = async (address: Omit<UserAddress, 'id'>): Promise<UserAddress> => {
       if (!canAddMore) {
         throw new Error(`You can save up to ${MAX_SAVED_ADDRESSES} addresses. Please delete one to add a new one.`);
       }
-      return authAddresses.createAddress(address);
+      return (await authAddresses.createAddress(address)).address;
     };
 
     return {
       addresses: authAddresses.addresses,
       isLoading: authAddresses.loading,
       createAddress: guardedCreate,
-      updateAddress: authAddresses.updateAddress,
+      updateAddress: async (id: string, data: Partial<UserAddress>): Promise<UserAddress> =>
+        (await authAddresses.updateAddress(id, data)).address,
       deleteAddress: authAddresses.deleteAddress,
       setDefaultAddress: authAddresses.setDefaultAddress,
       isCreating: authAddresses.isCreating,

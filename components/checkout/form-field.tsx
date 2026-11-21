@@ -23,6 +23,8 @@ export function FormField({
   register,
   className = '',
 }: FormFieldProps) {
+  // The message is linked to the field, so screen readers announce it with the field.
+  const errorId = `${id}-error`;
   return (
     <div className={className}>
       <Label htmlFor={id}>
@@ -32,11 +34,13 @@ export function FormField({
         id={id}
         type={type}
         placeholder={placeholder}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
         {...register(id)}
         className={error ? 'border-red-500' : ''}
       />
       {error && (
-        <p className="text-red-500 text-sm mt-1">{error.message}</p>
+        <p id={errorId} className="text-red-500 text-sm mt-1">{error.message}</p>
       )}
     </div>
   );
