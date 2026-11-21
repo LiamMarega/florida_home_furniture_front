@@ -79,7 +79,12 @@ Route evidence: about 12 files across forms, hooks, routes and the profile modal
 
 ## Delivery
 
-`ask-on-risk`; forecast about 500 authored changed lines (over the 400-line budget): chain strategy asked at PR time.
+`ask-on-risk`; forecast about 500 authored changed lines, actual +772/−152 (over the 400-line budget). At PR time
+the owner chose one PR with a size exception and a production deploy once the Vercel preview passes (2026-11-20):
+PR #34. Parent verification before delivery: `gentle-ai review assess` medium (executable change; writer not on a
+small model, so no separate verifier); spot check of both logic checks (16/16, 9/9) and `tsc` 0; structural check
+that all 56 USPS codes are accepted, names normalize ("Florida" → FL, "District of Columbia" → DC) and junk is
+refused ("Córdoba", "XX" → empty).
 
 ## Progress and evidence
 
