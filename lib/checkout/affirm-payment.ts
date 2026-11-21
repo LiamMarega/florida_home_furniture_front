@@ -78,7 +78,11 @@ export async function addAffirmPayment(req: Request, checkoutToken: unknown): Pr
     return { result: { ok: true, orderCode: payload.code, state: payload.state }, setCookies };
   }
 
-  console.warn('Affirm payment not completed:', payload.errorCode);
+  // The backend's reason (e.g. Affirm's own refusal message) is what diagnoses a failure from these logs; it carries
+  // no shopper data.
+  const reason =
+    'paymentErrorMessage' in payload ? payload.paymentErrorMessage : 'message' in payload ? payload.message : undefined;
+  console.warn('Affirm payment not completed:', payload.errorCode, reason ?? '');
   return { result: toFailure(payload), setCookies };
 }
 
