@@ -87,6 +87,27 @@ export function readableApiError(data: unknown, fallback: string): string {
   return fallback;
 }
 
+/** Vendure's UserInputError for a country code it does not know ("The countryCode "AR" was not recognized"). */
+const UNKNOWN_COUNTRY = /countryCode .* was not recognized/i;
+
+/**
+ * What the shopper sees when Vendure refuses an order address (`errors` from its GraphQL answer): an unknown
+ * country on the shipping address asks for a US address, since the store delivers within the US only; anything
+ * else says which address could not be saved. The details stay in the server logs.
+ */
+export function addressErrorMessage(
+  errors: ReadonlyArray<{ message?: unknown }> | undefined,
+  address: 'shipping' | 'billing'
+): string {
+  const unknownCountry = (errors ?? []).some(
+    (error) => typeof error?.message === 'string' && UNKNOWN_COUNTRY.test(error.message)
+  );
+  if (address === 'shipping' && unknownCountry) {
+    return 'We only deliver within the United States. Please use a US address.';
+  }
+  return `We could not save your ${address} address. Please check it and try again.`;
+}
+
 export const validateEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);

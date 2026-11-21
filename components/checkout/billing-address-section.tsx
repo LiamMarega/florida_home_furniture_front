@@ -1,6 +1,7 @@
 import { UseFormRegister, FieldErrors, UseFormWatch } from 'react-hook-form';
 import { Label } from '@/components/ui/label';
 import { FormField } from './form-field';
+import { StateSelect } from './state-select';
 import { CustomerFormData } from '@/lib/checkout/types';
 
 interface BillingAddressSectionProps {
@@ -29,15 +30,15 @@ export function BillingAddressSection({ register, errors, watch }: BillingAddres
       {!billingSameAsShipping && (
         <div className="space-y-4 pl-6">
           <h3 className="text-lg font-semibold text-brand-dark-blue">Billing Address</h3>
-          
+
+          {/* Name and phone are optional: payments fall back on the customer's name. */}
           <FormField
             id="billingFullName"
             label="Full Name"
-            required
             register={register}
             error={errors.billingFullName}
           />
-          
+
           <FormField
             id="billingStreetLine1"
             label="Street Address"
@@ -45,14 +46,14 @@ export function BillingAddressSection({ register, errors, watch }: BillingAddres
             register={register}
             error={errors.billingStreetLine1}
           />
-          
+
           <FormField
             id="billingStreetLine2"
             label="Apartment, suite, etc. (optional)"
             register={register}
             error={errors.billingStreetLine2}
           />
-          
+
           <div className="grid md:grid-cols-3 gap-4">
             <FormField
               id="billingCity"
@@ -61,27 +62,25 @@ export function BillingAddressSection({ register, errors, watch }: BillingAddres
               register={register}
               error={errors.billingCity}
             />
-            <FormField
+            <StateSelect
               id="billingProvince"
-              label="State / Province"
               required
-              register={register}
-              error={errors.billingProvince}
+              error={errors.billingProvince?.message}
+              {...register('billingProvince')}
             />
             <FormField
               id="billingPostalCode"
-              label="Postal Code"
+              label="ZIP Code"
               required
               register={register}
               error={errors.billingPostalCode}
             />
           </div>
-          
+
           <FormField
             id="billingPhoneNumber"
             label="Phone Number"
             type="tel"
-            required
             register={register}
             error={errors.billingPhoneNumber}
           />

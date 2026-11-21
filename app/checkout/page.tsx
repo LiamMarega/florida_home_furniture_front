@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState, useCallback } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -90,6 +90,9 @@ export default function CheckoutPage() {
     handleSubmit,
     watch,
     setValue,
+    trigger,
+    getFieldState,
+    subscribe,
     formState: { errors, isSubmitting },
   } = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
@@ -105,14 +108,29 @@ export default function CheckoutPage() {
     setSelectedAddressId(address.id);
     setShowAddressForm(false);
 
-    // Auto-populate form fields
+    // Auto-populate form fields, then check them at once: a saved address outside the US or with a field to fix
+    // says what to fix as soon as it is chosen.
     const formData = addressToFormData(address);
-    Object.entries(formData).forEach(([key, value]) => {
-      if (value !== undefined) {
-        setValue(key as keyof CustomerFormData, value as string);
-      }
-    });
-  }, [setValue]);
+    const fields = Object.keys(formData) as (keyof CustomerFormData)[];
+    fields.forEach((field) => setValue(field, formData[field] as string));
+    void trigger(fields);
+  }, [setValue, trigger]);
+
+  // Before the first submit the form checks nothing as the shopper types: a field flagged when an address was
+  // chosen is checked again on each change, so its message goes away once it is right.
+  useEffect(
+    () =>
+      subscribe({
+        formState: { values: true },
+        callback: ({ name, type }) => {
+          const field = name as keyof CustomerFormData | undefined;
+          if (type === 'change' && field && getFieldState(field).error) {
+            void trigger(field);
+          }
+        },
+      }),
+    [subscribe, getFieldState, trigger]
+  );
 
   // Auto-select default address once saved addresses load (one-time init, not derivable in render).
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -201,6 +219,16 @@ export default function CheckoutPage() {
       } catch {
         // Non-critical — don't block checkout
       }
+    }
+  };
+
+  // The country has no input to type in: when it is a field to fix, its line is focused and its message brought into
+  // view (react-hook-form then focuses the first other field to fix, if any).
+  const onInvalid = (formErrors: FieldErrors<CustomerFormData>) => {
+    if (formErrors.shippingCountry) {
+      const country = document.getElementById('shippingCountry');
+      country?.focus({ preventScroll: true });
+      country?.scrollIntoView({ block: 'center' });
     }
   };
 
@@ -301,7 +329,7 @@ export default function CheckoutPage() {
 
               {currentStep === CheckoutStep.CUSTOMER_INFO ? (
                 /* Customer Information Form */
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-6">
                   <CustomerInfoSection register={register} errors={errors} />
 
                   <Separator />
