@@ -1,10 +1,20 @@
+import Link from 'next/link';
 import { Package } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { ShippingMethod } from '@/lib/checkout/types';
+
+/** The id of the "no shipping method" message, which also explains why the continue button is disabled. */
+export const NO_SHIPPING_METHOD_ID = 'shipping-methods-unavailable';
 
 interface ShippingMethodsSectionProps {
   shippingMethods: ShippingMethod[];
   selectedShippingMethod: string;
   isLoadingShippingMethods: boolean;
+  /** The list could not load: the section says so and offers a retry. */
+  loadFailed: boolean;
+  /** A retry is running. */
+  isRetrying: boolean;
+  onRetry: () => void;
   onShippingMethodSelect: (methodId: string) => void;
 }
 
@@ -12,6 +22,9 @@ export function ShippingMethodsSection({
   shippingMethods,
   selectedShippingMethod,
   isLoadingShippingMethods,
+  loadFailed,
+  isRetrying,
+  onRetry,
   onShippingMethodSelect,
 }: ShippingMethodsSectionProps) {
   const formatPrice = (price: number) => {
@@ -41,6 +54,15 @@ export function ShippingMethodsSection({
               </div>
             </div>
           ))}
+        </div>
+      ) : loadFailed ? (
+        <div role="alert" className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-600">
+            We could not load the shipping methods. Please check your connection and try again.
+          </p>
+          <Button type="button" variant="outline" size="sm" onClick={onRetry} disabled={isRetrying} className="mt-3">
+            {isRetrying ? 'Retrying...' : 'Retry'}
+          </Button>
         </div>
       ) : shippingMethods.length > 0 ? (
         <div className="space-y-3">
@@ -89,9 +111,20 @@ export function ShippingMethodsSection({
           ))}
         </div>
       ) : (
-        <div className="text-center py-4">
-          <p className="text-brand-dark-blue/70 mb-4">
-            Shipping methods will be available after entering your address
+        // Loaded, and the order has none: payment cannot start, so the store's contact details (as on /contact)
+        // are the way forward.
+        <div id={NO_SHIPPING_METHOD_ID} role="status" className="p-4 border rounded-lg bg-amber-50 border-amber-200">
+          <p className="text-sm font-medium text-amber-800">No shipping method is available for this address.</p>
+          <p className="text-sm text-amber-800 mt-1">
+            Please call us at{' '}
+            <a href="tel:+13059240685" className="font-medium text-brand-dark-blue underline underline-offset-2">
+              +1 (305) 924-0685
+            </a>{' '}
+            or{' '}
+            <Link href="/contact" className="font-medium text-brand-dark-blue underline underline-offset-2">
+              send us a message
+            </Link>
+            , and we&apos;ll help you arrange delivery.
           </p>
         </div>
       )}

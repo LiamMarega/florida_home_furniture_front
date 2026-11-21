@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState, useCallback } from 'react';
+import { Suspense, useEffect, useRef, useState, useCallback } from 'react';
 import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
@@ -26,7 +26,7 @@ import { OrderSummary } from '@/components/checkout/order-summary';
 import { CustomerInfoSection } from '@/components/checkout/customer-info-section';
 import { ShippingAddressSection } from '@/components/checkout/shipping-address-section';
 import { BillingAddressSection } from '@/components/checkout/billing-address-section';
-import { ShippingMethodsSection } from '@/components/checkout/shipping-methods-section';
+import { NO_SHIPPING_METHOD_ID, ShippingMethodsSection } from '@/components/checkout/shipping-methods-section';
 import { AddressSelectorWithModal } from '@/components/checkout/address-selector';
 
 // Hooks and types
@@ -43,10 +43,18 @@ export default function CheckoutPage() {
   // Custom hooks for state management
   const {
     data: shippingData,
-    isLoading: isLoadingShippingMethods,
+    isPending: isLoadingShippingMethods,
+    isError: shippingMethodsError,
+    isFetching: isFetchingShippingMethods,
+    refetch: refetchShippingMethods,
   } = useShippingMethods();
 
   const shippingMethods = shippingData?.shippingMethods || [];
+  // The list could not load (and none loaded before): the section offers a retry.
+  const shippingMethodsLoadFailed = shippingMethodsError && !shippingData;
+  // The order has no shipping method to choose, so payment cannot start: continuing is blocked and the section
+  // says how to reach the store.
+  const noShippingMethod = !!shippingData && shippingMethods.length === 0;
   // The shopper's explicit choice; until then, the method the order already has (so the page never
   // shows a shipping price other than the one the order charges), else the first eligible one.
   const [chosenShippingMethod, setChosenShippingMethod] = useState<string>('');
@@ -60,6 +68,15 @@ export default function CheckoutPage() {
     processCheckout,
     resetCheckout,
   } = useCheckoutProcess();
+
+  // A failed step is announced and brought into view whenever its message changes (each attempt clears it first),
+  // so it is never missed below the fold, as on a phone where the button is far from the top of the form.
+  const stepErrorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!checkoutError) return;
+    stepErrorRef.current?.focus({ preventScroll: true });
+    stepErrorRef.current?.scrollIntoView({ block: 'center' });
+  }, [checkoutError]);
 
   // Active order (same data as the order summary); its total feeds Affirm's payment messaging
   const { order: cartOrder, isLoading: isLoadingCart } = useCart();
@@ -277,7 +294,12 @@ export default function CheckoutPage() {
 
               {/* Error Display */}
               {checkoutError && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div
+                  ref={stepErrorRef}
+                  role="alert"
+                  tabIndex={-1}
+                  className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg outline-none"
+                >
                   <p className="text-red-600 text-sm">{checkoutError}</p>
                 </div>
               )}
@@ -380,6 +402,9 @@ export default function CheckoutPage() {
                     shippingMethods={shippingMethods}
                     selectedShippingMethod={selectedShippingMethod}
                     isLoadingShippingMethods={isLoadingShippingMethods}
+                    loadFailed={shippingMethodsLoadFailed}
+                    isRetrying={isFetchingShippingMethods}
+                    onRetry={() => void refetchShippingMethods()}
                     onShippingMethodSelect={setChosenShippingMethod}
                   />
 
@@ -391,8 +416,12 @@ export default function CheckoutPage() {
                   <Button
                     type="submit"
                     className="w-full h-12 text-lg font-semibold"
-                    disabled={isSubmitting || isProcessing || continueBlocked}
-                    aria-describedby={continueBlocked ? 'checkout-continue-hint' : undefined}
+                    disabled={isSubmitting || isProcessing || continueBlocked || noShippingMethod}
+                    aria-describedby={
+                      [continueBlocked && 'checkout-continue-hint', noShippingMethod && NO_SHIPPING_METHOD_ID]
+                        .filter(Boolean)
+                        .join(' ') || undefined
+                    }
                   >
                     {isSubmitting || isProcessing ? (
                       <>

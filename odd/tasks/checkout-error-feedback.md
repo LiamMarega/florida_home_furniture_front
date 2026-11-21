@@ -53,9 +53,9 @@ next to the field, what to fix; every failure in the checkout shows a specific m
 
 | ID | Task | Route | Status |
 | --- | --- | --- | --- |
-| E1 | US-only address entry: state select, "ZIP Code"/"State" labels, US-only note, non-US country refused with a message that names the saved address, saved addresses normalized and validated on selection, billing asterisks match the schema, route trims the state; readable address errors (unrecognized country → US-only message, billing failures say billing) | delegated writer | done (commit recorded in the next update) |
-| E2 | Visible step errors: `role=alert`, focus and scroll when the error changes; field errors linked (`aria-invalid`, `aria-describedby`) | delegated writer | pending |
-| E3 | Shipping methods: load error with Retry; zero methods explained with a way forward and submit blocked; list refetched after the address is saved | delegated writer | pending |
+| E1 | US-only address entry: state select, "ZIP Code"/"State" labels, US-only note, non-US country refused with a message that names the saved address, saved addresses normalized and validated on selection, billing asterisks match the schema, route trims the state; readable address errors (unrecognized country → US-only message, billing failures say billing) | delegated writer | done `015e577` |
+| E2 | Visible step errors: `role=alert`, focus and scroll when the error changes; field errors linked (`aria-invalid`, `aria-describedby`) | delegated writer | done (commit recorded in the next update) |
+| E3 | Shipping methods: load error with Retry; zero methods explained with a way forward and submit blocked; list refetched after the address is saved | delegated writer | done (commit recorded in the next update) |
 | E4 | Payment readiness: missing shipping method and insufficient stock named; Stripe load failure shown with the alternative | delegated writer | pending |
 | E5 | Saved-address modal: same US rules as checkout, inline save errors, edited or new address selected and the form refreshed | delegated writer | pending |
 
@@ -96,8 +96,24 @@ Route evidence: about 12 files across forms, hooks, routes and the profile modal
   Checks: logic check `checkout-feedback-check.mts` RED (15 of 16 failing) before, then E1's 13 tests GREEN
   (E4/E5 tests still RED by design); `checkout-address-check.mts` 9/9 (its harness gained a resolve hook for the
   extensionless `./us-states` import, fixtures unchanged); `npx tsc --noEmit` exit 0; `npx eslint` on the changed
-  files: no issues.
+  files: no issues. Commit `015e577`.
+- 2026-11-20 E2 and E3 done (delegated writer). The step error box is `role="alert"`, `tabIndex={-1}`, focused and
+  scrolled to the center whenever its message changes (each attempt clears it first); `FormField` and
+  `StateSelect` set `aria-invalid` and `aria-describedby` to their message's id. The shipping method section shows
+  "We could not load the shipping methods. Please check your connection and try again." with a Retry button
+  ("Retrying..." while it runs) when the list fails with nothing loaded; an empty list says "No shipping method is
+  available for this address." with the store's phone (+1 (305) 924-0685) and the /contact page, and disables
+  "Continue to Payment" (`aria-describedby` points to that message); the list is refetched after the address is
+  saved. UI only: no meaningful RED (no DOM test runner).
+  Checks: `npx tsc --noEmit` exit 0; `npx eslint` on the changed files: no issues; browser pass
+  (scratchpad `browser-pass/checkout-pass.cjs`, Playwright with Chrome for Testing against `next dev -p 3456`, no
+  backend, every non-localhost request aborted, the storefront's API routes answered per scenario), 390x844
+  viewport, 29 checks passing: E1 saved Argentine address flagged at once under State, ZIP Code and Country, each
+  message cleared as it is fixed, a US address saved as "Florida"/"United States" fills FL with no message, submit
+  with only the country to fix focuses the Country line; E3 load failure + Retry, then an empty list with phone and
+  contact links and the button disabled; E2 a refused address shows the route's US-only message in the step alert,
+  focused and in view after the page's smooth scroll.
 
 ## Next step
 
-E2 and E3 (visible step errors, shipping method states), then E4, E5.
+E4 (payment readiness reasons, card form load failure), then E5.

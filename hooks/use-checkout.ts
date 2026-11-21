@@ -181,6 +181,8 @@ export function useCheckoutProcess() {
     mutationFn: setShippingAddress,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cart'] });
+      // Which shipping methods the order can use may depend on its address: list them again for the saved one.
+      queryClient.invalidateQueries({ queryKey: checkoutKeys.shippingMethods() });
     },
   });
 
