@@ -54,9 +54,9 @@ next to the field, what to fix; every failure in the checkout shows a specific m
 | ID | Task | Route | Status |
 | --- | --- | --- | --- |
 | E1 | US-only address entry: state select, "ZIP Code"/"State" labels, US-only note, non-US country refused with a message that names the saved address, saved addresses normalized and validated on selection, billing asterisks match the schema, route trims the state; readable address errors (unrecognized country → US-only message, billing failures say billing) | delegated writer | done `015e577` |
-| E2 | Visible step errors: `role=alert`, focus and scroll when the error changes; field errors linked (`aria-invalid`, `aria-describedby`) | delegated writer | done (commit recorded in the next update) |
-| E3 | Shipping methods: load error with Retry; zero methods explained with a way forward and submit blocked; list refetched after the address is saved | delegated writer | done (commit recorded in the next update) |
-| E4 | Payment readiness: missing shipping method and insufficient stock named; Stripe load failure shown with the alternative | delegated writer | pending |
+| E2 | Visible step errors: `role=alert`, focus and scroll when the error changes; field errors linked (`aria-invalid`, `aria-describedby`) | delegated writer | done `f8c5d34` |
+| E3 | Shipping methods: load error with Retry; zero methods explained with a way forward and submit blocked; list refetched after the address is saved | delegated writer | done `f8c5d34` |
+| E4 | Payment readiness: missing shipping method and insufficient stock named; Stripe load failure shown with the alternative | delegated writer | done (commit recorded in the next update) |
 | E5 | Saved-address modal: same US rules as checkout, inline save errors, edited or new address selected and the form refreshed | delegated writer | pending |
 
 Route evidence: about 12 files across forms, hooks, routes and the profile modal (writer trigger: 2+ non-trivial files).
@@ -112,8 +112,22 @@ Route evidence: about 12 files across forms, hooks, routes and the profile modal
   message cleared as it is fixed, a US address saved as "Florida"/"United States" fills FL with no message, submit
   with only the country to fix focuses the Country line; E3 load failure + Retry, then an empty list with phone and
   contact links and the button disabled; E2 a refused address shows the route's US-only message in the step alert,
-  focused and in view after the page's smooth scroll.
+  focused and in view after the page's smooth scroll. Commit `f8c5d34`.
+- 2026-11-20 E4 done (delegated writer). `friendlyCheckoutMessage` names the payment-step reasons before the code
+  mapping: "without a ShippingMethod" → "Please choose a shipping method, then continue to payment."; "insufficient
+  stock of X" → "Sorry, we don't have enough stock of X. Please update your cart to continue."; other
+  ORDER_TRANSITION_FAILED reasons keep the generic message. `getStripe()` resolves to null when Stripe.js cannot
+  load (it rejected before, unhandled, and the card form waited forever); `PaymentStep` then, or on the Payment
+  Element's `onLoadError`, shows "We couldn't load the card payment form. Please refresh the page and try again."
+  (plus "You can also choose Affirm above if it's offered for your order." where the store offers Affirm) with a
+  "Refresh the page" button, brought into view, and "Pay now" disabled. Payment logic unchanged.
+  Checks: logic check tests 12-13 RED → GREEN (15 of 16 pass; the E5 test still RED by design);
+  `checkout-address-check.mts` 9/9; `npx tsc --noEmit` exit 0; `npx eslint` on the changed files: no issues;
+  browser pass 15 checks: both reasons named in a focused, in-view step alert; with Stripe.js blocked the payment
+  step shows the card form message with and without Affirm, "Pay now" disabled, the alert in view, and no
+  unhandled "Failed to load Stripe.js" rejection (it was one before). Not checked in a browser: `onLoadError` (needs
+  real Stripe.js).
 
 ## Next step
 
-E4 (payment readiness reasons, card form load failure), then E5.
+E5 (saved-address modal with the checkout's US rules and inline errors).

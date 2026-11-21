@@ -41,16 +41,34 @@ const TECHNICAL_TEXT =
   /\w_\w|graphql|json|econn|etimedout|failed to|load failed|networkerror|unexpected token|internal server error|invalid response/i;
 
 /**
- * What the shopper sees for a backend error: friendly copy for Vendure's raw codes and messages, `fallback` for
- * technical text (or none), otherwise the text itself (the storefront routes already send readable messages). The
- * details stay in the server logs.
+ * The reasons Vendure refuses the payment step that the shopper can act on, which the payment-intent route sends
+ * behind the generic ORDER_TRANSITION_FAILED code: the order has no shipping method, or not enough stock of the
+ * items it names ("... due to insufficient stock of Kendall Sofa, Lulu Chair").
+ */
+function paymentReadinessMessage(text: string): string | undefined {
+  if (/without a ShippingMethod/i.test(text)) {
+    return 'Please choose a shipping method, then continue to payment.';
+  }
+  const items = /insufficient stock of (.+)$/i.exec(text)?.[1].trim().replace(/\.$/, '');
+  return items ? `Sorry, we don't have enough stock of ${items}. Please update your cart to continue.` : undefined;
+}
+
+/**
+ * What the shopper sees for a backend error: a payment-step reason they can act on, else friendly copy for Vendure's
+ * raw codes and messages, `fallback` for technical text (or none), otherwise the text itself (the storefront routes
+ * already send readable messages). The details stay in the server logs.
  */
 export function friendlyCheckoutMessage(message: unknown, fallback: string, code?: unknown): string {
+  const text = typeof message === 'string' ? message.trim() : '';
+  // Before the code mapping, which would hide the reason behind "not ready for payment".
+  const reason = text ? paymentReadinessMessage(text) : undefined;
+  if (reason) {
+    return reason;
+  }
   const byCode = typeof code === 'string' ? MESSAGES_BY_CODE.get(code) : undefined;
   if (byCode) {
     return byCode;
   }
-  const text = typeof message === 'string' ? message.trim() : '';
   if (!text) {
     return fallback;
   }
