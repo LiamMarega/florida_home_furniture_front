@@ -57,7 +57,7 @@ next to the field, what to fix; every failure in the checkout shows a specific m
 | E2 | Visible step errors: `role=alert`, focus and scroll when the error changes; field errors linked (`aria-invalid`, `aria-describedby`) | delegated writer | done `f8c5d34` |
 | E3 | Shipping methods: load error with Retry; zero methods explained with a way forward and submit blocked; list refetched after the address is saved | delegated writer | done `f8c5d34` |
 | E4 | Payment readiness: missing shipping method and insufficient stock named; Stripe load failure shown with the alternative | delegated writer | done `192e566` |
-| E5 | Saved-address modal: same US rules as checkout, inline save errors, edited or new address selected and the form refreshed | delegated writer | done (commit recorded in the next update) |
+| E5 | Saved-address modal: same US rules as checkout, inline save errors, edited or new address selected and the form refreshed | delegated writer | done `62f859c` |
 
 Route evidence: about 12 files across forms, hooks, routes and the profile modal (writer trigger: 2+ non-trivial files).
 
@@ -141,11 +141,19 @@ Route evidence: about 12 files across forms, hooks, routes and the profile modal
   exit 0; `npx eslint` on the changed files: no issues; browser pass: fixing the saved Argentine address in the
   Edit dialog (messages, focus, live clearing, saved back as US, checkout form refreshed with FL/33130 and no
   message) and adding an address whose first save fails (message in the dialog, then saved, chosen and filled into
-  the form): 20 checks; the full pass is 64 of 64 across the 8 scenarios.
+  the form): 20 checks; the full pass is 64 of 64 across the 8 scenarios. Commit `62f859c`.
+- 2026-11-20 final verification on `62f859c`: `checkout-feedback-check.mts` 16/16; `checkout-address-check.mts` 9/9;
+  `npx tsc --noEmit` exit 0; `npx eslint` on the 16 changed code files exit 0, no issues; `npm run build` exit 0
+  ("Compiled successfully", the expected "GraphQL fetch error: TypeError: fetch failed" during static generation,
+  no local backend).
+- Delivery count: 765 authored changed lines in code (+613/−152, the feature document aside) over 4 work units:
+  E1 `015e577` 353, E2+E3 `f8c5d34` 88, E4 `192e566` 85, E5 `62f859c` 239. Over the ~400 budget (forecast 500):
+  under `ask-on-risk` the chain strategy is asked before the pull request.
 
 ## Next step
 
-Record the E5 commit and the final verification. Follow-ups outside this feature's edit surfaces:
+Choose the delivery (one PR, or a chain split at the work units above); push and the PR are the owner's decisions.
+Follow-ups outside this feature's edit surfaces:
 `app/profile/components/AddressesPanel.tsx` still calls `alert()` before rethrowing a failed save (the dialog now
 shows the reason itself); on phones the payment step opens scrolled to where "Continue to Payment" was
 (pre-existing; only the card form failure is brought into view).
