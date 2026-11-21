@@ -51,6 +51,18 @@ export const customerSchema = z.object({
 
 export type CustomerFormData = z.infer<typeof customerSchema>;
 
+/**
+ * A saved address (account address book, checkout's saved addresses) follows the checkout's US rules: a listed state
+ * code and a US ZIP code. The country is always the US; nickname, second line and phone stay optional.
+ */
+export const savedAddressSchema = z.object({
+  fullName: z.string().trim().min(2, 'Full name is required'),
+  street: z.string().trim().min(5, 'Street address is required'),
+  city: z.string().trim().min(2, 'City is required'),
+  state: z.string().refine(isUsStateCode, STATE_MESSAGE),
+  zipCode: z.string().trim().regex(US_ZIP_CODE, ZIP_CODE_MESSAGE),
+});
+
 // Shipping method type
 export interface ShippingMethod {
   id: string;

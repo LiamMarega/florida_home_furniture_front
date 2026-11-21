@@ -219,8 +219,9 @@ interface AddressSelectorWithModalProps {
   addresses: UserAddress[];
   selectedAddressId: string | null;
   onSelect: (address: UserAddress) => void;
-  onCreateAddress: (address: Omit<UserAddress, 'id'>) => Promise<any>;
-  onUpdateAddress: (id: string, address: Partial<UserAddress>) => Promise<any>;
+  /** Both resolve to the saved address, which is then chosen. */
+  onCreateAddress: (address: Omit<UserAddress, 'id'>) => Promise<UserAddress>;
+  onUpdateAddress: (id: string, address: Partial<UserAddress>) => Promise<UserAddress>;
   onDeleteAddress: (id: string) => Promise<void>;
   isLoading?: boolean;
   canAddMore?: boolean;
@@ -249,13 +250,17 @@ export function AddressSelectorWithModal({
     setModalOpen(true);
   };
 
+  // The saved address is chosen at once, so the checkout form shows (and checks) what was just saved. A failure
+  // rejects: the dialog stays open and says why.
   const handleSubmit = async (addressData: Omit<UserAddress, 'id'>) => {
     if (editingAddress) {
-      await onUpdateAddress(editingAddress.id, addressData);
+      const saved = await onUpdateAddress(editingAddress.id, addressData);
       toast.success('Address updated');
+      onSelect(saved ?? { ...editingAddress, ...addressData });
     } else {
-      await onCreateAddress(addressData);
+      const saved = await onCreateAddress(addressData);
       toast.success('Address added');
+      if (saved) onSelect(saved);
     }
   };
 

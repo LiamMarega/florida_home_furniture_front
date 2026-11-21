@@ -56,8 +56,8 @@ next to the field, what to fix; every failure in the checkout shows a specific m
 | E1 | US-only address entry: state select, "ZIP Code"/"State" labels, US-only note, non-US country refused with a message that names the saved address, saved addresses normalized and validated on selection, billing asterisks match the schema, route trims the state; readable address errors (unrecognized country → US-only message, billing failures say billing) | delegated writer | done `015e577` |
 | E2 | Visible step errors: `role=alert`, focus and scroll when the error changes; field errors linked (`aria-invalid`, `aria-describedby`) | delegated writer | done `f8c5d34` |
 | E3 | Shipping methods: load error with Retry; zero methods explained with a way forward and submit blocked; list refetched after the address is saved | delegated writer | done `f8c5d34` |
-| E4 | Payment readiness: missing shipping method and insufficient stock named; Stripe load failure shown with the alternative | delegated writer | done (commit recorded in the next update) |
-| E5 | Saved-address modal: same US rules as checkout, inline save errors, edited or new address selected and the form refreshed | delegated writer | pending |
+| E4 | Payment readiness: missing shipping method and insufficient stock named; Stripe load failure shown with the alternative | delegated writer | done `192e566` |
+| E5 | Saved-address modal: same US rules as checkout, inline save errors, edited or new address selected and the form refreshed | delegated writer | done (commit recorded in the next update) |
 
 Route evidence: about 12 files across forms, hooks, routes and the profile modal (writer trigger: 2+ non-trivial files).
 
@@ -126,8 +126,26 @@ Route evidence: about 12 files across forms, hooks, routes and the profile modal
   browser pass 15 checks: both reasons named in a focused, in-view step alert; with Stripe.js blocked the payment
   step shows the card form message with and without Affirm, "Pay now" disabled, the alert in view, and no
   unhandled "Failed to load Stripe.js" rejection (it was one before). Not checked in a browser: `onLoadError` (needs
-  real Stripe.js).
+  real Stripe.js). Commit `192e566`.
+- 2026-11-20 E5 done (delegated writer). `savedAddressSchema` holds the checkout's US rules for saved addresses (full
+  name, street, city, a listed state code, a US ZIP code). The address dialog (profile and checkout) has the State
+  select (saved names and lowercase codes preselected), "ZIP Code", a read-only Country "United States" (saved as
+  `US`) and "We deliver within the United States only." in its description; it checks on save with messages under
+  the fields (`aria-invalid`, `aria-describedby`, focus on the first to fix), re-checks a flagged field as it
+  changes, and shows save and delete failures inside the dialog ("We could not save this address. Please try
+  again.", "We could not delete this address. Please try again.", or a readable reason such as the 4-address limit)
+  instead of only the console. City, State and ZIP stack on phones, as on checkout, so state names fit.
+  `useSavedAddresses` create and update resolve to the saved address for accounts too, and checkout chooses it, so
+  the form is refreshed and checked.
+  Checks: logic check test 16 RED → GREEN (16 of 16 pass); `checkout-address-check.mts` 9/9; `npx tsc --noEmit`
+  exit 0; `npx eslint` on the changed files: no issues; browser pass: fixing the saved Argentine address in the
+  Edit dialog (messages, focus, live clearing, saved back as US, checkout form refreshed with FL/33130 and no
+  message) and adding an address whose first save fails (message in the dialog, then saved, chosen and filled into
+  the form): 20 checks; the full pass is 64 of 64 across the 8 scenarios.
 
 ## Next step
 
-E5 (saved-address modal with the checkout's US rules and inline errors).
+Record the E5 commit and the final verification. Follow-ups outside this feature's edit surfaces:
+`app/profile/components/AddressesPanel.tsx` still calls `alert()` before rethrowing a failed save (the dialog now
+shows the reason itself); on phones the payment step opens scrolled to where "Continue to Payment" was
+(pre-existing; only the card form failure is brought into view).

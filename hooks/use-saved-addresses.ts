@@ -127,21 +127,22 @@ export function useSavedAddresses() {
     setGuestAddresses(addresses);
   }, []);
 
-  // Unified interface
+  // Unified interface: creating or updating resolves to the saved address (the account routes answer `{ address }`).
   if (isAuthenticated) {
     const canAddMore = authAddresses.addresses.length < MAX_SAVED_ADDRESSES;
-    const guardedCreate = async (address: Omit<UserAddress, 'id'>) => {
+    const guardedCreate = async (address: Omit<UserAddress, 'id'>): Promise<UserAddress> => {
       if (!canAddMore) {
         throw new Error(`You can save up to ${MAX_SAVED_ADDRESSES} addresses. Please delete one to add a new one.`);
       }
-      return authAddresses.createAddress(address);
+      return (await authAddresses.createAddress(address)).address;
     };
 
     return {
       addresses: authAddresses.addresses,
       isLoading: authAddresses.loading,
       createAddress: guardedCreate,
-      updateAddress: authAddresses.updateAddress,
+      updateAddress: async (id: string, data: Partial<UserAddress>): Promise<UserAddress> =>
+        (await authAddresses.updateAddress(id, data)).address,
       deleteAddress: authAddresses.deleteAddress,
       setDefaultAddress: authAddresses.setDefaultAddress,
       isCreating: authAddresses.isCreating,
