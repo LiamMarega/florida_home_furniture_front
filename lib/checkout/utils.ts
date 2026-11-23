@@ -79,6 +79,30 @@ export function friendlyCheckoutMessage(message: unknown, fallback: string, code
   return TECHNICAL_TEXT.test(text) ? fallback : text;
 }
 
+// How the backend's Affirm handler says a card payment of the order stands in its way: the message of the Error
+// payment it records (Shop API payments expose no private metadata to tell it otherwise). A card charge the store
+// never recorded is checked first, since its message names a card payment too.
+const UNRECORDED_CARD_CHARGE = /card payment our store did not record/i;
+const CARD_PAYMENT_IN_PROGRESS = /card payment/i;
+
+/**
+ * - unrecorded-card-charge: the order already has a card charge the store never recorded: final, the shopper must
+ *   contact the store before paying again
+ * - card-payment-in-progress: a card payment of the order moved money or may still move it, and decides the order
+ */
+export type CardPaymentRefusal = 'unrecorded-card-charge' | 'card-payment-in-progress';
+
+/** Whether the backend refused a payment (an order's latest) because of a card payment of the order, and which way. */
+export function cardPaymentRefusal(
+  payment: { state: string; errorMessage?: string | null } | undefined
+): CardPaymentRefusal | null {
+  const message = payment?.state === 'Error' ? (payment.errorMessage ?? '') : '';
+  if (UNRECORDED_CARD_CHARGE.test(message)) {
+    return 'unrecorded-card-charge';
+  }
+  return CARD_PAYMENT_IN_PROGRESS.test(message) ? 'card-payment-in-progress' : null;
+}
+
 /** The error code of an API error body (Vendure's `errorCode`, else the route's `code`), if any. */
 export function apiErrorCode(data: unknown): string | undefined {
   if (!data || typeof data !== 'object') {

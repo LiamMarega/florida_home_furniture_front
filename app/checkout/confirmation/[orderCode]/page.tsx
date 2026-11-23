@@ -22,15 +22,12 @@ import { useAuth } from '@/contexts/auth-context';
 import { useAffirmConfig } from '@/hooks/use-affirm-config';
 import { usePaymentLock } from '@/hooks/use-payment-lock';
 import { useAffirmResume, type AffirmResumeAction } from '@/components/checkout/affirm-resume';
-import { friendlyCheckoutMessage } from '@/lib/checkout/utils';
+import { cardPaymentRefusal, friendlyCheckoutMessage } from '@/lib/checkout/utils';
 
 // Order states of a placed order: payment authorized (Affirm captures it a moment later) or settled
 const SUCCESS_STATES = ['PaymentAuthorized', 'PaymentSettled', 'PartiallyShipped', 'Shipped', 'PartiallyDelivered', 'Delivered'];
 // Stripe redirect statuses after which the card (or other Stripe method) payment is going through
 const STRIPE_PAYMENT_IN_PROGRESS = ['succeeded', 'processing'];
-// How the backend's Affirm handler says a card payment of the order moved money or may still move it
-// (its Error message; Shop API payments expose no private metadata to tell it otherwise).
-const CARD_PAYMENT_IN_PROGRESS = /card payment/i;
 
 // The backend places the order once the payment lands (Stripe webhook or reconciliation task,
 // Affirm authorization). While the payment is still processing, re-check the order on this interval,
@@ -72,6 +69,8 @@ interface OrderData {
  * - nopayment: still awaiting payment with no payment recorded and none in flight from this browser, after a
  *   few re-checks: nothing is being processed, so the shopper is sent back to checkout
  * - failed: the latest payment was declined while the order still awaits payment
+ * - contact: the latest (Affirm) payment was refused because the order already has a card charge the store never
+ *   recorded: final, nothing is in progress, and the shopper must contact the store before paying again
  * - changed: the cart was edited before the payment completed (the order is back in AddingItems)
  * - cancelled: the order was cancelled
  * - signin: the order belongs to an account this session is not signed in to (or a guest order past its
@@ -84,6 +83,7 @@ type DisplayStatus =
   | 'stalled'
   | 'nopayment'
   | 'failed'
+  | 'contact'
   | 'changed'
   | 'cancelled'
   | 'signin'
@@ -155,8 +155,7 @@ function isCardPaymentInProgress(order: OrderData | null, redirectStatus: string
   if (redirectStatus !== null && STRIPE_PAYMENT_IN_PROGRESS.includes(redirectStatus)) {
     return true;
   }
-  const latest = latestPayment(order?.payments);
-  return latest?.state === 'Error' && CARD_PAYMENT_IN_PROGRESS.test(latest.errorMessage ?? '');
+  return cardPaymentRefusal(latestPayment(order?.payments)) === 'card-payment-in-progress';
 }
 
 /**
@@ -193,7 +192,12 @@ function getDisplayStatus(
   if (latestDeclinedPayment(order) || redirectStatus === 'failed') {
     return 'failed';
   }
-  // No payment yet, or one still being confirmed: a payment in the Error state is not final (the
+  if (cardPaymentRefusal(latestPayment(order.payments)) === 'unrecorded-card-charge') {
+    // A card charge of the order went through long ago and the store never recorded it: a person has to sort it
+    // out, so this Error is final here.
+    return 'contact';
+  }
+  // No payment yet, or one still being confirmed: any other payment in the Error state is not final (the
   // backend's contract for Affirm: busy or unreachable, the order changed meanwhile, a card payment in
   // progress), so the page keeps checking instead of suggesting another payment method.
   return 'processing';
@@ -284,11 +288,12 @@ export default function ConfirmationPage() {
 
   // An Affirm token this browser holds for the order but never got a final answer for (a refresh, a closed
   // tab, a lost answer): sent again while the order awaits payment and no card payment decides, dropped
-  // once the order is placed, cancelled or changed. Its answer only triggers a re-read: the order decides.
+  // once the order is placed, cancelled or changed, or was refused for a card charge it never recorded (sent
+  // again, it would only be refused again). Its answer only triggers a re-read: the order decides.
   const resumeAction: AffirmResumeAction =
     !order || signInRequired
       ? 'wait'
-      : baseStatus === 'success' || baseStatus === 'cancelled' || baseStatus === 'changed'
+      : baseStatus === 'success' || baseStatus === 'cancelled' || baseStatus === 'changed' || baseStatus === 'contact'
         ? 'discard'
         : order.state === 'ArrangingPayment' && !cardPaymentInProgress
           ? 'resume'
@@ -740,6 +745,65 @@ export default function ConfirmationPage() {
                   <Link href="/">
                     Continue Shopping
                   </Link>
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // The order already has a card charge the store never recorded: final, so no automatic re-checks and no
+  // "try again"; the store sorts it out (the merchant was alerted).
+  if (displayStatus === 'contact') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-brand-cream/30 to-white pt-28 pb-12 flex items-center justify-center">
+        <div className="max-w-2xl mx-auto px-4 w-full">
+          <Card className="p-8 text-center">
+            <div className="flex justify-center mb-6">
+              <div className="w-20 h-20 rounded-full bg-amber-100 flex items-center justify-center">
+                <AlertTriangle className="w-12 h-12 text-amber-600" />
+              </div>
+            </div>
+
+            <h1 className="text-3xl font-bold text-brand-dark-blue mb-4 font-tango-sans">
+              Please Contact Us
+            </h1>
+
+            <p className="text-lg text-brand-dark-blue/70 mb-8">
+              This order already has a card payment we could not confirm. Please don&apos;t pay again: Affirm has not
+              charged you, and we&apos;ll sort it out with you.
+            </p>
+
+            <div className="bg-amber-50 rounded-lg p-6 mb-8">
+              <p className="text-sm text-brand-dark-blue/60 mb-2">Order Number</p>
+              <p className="text-2xl font-bold text-brand-primary">{orderCode}</p>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-sm text-brand-dark-blue/70">
+                Call us at{' '}
+                <a href="tel:+13059240685" className="font-medium text-brand-dark-blue underline underline-offset-2">
+                  +1 (305) 924-0685
+                </a>{' '}
+                or{' '}
+                <Link href="/contact" className="font-medium text-brand-dark-blue underline underline-offset-2">
+                  send us a message
+                </Link>{' '}
+                with your order number.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button asChild size="lg">
+                  <Link href="/contact">
+                    <Mail className="w-5 h-5 mr-2" />
+                    Contact Us
+                  </Link>
+                </Button>
+                <Button onClick={handleRetry} variant="outline" size="lg">
+                  <RefreshCw className="w-5 h-5 mr-2" />
+                  Check Status
                 </Button>
               </div>
             </div>
